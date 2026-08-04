@@ -1,7 +1,8 @@
 # VPS-дев (retain-lab): Redpanda без TLS (конфиг ./redpanda-local), все порты
 # наружу — только loopback, доступ через SSH-туннель. ВАЖНО: docker публикует
 # порты в ОБХОД ufw, поэтому 0.0.0.0:19092 из базового файла здесь принудительно
-# перебинжен на 127.0.0.1 (!override).
+# перебинжен на 127.0.0.1 (!override), а внешний вход в published-порты дополнительно
+# закрыт правилом в цепочке DOCKER-USER (см. память/отчёт Phase 0).
 #   запуск:  docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d <svc...>
 services:
   redpanda:
@@ -13,6 +14,25 @@ services:
   board:
     ports:
       - "127.0.0.1:8050:8050"
+    environment:
+      # SPA открывается через SSH-туннель как localhost:3000 — иначе браузер режет CORS
+      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      # Локальный Supabase (CLI) подписывает JWT HS256 — legacy-путь api/core.py
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
   ingest:
     ports:
       - "127.0.0.1:8081:8081"
+  # SPA в host-сети: NEXT_PUBLIC_SUPABASE_URL=127.0.0.1:54321 обязан работать и в
+  # server-runtime (proxy/route handlers), и в браузере (через SSH-туннель) — в
+  # bridge-сети контейнерный 127.0.0.1 указывал бы на сам контейнер.
+  crm-spa:
+    network_mode: host
+    build:
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_FLASK_API_URL: http://127.0.0.1:8050
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_FLASK_API_URL: http://127.0.0.1:8050
+      HOSTNAME: "127.0.0.1"
