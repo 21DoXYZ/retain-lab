@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { FormField, Input, Button } from "@/components/ui";
-import { useT, LocaleSwitcher } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 
 /**
  * /login — email + password via Supabase Auth (signInWithPassword). On success
@@ -71,7 +71,6 @@ function LoginForm() {
         <div className="bg-canvas border border-hair2 rounded-card px-6 py-6 shadow-sm">
           <div className="flex items-start justify-between gap-3 mb-1">
             <h1 className="text-[18px] font-semibold text-ink">{t("login.title")}</h1>
-            <LocaleSwitcher className="flex-none" />
           </div>
           <p className="text-[13px] text-steel mb-5">{t("login.subtitle")}</p>
 

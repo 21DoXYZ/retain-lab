@@ -22,6 +22,15 @@ import {
 const PUBLIC_PATHS = ["/login"];
 
 function isPublic(pathname: string): boolean {
+  // /dev (component showcase) is dev-only anyway — its layout 404s in
+  // production. Skip the session gate in development so it works without a
+  // running Supabase, matching the DevLayout contract.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    (pathname === "/dev" || pathname.startsWith("/dev/"))
+  ) {
+    return true;
+  }
   return PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );

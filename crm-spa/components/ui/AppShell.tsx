@@ -5,7 +5,11 @@ import { NAV_GROUPS, canSee } from "./nav";
 import { isNavKeyEnabled, isGroupEnabled } from "@/lib/modules";
 import { Icon, hasIcon } from "./icons";
 import type { MessageKey } from "@/lib/i18n";
-import { ru } from "@/lib/i18n/dictionaries/ru";
+import { DEFAULT_LOCALE } from "@/lib/i18n/config";
+import { getMessages } from "@/lib/i18n/messages";
+
+/** Resolved default-locale dictionary for provider-less renders (/dev/ui). */
+const FALLBACK_MESSAGES = getMessages(DEFAULT_LOCALE);
 
 /**
  * AppShell — dark sidebar + white content area, 1:1 with the live dashboard.
@@ -22,16 +26,16 @@ interface AppShellProps {
   /**
    * Translate nav group titles / item labels. AppChrome (client, inside the
    * global <I18nProvider>) passes useT() here so the sidebar follows the
-   * active locale. Falls back to the ru base dictionary when omitted, so
-   * AppShell keeps working standalone (e.g. the /dev/ui showcase) without
-   * requiring a provider — this is why AppShell itself doesn't call useT()
-   * and can stay a plain (server-renderable) component.
+   * active locale. Falls back to the resolved default-locale dictionary when
+   * omitted, so AppShell keeps working standalone (e.g. the /dev/ui showcase)
+   * without requiring a provider — this is why AppShell itself doesn't call
+   * useT() and can stay a plain (server-renderable) component.
    */
   t?: (key: MessageKey) => string;
 }
 
 export function AppShell({ active, role, children, headerRight, t }: AppShellProps) {
-  const translate = t ?? ((key: MessageKey) => ru[key]);
+  const translate = t ?? ((key: MessageKey) => FALLBACK_MESSAGES[key]);
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar — hidden below ~lg, like the board. Own scroll + full-height dark

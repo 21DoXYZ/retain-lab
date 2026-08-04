@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/ui";
 import { activeKeyForPath } from "@/components/ui/nav";
 import { RoleProvider } from "@/lib/role-context";
-import { LocaleSwitcher, useT } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import { UserMenu } from "@/components/UserMenu";
 import { DataFreshness } from "@/components/DataFreshness";
 import type { CurrentUser } from "@/lib/types";
@@ -39,7 +39,6 @@ export function AppChrome({
         headerRight={
           <div className="flex items-center gap-3">
             <DataFreshness />
-            <LocaleSwitcher />
             <UserMenu user={user} />
           </div>
         }

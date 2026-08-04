@@ -18,9 +18,22 @@
  * открытый по прямому URL, всё равно упрётся в API-гейт.
  */
 
-// Точечно спрятать пункты/модули к запуску (пример: ["reports", "calls.nav.group"]).
-// На данный момент пусто — включаем/выключаем по согласованию с клиентом.
-const STATIC_DISABLED: readonly string[] = [];
+// SaaS-пресет Revenue Autopilot (REBUILD-TASK.md §2): казино-модули выключены
+// флагами, код не удаляется. /pool в меню отсутствует (доступен только прямым
+// URL) — на nav-уровне скрывать нечего.
+const STATIC_DISABLED: readonly string[] = [
+  "games",
+  "ggr",
+  "ggr-bonus",
+  "vip-risk",
+  "vip-queue",
+  "affiliates",
+  "verdicts",
+  "affiliate_cabinet",
+  "risk",
+  "live",
+  "calls.nav.group",
+];
 
 function fromEnv(): string[] {
   const raw = process.env.NEXT_PUBLIC_DISABLED_MODULES ?? "";

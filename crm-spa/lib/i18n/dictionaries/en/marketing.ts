@@ -141,7 +141,7 @@ export const marketing: Partial<Messages> = {
   // ── /bonuses ──────────────────────────────────────────────────────────
   "marketing.bonuses.title": "Bonuses: catalogue",
   "marketing.bonuses.lead":
-    "Real BillionBahis promotions · for each player the rules pick a specific promo based on their state (deposits, losses, churn risk, tier) · source — BillionBahis_бонусы.md.",
+    "Offer catalogue · for each user the rules pick a specific offer based on their state (payments, activity, churn risk, tier).",
   "marketing.bonuses.col.promo": "Promo",
   "marketing.bonuses.col.typeZone": "Type / zone",
   "marketing.bonuses.col.limits": "Limits",

@@ -5,13 +5,10 @@
  */
 import { ru, type MessageKey, type Messages } from "./dictionaries/ru";
 import { en } from "./dictionaries/en";
-import { tr } from "./dictionaries/tr";
 import type { Locale } from "./config";
 
 const OVERRIDES: Record<Locale, Partial<Messages>> = {
-  ru: {},
   en,
-  tr,
 };
 
 /**
