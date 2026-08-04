@@ -1,0 +1,12 @@
+{
+  "provider": "mock",
+  "channels": 1,
+  "note": "Одноканальный retention-дозвон (TR). Оператор пропускает отработку возражения 'param yok' и не предлагает альтернативу — образец по карточке интерфейс §10.3. Содержит телефон для проверки PII-редакции.",
+  "words": [
+    {"w": "Merhaba, ben Casino X'ten Ahmet. Nasılsınız?", "start": 4.0, "end": 8.5, "channel": null, "speaker": "spk_0", "conf": 0.94},
+    {"w": "İyiyim, teşekkürler.", "start": 18.0, "end": 20.0, "channel": null, "speaker": "spk_1", "conf": 0.88},
+    {"w": "Şu an param yok, çok kaybettim.", "start": 31.0, "end": 34.5, "channel": null, "speaker": "spk_1", "conf": 0.86},
+    {"w": "Bonusumuz var, buyurun. Size 05321234567 numarasından ulaşırız.", "start": 38.0, "end": 43.0, "channel": null, "speaker": "spk_0", "conf": 0.91},
+    {"w": "Peki, o zaman görüşmek üzere.", "start": 72.0, "end": 74.0, "channel": null, "speaker": "spk_0", "conf": 0.9}
+  ]
+}

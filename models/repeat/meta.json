@@ -1,0 +1,35 @@
+{
+  "name": "repeat",
+  "trained_at": "2026-07-15T10:28:47Z",
+  "artifacts": [
+    "model.cbm"
+  ],
+  "features": [
+    "ftd_amount",
+    "act_lag_days",
+    "bets_d0",
+    "turnover_d0",
+    "avg_bet_d0",
+    "distinct_games_d0",
+    "freespin_d0",
+    "net_d0",
+    "night_d0",
+    "provider_d0",
+    "payment_method",
+    "affiliate_type",
+    "country"
+  ],
+  "cat_features": [
+    "provider_d0",
+    "payment_method",
+    "affiliate_type",
+    "country"
+  ],
+  "metrics": {
+    "roc_auc": 0.657,
+    "pr_auc": 0.64,
+    "brier": 0.236
+  },
+  "target": "2nd_deposit_within_30d",
+  "table": "player_repeat_ml"
+}

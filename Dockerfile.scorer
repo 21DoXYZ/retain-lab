@@ -1,0 +1,12 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY requirements-ml.txt .
+RUN pip install --no-cache-dir -r requirements-ml.txt flask==3.0.3
+# Проект целиком (models/, *_model.py, train_all.sh, scorer_service.py).
+# Списки файлов не ведём — новый модуль/модель приезжает в образ сам.
+# Что НЕ должно попасть внутрь (секреты, PII, crm-spa) — см. .dockerignore.
+COPY . .
+
+# SCORE_ONLY: загрузить сохранённые .cbm и только заскорить (без обучения)
+CMD ["bash", "train_all.sh"]

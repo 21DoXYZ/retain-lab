@@ -1,0 +1,14 @@
+{
+  "provider": "mock",
+  "channels": 2,
+  "note": "Двухканальный retention-дозвон (TR): канал 0 = оператор, канал 1 = игрок. Оператор отрабатывает возражение и предлагает фриспины, игрок принимает оффер. Проверяет маппинг ролей по каналу (§6.3).",
+  "words": [
+    {"w": "Merhaba, ben Casino X'ten Ayşe. Sizi özledik!", "start": 3.0, "end": 7.0, "channel": 0, "speaker": null, "conf": 0.95},
+    {"w": "Merhaba, buyurun.", "start": 8.0, "end": 9.5, "channel": 1, "speaker": null, "conf": 0.9},
+    {"w": "Uzun zamandır oynamıyorsunuz, bir sorun mu var?", "start": 12.0, "end": 16.0, "channel": 0, "speaker": null, "conf": 0.93},
+    {"w": "Son zamanlarda çok kaybettim, param yok.", "start": 20.0, "end": 24.0, "channel": 1, "speaker": null, "conf": 0.88},
+    {"w": "Anlıyorum. Depozito bonusu yerine bedava dönüş öneriyorum, para yatırmadan.", "start": 27.0, "end": 33.0, "channel": 0, "speaker": null, "conf": 0.92},
+    {"w": "Tamam, bu güzel, kabul ediyorum.", "start": 36.0, "end": 39.0, "channel": 1, "speaker": null, "conf": 0.9},
+    {"w": "Harika, yarın hesabınıza tanımlarım. İyi günler!", "start": 42.0, "end": 46.0, "channel": 0, "speaker": null, "conf": 0.94}
+  ]
+}

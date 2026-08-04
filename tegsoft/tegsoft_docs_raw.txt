@@ -1,0 +1,4792 @@
+Public
+ENVIRONMENT
+Sample
+LAYOUT
+Double Column
+LANGUAGE
+cURL - cURL
+TEGSOFT’S REST APIS
+Introduction
+Login Services
+POST
+Generate token and crypt password
+GET
+Performing login with usercode password
+GET
+Performing login with token
+GET
+Checking login status
+GET
+Logging-out an active user
+Contact Center Services
+Agent Management Services
+User Management Services
+Answer a voice/webchat call
+Transfer a voice/webchat call
+Create a Call
+Active Call Holding / Unholding
+Active Call Muting / Unmuting
+Agent Hangup Methods
+Outbound Campaign Services
+Music On Hold Services
+Definition and Setting Services
+External Contact Router
+Contact Center Webhooks
+Dashboard Services
+GET
+Real time status of agents
+GET
+Real time status of skills
+GET
+Real time status of campaigns
+GET
+Real time status of webchats
+GET
+Real time status of trunks and extensions
+GET
+Real time status of infrastructure and active users
+GET
+Active Project List
+GET
+Real Time Activity Data
+Data and Functional Services
+DB Data Services
+Form & UI Services
+License Services
+User Services
+GET
+Presence
+Webchat Services
+Recording Services
+GET
+Get Related Audio File Names
+GET
+Download Audio File
+GET
+Stream Audio File
+GET
+Download Audio File Analysis Image
+POST
+Upload Screen Recording
+GET
+Download Screen-recording file
+PBX Functions and Services
+RequirementManagement
+Tegsoft’s REST APIs
+
+Tegsoft tries to be a strong bridge between the software world and the communication world. We are supplying detailed APIs for allowing many programming languages such as .NET, Java, Php, Python, Javascript to interact with communication services like Voice, SMS, Whatsapp, Webchat.
+
+Many programmers are willing to use JSON-based REST services so we are happy to share our native JSON REST APIs which is documented in this article.
+
+If you need REST XML or SOAP APIs please use the link below to access the related article. https://documenter.getpostman.com/view/5270594/RzthSC1e
+
+Tegsoft provides many REST APIs for managing calls process, sending text messages, managing customer information and much more, to integrate with CRM / ERP / E-Shopping etc. to answer the below requirements.
+
+Receives the call and shows on the agent's screen with using programming skills(Screen-popup)
+
+Introduces customer information to Tegsoft's infrastructure
+
+Receives the calls as different groups such as recognize/unrecognize or in a group or not
+
+Stores the communication history and shows these informations if the customer needs.
+
+Shows customer's informations on the agent's screen
+
+Shows information of the customer waiting in the queue
+
+Monitors the call on the status panel with name
+
+Starts a call by using Tegsoft infrastructure from programming infrastructure with clicking call button
+
+Starts a group call by using Tegsoft infrastructure from programming infrastructure with clicking call button
+
+Tegsoft API infrastructures should be used to see the basic requirements mentioned above.
+
+For additional documentation please check link https://docs.tegsoft.com
+
+What is REST API?
+
+API (Application Programming Interface), is the interface that enables the functions of an application to be accessed and used externally or remotely. The API allows the application on a server to be accessed from different platforms and to return a response.
+
+REST is an architecture that works over the HTTP protocol that provides communication between client and server.
+
+REST API enables applications to communicate by carrying data in many formats, especially XML, JSON, HTML, TEXT, between client and server.
+
+REST API services use different HTTP methods in data transmission. These are GET, POST, PUT, DELETE methods. GET is used for reading, POST is for inserting a new record, PUT is for updating a record, and DELETE is for deleting a record. The HTTP method information, together with the URL called for the HTTP request, is selected as one of the 4 methods and the server determines how the request will affect the recording accordingly.
+
+GET = Read
+
+POST = Create
+
+PUT = Update
+
+DELETE = Delete
+
+alt
+
+P.S. Please mind SOAP services are published via link https://documenter.getpostman.com/view/5270594/RzthSC1e
+
+GET
+Performing login with token
+https://sample.tegsoftcloud.com/Tobe/view/Login?service=performLogin&locale=en
+
+This method is used to login and for generating an active token.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+performLogin
+
+locale
+
+en
+
+Example Request
+Performing login with token
+View More
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/Login?service=performLogin&locale=en'
+200 OK
+Example Response
+Body
+Headers (8)
+View More
+json
+{
+  "duration": 0,
+  "subService": "performLogin",
+  "endService": 1635879651123,
+  "beginService": 1635879651123,
+  "serviceName": "/Login",
+  "user": {
+    "DISPLAYNAME": "Test Admin",
+    "loginScreenProperties": {
+      "isCupGettingStarted": false,
+      "LoginTime": 1635763842642,
+      "onlyAgent": false,
+      "isAgent": false,
+      "onlyCupGettingStarted": false,
+      "isCupCloud": false,
+      "networkDefinitions": "eth0 52:54:00:5a:b0:b6 192.168.47.17 ",
+      "APPLICATIONS": [
+        {
+          "fullPath": "/forms/TegsoftOS/useractivity/useractivity",
+          "itemId": "Out-of-Menu-userActivity",
+          "title": "System Status",
+          "parentId": "Menu-Monitoring"
+        }
+      ],
+      "onlyCupCloud": false
+    },
+    "rowTBLLOGINS": {
+      "MODUID": "0",
+      "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "STATUS": "ACTIVE",
+      "SESSIONID": "4c52b76a-8054-4135-ab90-29678acb68f0",
+      "LOGINID": "800dc97a-8388-4712-9689-f62349034195",
+      "PING": "2021-11-01 13:50:42.648",
+      "LOGIN": "2021-11-01 13:50:42.648",
+      "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+      "MODDATE": "2021-11-01 13:50:42.648",
+      "dataRowState": "Unchanged"
+    },
+    "logintime": 1635763842642,
+    "SURNAME": "Admin",
+    "EXTID": "98daf7d2-bf33-43e8-9b85-850c030191fe",
+    "sessionid": "ad0a6bf3-33dc-4a1e-bcfb-a912585c6e95",
+    "SERVERNAME": "arge17.tegsoft.local",
+    "PHOTOURL": "/Tobe/image/themes/flat2/tegsoft_user_default.png",
+    "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+    "IVRGRPID": "default",
+    "USERCODE": "test.admin",
+    "CAMPGRPID": "default",
+    "USERNAME": "Test",
+    "rowVIEWUSERS": {
+      "SURNAME": "Admin",
+      "EXTID": "98daf7d2-bf33-43e8-9b85-850c030191fe",
+      "PNLAGENTICON": "true",
+      "dataRowState": "Unchanged",
+      "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "USERROLE": "admin",
+      "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "IVRGRPID": "default",
+      "ALLOWED": "0.0.0.0",
+      "USERCODE": "test.admin",
+      "PASS": "test123",
+      "CAMPGRPID": "default",
+      "USERNAME": "Test",
+      "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+      "MODDATE": "2021-09-01 23:48:22.15",
+      "CONTGRPID": "default",
+      "UCSTATE": "passive"
+    },
+    "rowTBLCRMCONTACTS": {
+      "ENFIRSTNAME": "TEST",
+      "CREATORUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "FIRSTNAME": "Test",
+      "EMAILTYPE3": "other",
+      "INSTTYPE4": "ICQ",
+      "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "ENLASTNAME": "ADMIN",
+      "EMAILTYPE2": "home",
+      "HOMECOUNTRY": "TÜRKİYE",
+      "EMAILTYPE4": "other",
+      "LASTNAME": "Admin",
+      "INSTTYPE1": "AIM",
+      "EMAILTYPE1": "work",
+      "INSTTYPE2": "MSN",
+      "INSTTYPE3": "YAHOO",
+      "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+      "CONTGRPID": "default",
+      "CONTID": "e1b6b769-4b3c-4144-a5b5-8de9dd68ec92",
+      "CREATEDATE": "2021-04-29 21:13:51.825",
+      "PHONETYPE8": "other",
+      "ENFULLNAME": "TEST ADMIN",
+      "dataRowState": "Unchanged",
+      "PHONETYPE5": "work fax",
+      "PHONETYPE4": "home fax",
+      "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "PHONETYPE7": "other",
+      "PHONETYPE6": "pager",
+      "PHONETYPE1": "home",
+      "PHONETYPE3": "mobile",
+      "PHONETYPE2": "work",
+      "PREFCONTACT": "EMAIL",
+      "MODDATE": "2021-04-29 21:14:01.954"
+    },
+    "CONTGRPID": "default",
+    "CONTID": "e1b6b769-4b3c-4144-a5b5-8de9dd68ec92"
+  },
+  "clientSideActions": [],
+  "serverDateTime": "02/11/2021 22:00",
+  "token": "d9201f83a1c8071092ac4240b3eeb20b71e3bfeae2a53815c3e6a133b3a8b0313b76284e142f1616adb051b56675f49acb40ada6986c5858daab5f4faa17339628f533a0c19b33c1729b8f32221efe96"
+}
+GET
+Checking login status
+https://sample.tegsoftcloud.com/Tobe/view/Login?fileName=login&service=checkLoginStatus
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+fileName
+
+login
+
+service
+
+checkLoginStatus
+
+Example Request
+checkLoginStatus with a login user
+View More
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/Login?fileName=login&service=checkLoginStatus'
+200 OK
+Example Response
+Body
+Headers (8)
+View More
+json
+{
+  "duration": 2,
+  "subService": "checkLoginStatus",
+  "endService": 1635078535214,
+  "beginService": 1635078535212,
+  "serviceName": "/Login",
+  "user": {
+    "DISPLAYNAME": "Test Admin",
+    "loginScreenProperties": {
+      "isCupGettingStarted": false,
+      "LoginTime": 1635077997357,
+      "onlyAgent": false,
+      "isAgent": false,
+      "onlyCupGettingStarted": false,
+      "isCupCloud": false,
+      "networkDefinitions": "eth0 52:54:00:5a:b0:b6 192.168.47.17 ",
+      "APPLICATIONS": [
+        {
+          "fullPath": "/forms/TegsoftOS/useractivity/useractivity",
+          "itemId": "Out-of-Menu-userActivity",
+          "title": "System Status",
+          "parentId": "Menu-Monitoring"
+        }
+      ],
+      "onlyCupCloud": false
+    },
+    "rowTBLLOGINS": {
+      "MODUID": "0",
+      "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "STATUS": "ACTIVE",
+      "SESSIONID": "3a104dae-338f-4745-a545-418e21018b2f",
+      "LOGINID": "6fdf9d4e-2a3c-404b-a677-8a07953e9708",
+      "PING": "2021-10-24 15:19:57.563",
+      "LOGIN": "2021-10-24 15:19:57.563",
+      "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+      "MODDATE": "2021-10-24 15:19:57.564",
+      "dataRowState": "Unchanged"
+    },
+    "logintime": 1635077997357,
+    "SURNAME": "Admin",
+    "TBLUSERDATA": [
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "TOBE_LOGOUT",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-04-07 23:49:44.556",
+        "DATAVALUE": [
+          100,
+          57,
+          49,
+          97,
+          50,
+          57,
+          101,
+          53,
+          50,
+          97,
+          100,
+          54,
+          56,
+          57,
+          57,
+          100,
+          97,
+          51,
+          97,
+          98,
+          54,
+          53,
+          100,
+          54,
+          56,
+          54,
+          54,
+          100,
+          50,
+          55,
+          53,
+          102
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_TYPEID",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:27.605",
+        "DATAVALUE": [
+          48,
+          100,
+          101,
+          97,
+          51,
+          56,
+          52,
+          48,
+          49,
+          51,
+          51,
+          50,
+          55,
+          57,
+          52,
+          57,
+          49,
+          49,
+          53,
+          101,
+          57,
+          52,
+          100,
+          102,
+          54,
+          54,
+          101,
+          53,
+          97,
+          54,
+          97,
+          101
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_CATEGORYID",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:27.639",
+        "DATAVALUE": [
+          102,
+          55,
+          53,
+          55,
+          100,
+          51,
+          55,
+          48,
+          49,
+          102,
+          49,
+          99,
+          101,
+          54,
+          52,
+          97,
+          52,
+          99,
+          48,
+          50,
+          50,
+          56,
+          52,
+          98,
+          50,
+          56,
+          52,
+          53,
+          102,
+          53,
+          52,
+          97
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_CRMCONTPRIMARY_ONCRM",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:27.74",
+        "DATAVALUE": [
+          99,
+          100,
+          49,
+          102,
+          53,
+          98,
+          57,
+          101,
+          54,
+          98,
+          52,
+          97,
+          50,
+          48,
+          48,
+          52,
+          49,
+          54,
+          100,
+          102,
+          99,
+          49,
+          53,
+          99,
+          100,
+          55,
+          49,
+          50,
+          49,
+          97,
+          49,
+          97
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_AddressGroup",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:28.086",
+        "DATAVALUE": [
+          50,
+          99,
+          49,
+          97,
+          53,
+          100,
+          52,
+          57,
+          54,
+          49,
+          56,
+          54,
+          49,
+          48,
+          101,
+          54,
+          99,
+          52,
+          54,
+          56,
+          50,
+          57,
+          99,
+          99,
+          54,
+          56,
+          57,
+          54,
+          97,
+          51,
+          50,
+          55
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_EMailGroup",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:28.095",
+        "DATAVALUE": [
+          57,
+          101,
+          100,
+          48,
+          99,
+          50,
+          55,
+          54,
+          50,
+          97,
+          49,
+          57,
+          52,
+          57,
+          55,
+          97,
+          55,
+          53,
+          99,
+          55,
+          98,
+          49,
+          52,
+          51,
+          55,
+          51,
+          50,
+          55,
+          54,
+          99,
+          49,
+          52
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_ContactTabOther",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:28.111",
+        "DATAVALUE": [
+          57,
+          101,
+          55,
+          57,
+          55,
+          54,
+          101,
+          54,
+          50,
+          51,
+          49,
+          54,
+          56,
+          51,
+          100,
+          99,
+          49,
+          99,
+          98,
+          98,
+          56,
+          52,
+          100,
+          102,
+          51,
+          51,
+          54,
+          52,
+          97,
+          50,
+          97,
+          53
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_MAINNOTE",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:28.132",
+        "DATAVALUE": [
+          55,
+          51,
+          48,
+          50,
+          52,
+          54,
+          100,
+          51,
+          51,
+          49,
+          57,
+          55,
+          48,
+          56,
+          101,
+          97,
+          97,
+          101,
+          51,
+          101,
+          102,
+          102,
+          54,
+          52,
+          102,
+          97,
+          100,
+          49,
+          54,
+          48,
+          54,
+          51
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_TBLCRMCONTACTRESP",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:28.139",
+        "DATAVALUE": [
+          55,
+          57,
+          102,
+          52,
+          55,
+          54,
+          50,
+          57,
+          56,
+          54,
+          50,
+          48,
+          54,
+          55,
+          49,
+          54,
+          57,
+          57,
+          53,
+          50,
+          54,
+          99,
+          99,
+          48,
+          48,
+          102,
+          101,
+          102,
+          53,
+          57,
+          52,
+          50
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_TBLCRMDSQUERY",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:28.145",
+        "DATAVALUE": [
+          99,
+          49,
+          56,
+          54,
+          99,
+          52,
+          101,
+          102,
+          99,
+          101,
+          48,
+          49,
+          98,
+          97,
+          55,
+          102,
+          98,
+          57,
+          56,
+          56,
+          100,
+          48,
+          100,
+          52,
+          51,
+          56,
+          57,
+          99,
+          50,
+          56,
+          48,
+          57
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "crm_contacts_TBLCRMGRP",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-17 16:43:28.151",
+        "DATAVALUE": [
+          97,
+          49,
+          53,
+          50,
+          102,
+          98,
+          97,
+          56,
+          99,
+          49,
+          51,
+          50,
+          49,
+          53,
+          48,
+          50,
+          99,
+          51,
+          57,
+          97,
+          49,
+          99,
+          99,
+          53,
+          52,
+          55,
+          51,
+          100,
+          50,
+          97,
+          56,
+          49
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_CRMCONTPRIMARY_ONAGENT",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:01.478",
+        "DATAVALUE": [
+          101,
+          57,
+          98,
+          102,
+          102,
+          50,
+          101,
+          54,
+          56,
+          54,
+          54,
+          101,
+          54,
+          100,
+          54,
+          55,
+          48,
+          101,
+          49,
+          98,
+          97,
+          99,
+          100,
+          52,
+          51,
+          100,
+          100,
+          54,
+          53,
+          98,
+          55,
+          98
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_AddressGroup",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:01.522",
+        "DATAVALUE": [
+          97,
+          52,
+          52,
+          57,
+          100,
+          54,
+          97,
+          101,
+          56,
+          53,
+          49,
+          57,
+          56,
+          57,
+          102,
+          56,
+          51,
+          56,
+          53,
+          50,
+          51,
+          100,
+          57,
+          101,
+          56,
+          57,
+          49,
+          50,
+          101,
+          50,
+          53,
+          98
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_EMailGroup",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:01.53",
+        "DATAVALUE": [
+          53,
+          98,
+          100,
+          48,
+          100,
+          102,
+          99,
+          52,
+          48,
+          55,
+          100,
+          51,
+          53,
+          56,
+          50,
+          48,
+          55,
+          98,
+          52,
+          51,
+          52,
+          48,
+          54,
+          50,
+          98,
+          55,
+          50,
+          56,
+          101,
+          48,
+          54,
+          52
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_ContactTabOther",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:01.538",
+        "DATAVALUE": [
+          56,
+          102,
+          49,
+          97,
+          55,
+          99,
+          99,
+          56,
+          53,
+          98,
+          99,
+          101,
+          99,
+          55,
+          51,
+          55,
+          53,
+          98,
+          102,
+          102,
+          50,
+          56,
+          97,
+          102,
+          102,
+          97,
+          54,
+          100,
+          53,
+          56,
+          97,
+          102
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_MAINNOTE",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:01.554",
+        "DATAVALUE": [
+          56,
+          53,
+          50,
+          102,
+          48,
+          100,
+          97,
+          101,
+          101,
+          99,
+          48,
+          55,
+          51,
+          52,
+          102,
+          50,
+          98,
+          97,
+          97,
+          57,
+          100,
+          55,
+          54,
+          102,
+          100,
+          100,
+          49,
+          57,
+          100,
+          57,
+          55,
+          48
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_TBLCRMCONTACTRESP",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:01.558",
+        "DATAVALUE": [
+          101,
+          51,
+          51,
+          98,
+          99,
+          56,
+          54,
+          55,
+          97,
+          49,
+          99,
+          56,
+          54,
+          52,
+          55,
+          97,
+          97,
+          99,
+          49,
+          99,
+          49,
+          50,
+          102,
+          57,
+          56,
+          100,
+          98,
+          49,
+          101,
+          102,
+          49,
+          101
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_TBLCRMDSQUERY",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:01.563",
+        "DATAVALUE": [
+          56,
+          48,
+          51,
+          101,
+          50,
+          53,
+          52,
+          102,
+          55,
+          53,
+          99,
+          49,
+          102,
+          100,
+          52,
+          51,
+          101,
+          97,
+          51,
+          57,
+          100,
+          97,
+          53,
+          97,
+          98,
+          99,
+          97,
+          100,
+          49,
+          55,
+          99,
+          54
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_TBLCRMGRP",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:01.568",
+        "DATAVALUE": [
+          101,
+          97,
+          50,
+          51,
+          101,
+          53,
+          54,
+          55,
+          50,
+          97,
+          102,
+          56,
+          49,
+          54,
+          52,
+          54,
+          49,
+          97,
+          48,
+          101,
+          97,
+          49,
+          98,
+          56,
+          53,
+          53,
+          50,
+          97,
+          51,
+          98,
+          54,
+          99
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_pageNOTREADYAGENTS",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:01.751",
+        "DATAVALUE": [
+          101,
+          99,
+          99,
+          56,
+          54,
+          49,
+          55,
+          53,
+          99,
+          50,
+          54,
+          50,
+          97,
+          56,
+          97,
+          50,
+          57,
+          53,
+          101,
+          51,
+          102,
+          54,
+          53,
+          99,
+          54,
+          50,
+          56,
+          57,
+          48,
+          53,
+          97,
+          51
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_TYPEID",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:02.009",
+        "DATAVALUE": [
+          55,
+          57,
+          55,
+          54,
+          99,
+          50,
+          52,
+          99,
+          102,
+          100,
+          101,
+          54,
+          57,
+          50,
+          53,
+          100,
+          48,
+          57,
+          100,
+          55,
+          55,
+          54,
+          102,
+          56,
+          54,
+          100,
+          102,
+          53,
+          52,
+          102,
+          55,
+          49
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_agent_CATEGORYID",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2020-08-18 10:18:02.014",
+        "DATAVALUE": [
+          54,
+          50,
+          101,
+          53,
+          51,
+          98,
+          55,
+          99,
+          51,
+          56,
+          52,
+          51,
+          55,
+          53,
+          54,
+          55,
+          56,
+          99,
+          53,
+          48,
+          55,
+          48,
+          51,
+          102,
+          51,
+          97,
+          102,
+          56,
+          101,
+          53,
+          57,
+          54
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_camp_settings_tabATTENDED3",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-05-19 17:43:48.355",
+        "DATAVALUE": [
+          50,
+          99,
+          57,
+          49,
+          53,
+          55,
+          50,
+          102,
+          56,
+          102,
+          99,
+          55,
+          97,
+          98,
+          98,
+          48,
+          56,
+          51,
+          55,
+          56,
+          50,
+          100,
+          100,
+          51,
+          57,
+          101,
+          56,
+          97,
+          51,
+          100,
+          98,
+          51
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_camp_settings_tabATTENDED2",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-05-19 17:43:48.397",
+        "DATAVALUE": [
+          56,
+          99,
+          56,
+          53,
+          55,
+          48,
+          53,
+          50,
+          101,
+          51,
+          97,
+          101,
+          52,
+          97,
+          97,
+          100,
+          101,
+          53,
+          98,
+          52,
+          98,
+          100,
+          54,
+          99,
+          52,
+          99,
+          56,
+          56,
+          52,
+          49,
+          50,
+          53
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_camp_settings_tabGRPMEMBER",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-05-19 17:43:48.401",
+        "DATAVALUE": [
+          53,
+          49,
+          55,
+          99,
+          54,
+          52,
+          98,
+          54,
+          98,
+          99,
+          49,
+          51,
+          57,
+          98,
+          54,
+          50,
+          57,
+          53,
+          99,
+          57,
+          51,
+          53,
+          54,
+          99,
+          98,
+          54,
+          99,
+          54,
+          100,
+          56,
+          51,
+          97
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "cc_camp_settings_tabTBLCRMCONTACTSADD",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-05-19 17:43:48.406",
+        "DATAVALUE": [
+          56,
+          99,
+          99,
+          56,
+          99,
+          56,
+          99,
+          50,
+          55,
+          51,
+          56,
+          53,
+          53,
+          100,
+          98,
+          54,
+          99,
+          98,
+          51,
+          49,
+          57,
+          53,
+          101,
+          57,
+          52,
+          52,
+          101,
+          56,
+          49,
+          98,
+          97,
+          100
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_monitorSortREADY",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.489",
+        "DATAVALUE": [
+          53,
+          52,
+          101,
+          51,
+          56,
+          102,
+          100,
+          97,
+          49,
+          99,
+          56,
+          54,
+          99,
+          100,
+          51,
+          50,
+          98,
+          97,
+          97,
+          97,
+          53,
+          101,
+          53,
+          49,
+          49,
+          98,
+          51,
+          48,
+          101,
+          53,
+          48,
+          50
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_monitorSortNOTREADY",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.525",
+        "DATAVALUE": [
+          101,
+          57,
+          53,
+          52,
+          54,
+          52,
+          101,
+          54,
+          98,
+          54,
+          98,
+          97,
+          56,
+          53,
+          52,
+          97,
+          57,
+          49,
+          50,
+          100,
+          101,
+          57,
+          102,
+          98,
+          51,
+          49,
+          49,
+          99,
+          49,
+          100,
+          53,
+          56
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_filterREADYMonitorSkill",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.534",
+        "DATAVALUE": [
+          99,
+          49,
+          49,
+          99,
+          102,
+          101,
+          102,
+          101,
+          55,
+          57,
+          55,
+          54,
+          99,
+          56,
+          99,
+          52,
+          99,
+          55,
+          53,
+          56,
+          99,
+          54,
+          56,
+          55,
+          56,
+          53,
+          97,
+          99,
+          48,
+          97,
+          53,
+          52
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_filterNOTREADYMonitorSkill",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.538",
+        "DATAVALUE": [
+          52,
+          48,
+          53,
+          56,
+          97,
+          50,
+          52,
+          53,
+          56,
+          97,
+          50,
+          57,
+          56,
+          57,
+          98,
+          48,
+          54,
+          49,
+          102,
+          53,
+          100,
+          52,
+          49,
+          98,
+          102,
+          102,
+          50,
+          98,
+          98,
+          53,
+          100,
+          53
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_filterREADYMonitorBusyState",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.541",
+        "DATAVALUE": [
+          53,
+          101,
+          99,
+          52,
+          100,
+          99,
+          48,
+          101,
+          100,
+          53,
+          99,
+          100,
+          100,
+          57,
+          57,
+          100,
+          50,
+          49,
+          99,
+          51,
+          101,
+          97,
+          53,
+          56,
+          97,
+          50,
+          100,
+          49,
+          51,
+          50,
+          56,
+          55
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_filterNOTREADYMonitorBusyState",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.544",
+        "DATAVALUE": [
+          56,
+          57,
+          48,
+          49,
+          102,
+          49,
+          51,
+          100,
+          98,
+          54,
+          99,
+          101,
+          102,
+          98,
+          57,
+          52,
+          53,
+          55,
+          52,
+          54,
+          102,
+          97,
+          49,
+          52,
+          51,
+          100,
+          97,
+          57,
+          102,
+          97,
+          52,
+          56
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_filterREADYMonitorProject",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.548",
+        "DATAVALUE": [
+          97,
+          101,
+          49,
+          54,
+          56,
+          102,
+          99,
+          55,
+          99,
+          49,
+          97,
+          100,
+          101,
+          57,
+          51,
+          49,
+          53,
+          48,
+          54,
+          52,
+          56,
+          101,
+          100,
+          49,
+          100,
+          57,
+          48,
+          100,
+          55,
+          51,
+          100,
+          53
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_filterNOTREADYMonitorProject",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.55",
+        "DATAVALUE": [
+          51,
+          49,
+          97,
+          55,
+          54,
+          49,
+          99,
+          55,
+          49,
+          97,
+          53,
+          52,
+          49,
+          48,
+          102,
+          52,
+          53,
+          52,
+          54,
+          53,
+          52,
+          54,
+          98,
+          101,
+          99,
+          102,
+          53,
+          55,
+          53,
+          100,
+          51,
+          57
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_PNLCOLUMNNUMBER",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.554",
+        "DATAVALUE": [
+          52,
+          53,
+          56,
+          48,
+          99,
+          100,
+          55,
+          102,
+          101,
+          51,
+          97,
+          49,
+          101,
+          54,
+          51,
+          49,
+          99,
+          99,
+          102,
+          56,
+          100,
+          98,
+          52,
+          100,
+          48,
+          53,
+          54,
+          57,
+          49,
+          52,
+          56,
+          52
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_isGridView",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.556",
+        "DATAVALUE": [
+          100,
+          51,
+          50,
+          57,
+          97,
+          52,
+          97,
+          101,
+          49,
+          54,
+          56,
+          102,
+          101,
+          48,
+          49,
+          99,
+          48,
+          53,
+          51,
+          48,
+          97,
+          55,
+          55,
+          50,
+          48,
+          56,
+          51,
+          100,
+          97,
+          102,
+          97,
+          100
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoring_pageNOTREADYAGENTS",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:31.56",
+        "DATAVALUE": [
+          99,
+          50,
+          52,
+          57,
+          98,
+          48,
+          101,
+          53,
+          100,
+          57,
+          98,
+          54,
+          51,
+          101,
+          102,
+          50,
+          52,
+          100,
+          48,
+          54,
+          102,
+          57,
+          98,
+          98,
+          55,
+          55,
+          57,
+          101,
+          101,
+          56,
+          99,
+          98
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "pbx_monitoringstatusPanelEastSize",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-06-28 22:39:35.87",
+        "DATAVALUE": [
+          57,
+          100,
+          53,
+          98,
+          98,
+          54,
+          56,
+          99,
+          101,
+          99,
+          49,
+          97,
+          97,
+          52,
+          101,
+          102,
+          49,
+          99,
+          54,
+          52,
+          97,
+          48,
+          49,
+          100,
+          102,
+          98,
+          98,
+          49,
+          53,
+          49,
+          98,
+          50
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "rm_new_req_TYPEID",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-10-07 15:16:59.49",
+        "DATAVALUE": [
+          52,
+          97,
+          53,
+          52,
+          100,
+          102,
+          97,
+          49,
+          51,
+          50,
+          51,
+          55,
+          56,
+          48,
+          100,
+          99,
+          53,
+          48,
+          50,
+          55,
+          49,
+          54,
+          49,
+          52,
+          50,
+          102,
+          51,
+          50,
+          51,
+          57,
+          100,
+          57
+        ],
+        "dataRowState": "Unchanged"
+      },
+      {
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "NOTES": "Value of component",
+        "DATATYPE": "COOKIE",
+        "DATAKEY": "rm_new_req_CATEGORYID",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-10-07 15:16:59.523",
+        "DATAVALUE": [
+          98,
+          54,
+          97,
+          101,
+          51,
+          49,
+          57,
+          98,
+          54,
+          100,
+          54,
+          101,
+          56,
+          99,
+          102,
+          56,
+          102,
+          101,
+          100,
+          52,
+          49,
+          51,
+          50,
+          102,
+          48,
+          56,
+          97,
+          101,
+          51,
+          100,
+          98,
+          100
+        ],
+        "dataRowState": "Unchanged"
+      }
+    ],
+    "EXTID": "98daf7d2-bf33-43e8-9b85-850c030191fe",
+    "sessionid": "211cff21-075c-4752-a2be-1d2effda537b",
+    "SERVERNAME": "arge17.tegsoft.local",
+    "PHOTOURL": "/Tobe/null/tegsoft_user_default.png",
+    "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+    "IVRGRPID": "default",
+    "USERCODE": "test.admin",
+    "CAMPGRPID": "default",
+    "USERNAME": "Test",
+    "rowVIEWUSERS": {
+      "SURNAME": "Admin",
+      "EXTID": "98daf7d2-bf33-43e8-9b85-850c030191fe",
+      "PNLAGENTICON": "true",
+      "dataRowState": "Unchanged",
+      "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "USERROLE": "admin",
+      "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "IVRGRPID": "default",
+      "ALLOWED": "0.0.0.0",
+      "USERCODE": "test.admin",
+      "PASS": "test123",
+      "CAMPGRPID": "default",
+      "USERNAME": "Test",
+      "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+      "MODDATE": "2021-09-01 23:48:22.15",
+      "CONTGRPID": "default",
+      "UCSTATE": "passive"
+    },
+    "rowTBLCRMCONTACTS": {
+      "ENFIRSTNAME": "TEST",
+      "CREATORUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "FIRSTNAME": "Test",
+      "EMAILTYPE3": "other",
+      "INSTTYPE4": "ICQ",
+      "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "ENLASTNAME": "ADMIN",
+      "EMAILTYPE2": "home",
+      "HOMECOUNTRY": "TÜRKİYE",
+      "EMAILTYPE4": "other",
+      "LASTNAME": "Admin",
+      "INSTTYPE1": "AIM",
+      "EMAILTYPE1": "work",
+      "INSTTYPE2": "MSN",
+      "INSTTYPE3": "YAHOO",
+      "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+      "CONTGRPID": "default",
+      "CONTID": "e1b6b769-4b3c-4144-a5b5-8de9dd68ec92",
+      "CREATEDATE": "2021-04-29 21:13:51.825",
+      "PHONETYPE8": "other",
+      "ENFULLNAME": "TEST ADMIN",
+      "dataRowState": "Unchanged",
+      "PHONETYPE5": "work fax",
+      "PHONETYPE4": "home fax",
+      "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "PHONETYPE7": "other",
+      "PHONETYPE6": "pager",
+      "PHONETYPE1": "home",
+      "PHONETYPE3": "mobile",
+      "PHONETYPE2": "work",
+      "PREFCONTACT": "EMAIL",
+      "MODDATE": "2021-04-29 21:14:01.954"
+    },
+    "CONTGRPID": "default",
+    "CONTID": "e1b6b769-4b3c-4144-a5b5-8de9dd68ec92"
+  },
+  "clientSideActions": [],
+  "serverDateTime": "24/10/2021 15:28"
+}
+GET
+Logging out an Agent
+https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=ContactCenterServices&method=agentLogout&USERCODE=test.sample
+
+This method is used to log the agent out of the system.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+ContactCenterServices
+
+method
+
+agentLogout
+
+UID
+
+{UID}
+
+USERCODE
+
+test.sample
+
+Example Request
+Logging out an Agent
+View More
+curl
+curl --location -g 'https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=ContactCenterServices&method=agentLogout&UID={UID}'
+200 OK
+Example Response
+Body
+Headers (11)
+View More
+json
+{
+  "serviceResult": {
+    "duration": 35,
+    "errorCode": "NOERROR",
+    "endService": "Wed Apr 26 17:56:51 TRT 2023",
+    "operationName": "agentLogout",
+    "beginService": "Wed Apr 26 17:56:51 TRT 2023",
+    "serviceName": "ContactCenterServices",
+    "statusMessage": "Agent is logout now",
+    "errorOccurred": false
+  },
+  "success": true,
+  "serverDateTime": "26/04/2023 17:56"
+}
+Ready / NotReady Services
+
+When a customer representative logs into the system (default), he / she logs in. The customer representative is usually expected to take action to indicate that he or she is ready to receive a call. (Like pressing the ready button)
+
+GET
+Extension Status
+https://sample.tegsoftcloud.com/Tobe/view/ECR?service=extensionStatus&usercode=test.agent
+
+This method is used to query locale message descriptions and keywords for a given form file.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+extensionStatus
+
+usercode
+
+test.agent
+
+Example Request
+Extension Status
+View More
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/ECR?service=extensionStatus&usercode=test.agent'
+200 OK
+Example Response
+Body
+Headers (11)
+View More
+json
+{
+  "loginState": false,
+  "success": true,
+  "rowTBLPBXEXT": {
+    "PINLESSDIAL": "true",
+    "NAT": "yes",
+    "CALLERID": "1932",
+    "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+    "ENCALLERID": "1932",
+    "HOST": "dynamic",
+    "LDAPUSER": "test.admin",
+    "CLIPENABLE": "default",
+    "RINGTIME": 40,
+    "DIRECTEDPICKUPGROUP": "1",
+    "CALLSCREEN": "DISABLED",
+    "VMPINREQUIRED": "default",
+    "LASTIP": "213.14.134.167",
+    "PHONETYPE": "WebRTCPhone",
+    "VMACTIVE": "true",
+    "TYPE": "udp",
+    "LOGLEVEL": "ERROR",
+    "ALLOW": "ulaw&alaw&g729&h261&h263&h264",
+    "EXTEN": "1932",
+    "CANREINVITE": "true",
+    "PORT": 5060,
+    "EXTID": "b387879f-8418-4002-b48a-bb0a8e0f98f5",
+    "PICKUPGROUP": "1",
+    "RECORDOUT": "Always",
+    "CALLGROUP": "1",
+    "dataRowState": "Unchanged",
+    "DISABLED": "false",
+    "DISPLAYINFOP": "true",
+    "QUALIFY": "yes",
+    "CONTEXTID": "53ed25f3-36b1-45f6-8ae6-34dff98fb50a",
+    "DTMFMODE": "RFC2833",
+    "RECORDIN": "Always",
+    "EXTSTATE": "OK",
+    "CALLWAIT": "false",
+    "DIALGROUP": "0",
+    "SECRET": "tegsoft13591932",
+    "VMMWIACTIVE": "default"
+  },
+  "serverDateTime": "23/12/2023 16:16"
+}
+Webhooks
+
+External contact router has a lifecycle for each external router service definition and each caller joining skill.
+
+For each event listed below, a different webhook URL can be defined to receive event details.
+
+Events can be configured via ECR Definitions application under Contact Center Settings.
+
+Here is an example screenshot,
+
+Topology and Flow
+Webhooks and Events
+
+All the events with enabled webhook URL definitions will generate a webhook request upon event instance.
+
+A list of events, descriptions, and webhook contents are shared below.
+
+Table Synchronization Event
+
+Tegsoft ECR Engine is holding a live table for managing waiting callers.
+
+This table is delivered on every "Synchronization frequency (seconds)". If the frequency is empty, the event will not be fired.
+
+View More
+json
+{
+    "success": true,
+    "ecrStateTable": {
+        "ecrProviders": [
+            {
+                "ENHEALTHCHECK": "true",
+                "URLATTENDEDTRANSFER": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Attendedtransfer",
+                "FRQHEALTHCHECK": "120",
+                "ENTRANSFER2": "true",
+                "ENATTENDEDTRANSFER": "true",
+                "URLQUEUESTATUS": "https://89f3-176-236-157-242/Tobe/app/ApplicationServlet?externalService=debugRequest&parama=Queuestatus",
+                "FRQQUEUESTATUS": "120",
+                "ENEXITEMPTY": "true",
+                "ENCONNECT": "true",
+                "ENQUEUESTATUS": "true",
+                "ENAGENTDUMP": "true",
+                "TOHEALTHCHECK": "600",
+                "skills": [
+                    {
+                        "RECORDING": "true",
+                        "ANSWERED": 8,
+                        "LEAVEEMPTY": "false",
+                        "SKILL": "7000",
+                        "JOINNOREADY": "true",
+                        "ROUTERFAILTYPE": "ALTERNATE",
+                        "SLA": 0,
+                        "PRIORITY": 5,
+                        "MOHTYPE": "MOH",
+                        "ANNHOLDTIME": "no",
+                        "MAXWAIT": "09:13",
+                        "MAXLEN": 0,
+                        "ANNOUNCEFREQ": 0,
+                        "TRANSFER": 0,
+                        "READYMEMBERS": 0,
+                        "ABANDON": 1,
+                        "ENTERQUEUE": 9,
+                        "DESTTYPE": "QUEUE",
+                        "AVGTALK": "03:22",
+                        "MEMBERS": 1,
+                        "MAXHOLD": "09:13",
+                        "WRAPUPTIME": 2,
+                        "SERVICELEVEL": 60,
+                        "POPUPTYPE": "CALLERID",
+                        "RETRY": 5,
+                        "dataRowState": "Unchanged",
+                        "NAME": "VIP Customers",
+                        "AVGHOLD": "04:19",
+                        "JOINEMPTY": "true",
+                        "AVGSL": 0,
+                        "LOGINMEMBERS": 1,
+                        "ANSWERRATE": 88.88888888888889,
+                        "TIMEOUT": 15,
+                        "AUTONOTREADY": "true",
+                        "QUEUECALLS": 1,
+                        "SUMTALK": "26:56",
+                        "STRATEGY": "fewestcalls",
+                        "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+                        "WAITDURATION": 1708546819,
+                        "BUSYMEMBERS": 0,
+                        "POPUPCONTID": "true",
+                        "SL": 0,
+                        "WAITCOUNT": 1,
+                        "ROUTERID": "e06849c6-c6ae-4e24-a285-7648367bb69f",
+                        "AUTOFILL": "true",
+                        "AVGSLA": 0,
+                        "AVGWAIT": "04:19",
+                        "MOHID": "default",
+                        "EXITQUEUE": 0,
+                        "RINGINUSE": "false",
+                        "DESTPARAM": "7000",
+                        "ANNPOSITION": "no",
+                        "AUTOLOMEETINGDUR": "2",
+                        "TIMEDESTTYPE": "IVR",
+                        "callers": [
+                            {
+                                "callerIdNumber": "XXXXXXXX",
+                                "SKILL": "7000",
+                                "offerCount": 0,
+                                "QEHOLDTIME": 9,
+                                "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+                                "AUTOANSWER": "false",
+                                "DTMF": "WELCOME5",
+                                "WELCOME": "5",
+                                "PRIORITY": "3",
+                                "ivrDurationMillis": 3201,
+                                "waitStartMillis": 1708546813274,
+                                "waitDurationMillis": 9394,
+                                "RINGTIME": "15",
+                                "ctiVariableNames": [
+                                    "WELCOME"
+                                ],
+                                "ROUTERID": "e06849c6-c6ae-4e24-a285-7648367bb69f",
+                                "DID": "XXXXXXXX",
+                                "ivrDurationSeconds": 3,
+                                "CONTID": "8c6d3bb9-389b-4a13-ae05-43f05662ddf0",
+                                "DST": "XXXXXXXX",
+                                "DIRECTION": "INBOUND",
+                                "WRAPUPTIME": "2",
+                                "CALLDATE": "21/02/2024 23:20:10",
+                                "CONTTYPE": "VOICE",
+                                "QEORIGINALPOS": 1,
+                                "UNIQUEID": "1708546810.399",
+                                "CHANNEL": "PJSIP/ea27068e-41c6-4ddd-8508-7cf303baaf69-00000095",
+                                "waitDurationSeconds": 9,
+                                "waitStartDate": "21/02/2024 23:20:13",
+                                "AUTONOTREADY": "true",
+                                "callerIdName": "John Doe",
+                                "status": "ENTERQUEUE"
+                            }
+                        ],
+                        "TIMECONDID": "f05b996a-b872-4234-ab39-398dd3d2d937"
+                    }
+                ],
+                "ENOFFER": "true",
+                "ENCOMPLETEAGENT": "true",
+                "NOTES": "ss",
+                "ENENTERQUEUE": "true",
+                "URLABANDON": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Abandon",
+                "lastAttemptHEALTHCHECK": 1708546731986,
+                "ENABANDON": "true",
+                "healthCheckLastContact": 1708546813452,
+                "URLTRANSFER2": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Transfer2",
+                "healthCheckLastAttempt": 1708546813274,
+                "ROUTERID": "e06849c6-c6ae-4e24-a285-7648367bb69f",
+                "URLOFFER": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Offer C:method=GET,header0Name=myTestHeader,header0Value=myHeaderValuemyHeaderValuemyHeaderValuemyHeaderValuemyHeaderValuemyHeaderValuemyHeaderValuemyHead",
+                "ENCOMPLETECALLER": "true",
+                "ENEXITWITHTIMEOUT": "true",
+                "URLENTERQUEUE": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Enterqueue",
+                "URLBLINDTRANSFER": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Blindtransfer",
+                "ENBLINDTRANSFER": "true",
+                "ENRINGNOANSWER": "true",
+                "URLAGENTDUMP": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Agentdump",
+                "NAME": "Sample External Router",
+                "URLCOMPLETECALLER": "https://89f3-176-236-157-242?externalService=debugRequest&parama=CompleteCaller",
+                "URLEXITEMPTY": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Exitempty",
+                "URLEXITWITHTIMEOUT": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Exitwithtimeout",
+                "URLCOMPLETEAGENT": "https://89f3-176-236-157-242?externalService=debugRequest&parama=CompleteAgent",
+                "lastAttemptQUEUESTATUS": 1708546731953,
+                "URLRINGNOANSWER": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Ringnoanswer",
+                "URLHEALTHCHECK": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Healthcheck",
+                "URLCONNECT": "https://89f3-176-236-157-242?externalService=debugRequest&parama=Connect"
+            }
+        ],
+        "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+        "currentTimeMillis": 1708546822668,
+        "currentDate": "21/02/2024 23:20:22"
+    },
+    "serverDateTime": "21/02/2024 23:20"
+}
+Connection check (Health Check) Event
+
+The health check functionality is for overflowing waiting callers if the manager is down for "Timeout (seconds)". The health check functionality is active once "Timeout (seconds)" is provided even if the URL or the "Control frequency (seconds)" is empty.
+
+As long as any healthy communication between Tegsoft and the External Contact Router takes place the connection will be considered as healthy.
+
+If the control frequency is set, Tegsoft will send "Table Synchronization Content" every defined second.
+
+Enterqueue event
+
+When a voice caller joins the queue ENTERQUEUE event is fired. The body of the webhook is called the "Caller JSON Object".
+
+View More
+json
+{
+    "callerIdNumber": "XXXXXXXXXX",
+    "SKILL": "7000",
+    "offerCount": 0,
+    "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+    "AUTOANSWER": "false",
+    "DTMF": "WELCOME5",
+    "WELCOME": "5",
+    "PRIORITY": "3",
+    "ivrDurationMillis": 5489,
+    "waitStartMillis": 1708543078455,
+    "RINGTIME": "15",
+    "ctiVariableNames": [
+        "WELCOME"
+    ],
+    "ROUTERID": "e06849c6-c6ae-4e24-a285-7648367bb69f",
+    "DID": "XXXXXXXXXX",
+    "ivrDurationSeconds": 5,
+    "CONTID": "8c6d3bb9-389b-4a13-ae05-43f05662ddf0",
+    "DST": "XXXXXXXXXX",
+    "DIRECTION": "INBOUND",
+    "WRAPUPTIME": "2",
+    "CALLDATE": "21/02/2024 22:17:52",
+    "CONTTYPE": "VOICE",
+    "QEORIGINALPOS": 1,
+    "UNIQUEID": "1708543072.368",
+    "CHANNEL": "PJSIP/ea27068e-41c6-4ddd-8508-7cf303baaf69-0000008b",
+    "waitStartDate": "21/02/2024 22:17:58",
+    "AUTONOTREADY": "true",
+    "callerIdName": "John Doe",
+    "status": "ENTERQUEUE"
+}
+Offer event
+
+After joining the queue the caller will be waiting until the call is assigned to an agent. For assigning an agent please check the "Assign Agent" method under "External Contact Router / Requests".
+
+When Tegsoft receives an assignment command it starts creating an internal call to the agent interface for engaging the caller with the agent. This event is called an OFFER event and a webhook is executed with the body content below.
+
+View More
+json
+{
+    "offerDateMillis": 1708543091171,
+    "callerIdNumber": "XXXXXXXXXX",
+    "agent": {
+        "phoneAccess": true,
+        "popup_mode": "both",
+        "lastStateChange": 1708543019813,
+        "beepSound": "beep.mp3",
+        "ANSWERED": 35,
+        "LOGINDURATION": 436,
+        "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+        "autoAnswerActive": false,
+        "STATEDURATION": 71,
+        "NOTREADYDURATION": 0,
+        "rowTBLPBXEXT": {
+            "CALLERID": "1932",
+            "EXTSTATE": "OK",
+            "CALLWAIT": "false",
+            "EXTID": "b387879f-8418-4002-b48a-bb0a8e0f98f5",
+            "PHONETYPE": "WebRTCPhone",
+            "SECRET": "tegsoft13591932",
+            "dataRowState": "Unchanged",
+            "EXTEN": "1932"
+        },
+        "PHOTOURL": "/Tobe/image/themes/flat2/tegsoft_user_default.png",
+        "rowTBLCCAGENT": {
+            "PNLSCRLSTATUS": "true",
+            "OUTANNOUNCE": "false",
+            "QUEUESELECTION": "false",
+            "CHAT": "true",
+            "PNLPAGESIZE": "25",
+            "EMAIL": "true",
+            "MRAFTERLOGIN": "false",
+            "MODUID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+            "INBOUND": "true",
+            "NRRMEETING": "KEEPNOTREADY",
+            "INANNOUNCEFILE": "46e4417d-43c5-4233-aa76-c943c599b7cf",
+            "PNLSCRLEXTENSIONS": "false",
+            "NRRFOOD": "AUTOREADY",
+            "PLAYANNOUNCE": "true",
+            "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+            "CAMPANNOUNCE": "false",
+            "CAMP": "true",
+            "PNLTIMER": "10",
+            "PNLSCRLINBOUND": "true",
+            "NRDIALALLOWED": "true",
+            "NRROPERATION": "AUTOREADY",
+            "NRRMEDICAL": "AUTOREADY",
+            "PNLSCRLOUTBOUND": "false",
+            "NRROTHER": "KEEPNOTREADY",
+            "PNLSCRLRTD": "true",
+            "NRRINTERNALSERVICE": "KEEPNOTREADY",
+            "dataRowState": "Unchanged",
+            "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+            "CONTEXTID": "53ed25f3-36b1-45f6-8ae6-34dff98fb50a",
+            "INANNOUNCE": "true",
+            "PNLSCRLAGENTS": "true",
+            "NRRSYSTEMFAILURE": "KEEPNOTREADY",
+            "NRRAFTERLOGIN": "AUTOREADY",
+            "PNLSCRLTRUNKS": "true",
+            "NRRREQUIREMENT": "AUTOREADY",
+            "MODDATE": "2024-02-13 18:29:18.223",
+            "NRRTRAINING": "AUTOREADY"
+        },
+        "INBOUND": 6,
+        "seatType": "Extension",
+        "INTERFACE": "PJSIP/1932",
+        "holdNotificationSoundDuration": "30",
+        "ready": true,
+        "busy": 0,
+        "lastStateChangeDuration": 71,
+        "USERNAME": "Test",
+        "PHONETYPE": "WebRTCPhone",
+        "holdNotificationSoundUrl": "holdBeep.mp3",
+        "AVGTALK": 86,
+        "dialoutpopup": true,
+        "CAMPAIGN": 0,
+        "CONTID": "21aec9e8-4265-4b61-b956-ff3556441a7e",
+        "EXTEN": "1932",
+        "cc_popup_close": true,
+        "TALKDURATION": 3180,
+        "DISPLAYNAME": "Test Agent",
+        "audioWebChatAutoAnswer": "holdBeep.mp3",
+        "SURNAME": "Agent",
+        "holdRecordControl": "false",
+        "EXTID": "b387879f-8418-4002-b48a-bb0a8e0f98f5",
+        "phoneAccessNewContact": false,
+        "audioWebchatRingSound": "newMessage.mp3",
+        "isActivityMandatoryAfterAnswer": false,
+        "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+        "USERCODE": "test.agent",
+        "WEBCHAT": 0,
+        "TOTALLOGINDURATION": 41008,
+        "isActivityMandatory": false,
+        "TOTALNOTREADYDURATION": 6208,
+        "OUTBOUND": 17,
+        "REMOTEINTERFACE": "Local/001932-91e5c35d-3849-434d-8ca7-9e349f01f6ff@tegsoft-CLUSTER-AGENT",
+        "TOTALCALLCOUNT": 37
+    },
+    "assignDateMillis": 1708543090961,
+    "SKILL": "7000",
+    "offerCount": 1,
+    "QEHOLDTIME": 9,
+    "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+    "AUTOANSWER": "false",
+    "DTMF": "WELCOME5",
+    "WELCOME": "5",
+    "PRIORITY": "3",
+    "ivrDurationMillis": 5489,
+    "waitStartMillis": 1708543078455,
+    "waitDurationMillis": 9208,
+    "RINGTIME": "15",
+    "ctiVariableNames": [
+        "WELCOME"
+    ],
+    "ROUTERID": "e06849c6-c6ae-4e24-a285-7648367bb69f",
+    "DID": "XXXXXXXXXX",
+    "ivrDurationSeconds": 5,
+    "CONTID": "8c6d3bb9-389b-4a13-ae05-43f05662ddf0",
+    "DST": "XXXXXXXXXX",
+    "assignDate": "21/02/2024 22:18:10",
+    "DIRECTION": "INBOUND",
+    "WRAPUPTIME": "2",
+    "CALLDATE": "21/02/2024 22:17:52",
+    "CONTTYPE": "VOICE",
+    "QEORIGINALPOS": 1,
+    "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+    "USERCODE": "test.agent",
+    "UNIQUEID": "1708543072.368",
+    "CHANNEL": "PJSIP/ea27068e-41c6-4ddd-8508-7cf303baaf69-0000008b",
+    "offerDate": "21/02/2024 22:18:11",
+    "waitDurationSeconds": 9,
+    "waitStartDate": "21/02/2024 22:17:58",
+    "AUTONOTREADY": "true",
+    "callerIdName": "John Doe",
+    "status": "OFFER"
+}
+Ringnoanswer event
+
+If the offered agent doesn't answer the call in time, the call returns to the queue, and the caller state becomes RINGNOANSWER. Actually "Return to Queue" is an analogy to explain the flow easier. Normally the call never leaves the queue or returns.
+
+When a ring no answer event occurs following content is delivered in the defined webhook.
+
+View More
+json
+{
+   "callerIdNumber":"XXXXXXXXXX",
+   "agent":{
+      "lastStateChange":1706639547643,
+      "phoneAccess":true,
+      "popup_mode":"internal",
+      "ANSWERED":0,
+      "beepSound":"beep.mp3",
+      "LOGINDURATION":205,
+      "PBXID":"05f4e9b2-0c19-4a3e-8802-cda69d44e446",
+      "autoAnswerActive":false,
+      "STATEDURATION":3,
+      "NOTREADYDURATION":0,
+      "rowTBLPBXEXT":{
+         "CALLERID":"3333",
+         "EXTSTATE":"OK",
+         "CALLWAIT":"false",
+         "EXTID":"7a369f0c-7d7d-4af9-8c15-992c57207d5f",
+         "PHONETYPE":"WebRTCPhone-AudioOnly",
+         "SECRET":"3333",
+         "EXTEN":"3333",
+         "dataRowState":"Unchanged"
+      },
+      "PHOTOURL":"/Tobe/image/themes/flat2/tegsoft_user_default.png",
+      "rowTBLCCAGENT":{
+         "PNLSCRLSTATUS":"true",
+         "QUEUESELECTION":"false",
+         "CHAT":"true",
+         "PNLPAGESIZE":"25",
+         "EMAIL":"true",
+         "MRAFTERLOGIN":"false",
+         "INBOUND":"true",
+         "NRRMEETING":"KEEPNOTREADY",
+         "PNLSCRLEXTENSIONS":"false",
+         "NRRFOOD":"AUTOREADY",
+         "CAMP":"true",
+         "PNLTIMER":"10",
+         "PNLSCRLINBOUND":"true",
+         "NRDIALALLOWED":"true",
+         "NRROPERATION":"AUTOREADY",
+         "NRRMEDICAL":"AUTOREADY",
+         "PNLSCRLOUTBOUND":"false",
+         "NRROTHER":"KEEPNOTREADY",
+         "PNLSCRLRTD":"true",
+         "NRRINTERNALSERVICE":"KEEPNOTREADY",
+         "dataRowState":"Unchanged",
+         "UID":"aa5a660a-1a6c-45fa-bc4c-d1ab9efa1203",
+         "PNLSCRLAGENTS":"true",
+         "NRRSYSTEMFAILURE":"KEEPNOTREADY",
+         "NRRAFTERLOGIN":"AUTOREADY",
+         "PNLSCRLTRUNKS":"true",
+         "NRRREQUIREMENT":"AUTOREADY",
+         "NRRTRAINING":"AUTOREADY"
+      },
+      "INBOUND":0,
+      "seatType":"Extension",
+      "INTERFACE":"PJSIP/3333",
+      "ready":true,
+      "holdNotificationSoundDuration":"30",
+      "busy":0,
+      "lastStateChangeDuration":3,
+      "PHONETYPE":"WebRTCPhone-AudioOnly",
+      "USERNAME":"Agent",
+      "holdNotificationSoundUrl":"holdBeep.mp3",
+      "AVGTALK":0,
+      "dialoutpopup":true,
+      "CAMPAIGN":0,
+      "EXTEN":"3333",
+      "cc_popup_close":true,
+      "CONTID":"78aba3ac-436c-4e09-8c5f-a60a69ad9641",
+      "TALKDURATION":0,
+      "DISPLAYNAME":"Agent Test",
+      "audioWebChatAutoAnswer":"holdBeep.mp3",
+      "SURNAME":"Test",
+      "holdRecordControl":"false",
+      "EXTID":"7a369f0c-7d7d-4af9-8c15-992c57207d5f",
+      "phoneAccessNewContact":false,
+      "audioWebchatRingSound":"newMessage.mp3",
+      "isActivityMandatoryAfterAnswer":false,
+      "UID":"aa5a660a-1a6c-45fa-bc4c-d1ab9efa1203",
+      "USERCODE":"agent.test",
+      "WEBCHAT":0,
+      "TOTALLOGINDURATION":128,
+      "isActivityMandatory":false,
+      "TOTALNOTREADYDURATION":128,
+      "OUTBOUND":0,
+      "REMOTEINTERFACE":"Local/003333-05f4e9b2-0c19-4a3e-8802-cda69d44e446@tegsoft-CLUSTER-AGENT",
+      "TOTALCALLCOUNT":0
+   },
+   "SKILL":"7000",
+   "offerCount":0,
+   "QEHOLDTIME":70,
+   "PBXID":"afc074cd-3a20-46be-be64-90ffeb8828d9",
+   "AUTOANSWER":"false",
+   "PRIORITY":"3",
+   "waitDurationMillis":70806,
+   "RINGTIME":"15",
+   "ROUTERID":"743a61e3-6662-4d13-86d0-02deed725479",
+   "usercode":"agent.test",
+   "DID":"YYYYYYYYYYYY",
+   "DST":"YYYYYYYYYYYY",
+   "waitStart":1706639492037,
+   "assignDate":1706639550957,
+   "DIRECTION":"INBOUND",
+   "WRAPUPTIME":"2",
+   "dialBegin":1706639551893,
+   "CALLDATE":"30/01/2024 21:31:21",
+   "CONTTYPE":"VOICE",
+   "QEORIGINALPOS":1,
+   "UID":"aa5a660a-1a6c-45fa-bc4c-d1ab9efa1203",
+   "UNIQUEID":"1706639481.104",
+   "CHANNEL":"PJSIP/c96b01a3-81fa-4392-8903-af17b34b2b56-00000010",
+   "offerDate":1706639551868,
+   "waitDurationSeconds":70,
+   "AUTONOTREADY":"true",
+   "callerIdName":"XXXXXXXXXX",
+   "ACTIVITYMANDATORY":"no",
+   "status":"RINGNOANSWER"
+}
+Connect event
+View More
+json
+{
+    "offerDateMillis": 1708543091171,
+    "callerIdNumber": "XXXXXXXXXX",
+    "agent": {
+        "phoneAccess": true,
+        "popup_mode": "both",
+        "lastStateChange": 1708543019813,
+        "beepSound": "beep.mp3",
+        "ANSWERED": 35,
+        "LOGINDURATION": 436,
+        "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+        "autoAnswerActive": false,
+        "STATEDURATION": 71,
+        "NOTREADYDURATION": 0,
+        "rowTBLPBXEXT": {
+            "CALLERID": "1932",
+            "EXTSTATE": "OK",
+            "CALLWAIT": "false",
+            "EXTID": "b387879f-8418-4002-b48a-bb0a8e0f98f5",
+            "PHONETYPE": "WebRTCPhone",
+            "SECRET": "tegsoft13591932",
+            "dataRowState": "Unchanged",
+            "EXTEN": "1932"
+        },
+        "PHOTOURL": "/Tobe/image/themes/flat2/tegsoft_user_default.png",
+        "rowTBLCCAGENT": {
+            "PNLSCRLSTATUS": "true",
+            "OUTANNOUNCE": "false",
+            "QUEUESELECTION": "false",
+            "CHAT": "true",
+            "PNLPAGESIZE": "25",
+            "EMAIL": "true",
+            "MRAFTERLOGIN": "false",
+            "MODUID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+            "INBOUND": "true",
+            "NRRMEETING": "KEEPNOTREADY",
+            "INANNOUNCEFILE": "46e4417d-43c5-4233-aa76-c943c599b7cf",
+            "PNLSCRLEXTENSIONS": "false",
+            "NRRFOOD": "AUTOREADY",
+            "PLAYANNOUNCE": "true",
+            "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+            "CAMPANNOUNCE": "false",
+            "CAMP": "true",
+            "PNLTIMER": "10",
+            "PNLSCRLINBOUND": "true",
+            "NRDIALALLOWED": "true",
+            "NRROPERATION": "AUTOREADY",
+            "NRRMEDICAL": "AUTOREADY",
+            "PNLSCRLOUTBOUND": "false",
+            "NRROTHER": "KEEPNOTREADY",
+            "PNLSCRLRTD": "true",
+            "NRRINTERNALSERVICE": "KEEPNOTREADY",
+            "dataRowState": "Unchanged",
+            "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+            "CONTEXTID": "53ed25f3-36b1-45f6-8ae6-34dff98fb50a",
+            "INANNOUNCE": "true",
+            "PNLSCRLAGENTS": "true",
+            "NRRSYSTEMFAILURE": "KEEPNOTREADY",
+            "NRRAFTERLOGIN": "AUTOREADY",
+            "PNLSCRLTRUNKS": "true",
+            "NRRREQUIREMENT": "AUTOREADY",
+            "MODDATE": "2024-02-13 18:29:18.223",
+            "NRRTRAINING": "AUTOREADY"
+        },
+        "INBOUND": 6,
+        "seatType": "Extension",
+        "INTERFACE": "PJSIP/1932",
+        "holdNotificationSoundDuration": "30",
+        "ready": true,
+        "busy": 0,
+        "lastStateChangeDuration": 71,
+        "USERNAME": "Test",
+        "PHONETYPE": "WebRTCPhone",
+        "holdNotificationSoundUrl": "holdBeep.mp3",
+        "AVGTALK": 86,
+        "dialoutpopup": true,
+        "CAMPAIGN": 0,
+        "CONTID": "21aec9e8-4265-4b61-b956-ff3556441a7e",
+        "EXTEN": "1932",
+        "cc_popup_close": true,
+        "TALKDURATION": 3180,
+        "DISPLAYNAME": "Test Agent",
+        "audioWebChatAutoAnswer": "holdBeep.mp3",
+        "SURNAME": "Agent",
+        "holdRecordControl": "false",
+        "EXTID": "b387879f-8418-4002-b48a-bb0a8e0f98f5",
+        "phoneAccessNewContact": false,
+        "audioWebchatRingSound": "newMessage.mp3",
+        "isActivityMandatoryAfterAnswer": false,
+        "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+        "USERCODE": "test.agent",
+        "WEBCHAT": 0,
+        "TOTALLOGINDURATION": 41008,
+        "isActivityMandatory": false,
+        "TOTALNOTREADYDURATION": 6208,
+        "OUTBOUND": 17,
+        "REMOTEINTERFACE": "Local/001932-91e5c35d-3849-434d-8ca7-9e349f01f6ff@tegsoft-CLUSTER-AGENT",
+        "TOTALCALLCOUNT": 37
+    },
+    "assignDateMillis": 1708543090961,
+    "SKILL": "7000",
+    "offerCount": 1,
+    "QEHOLDTIME": 9,
+    "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+    "AUTOANSWER": "false",
+    "DTMF": "WELCOME5",
+    "WELCOME": "5",
+    "PRIORITY": "3",
+    "ivrDurationMillis": 5489,
+    "waitStartMillis": 1708543078455,
+    "waitDurationMillis": 9208,
+    "RINGTIME": "15",
+    "ctiVariableNames": [
+        "WELCOME"
+    ],
+    "ROUTERID": "e06849c6-c6ae-4e24-a285-7648367bb69f",
+    "DID": "XXXXXXXXXX",
+    "ivrDurationSeconds": 5,
+    "CONTID": "8c6d3bb9-389b-4a13-ae05-43f05662ddf0",
+    "DST": "XXXXXXXXXX",
+    "assignDate": "21/02/2024 22:18:10",
+    "DIRECTION": "INBOUND",
+    "WRAPUPTIME": "2",
+    "CALLDATE": "21/02/2024 22:17:52",
+    "CONTTYPE": "VOICE",
+    "QEORIGINALPOS": 1,
+    "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+    "USERCODE": "test.agent",
+    "UNIQUEID": "1708543072.368",
+    "CHANNEL": "PJSIP/ea27068e-41c6-4ddd-8508-7cf303baaf69-0000008b",
+    "offerDate": "21/02/2024 22:18:11",
+    "waitDurationSeconds": 9,
+    "waitStartDate": "21/02/2024 22:17:58",
+    "AUTONOTREADY": "true",
+    "callerIdName": "John Doe",
+    "status": "CONNECT"
+}
+Agentdump event
+
+If the offer event fails (busy call, failed to dial, etc.) the caller becomes eligible for re-assignment.
+
+View More
+json
+{
+   "callerIdNumber":"XXXXXXXXXX",
+   "agent":{
+      "lastStateChange":1706639462841,
+      "phoneAccess":true,
+      "popup_mode":"internal",
+      "notReadyReason":"AFTERLOGIN",
+      "ANSWERED":0,
+      "beepSound":"beep.mp3",
+      "LOGINDURATION":194,
+      "PBXID":"05f4e9b2-0c19-4a3e-8802-cda69d44e446",
+      "autoAnswerActive":false,
+      "STATEDURATION":77,
+      "NOTREADYDURATION":194,
+      "rowTBLPBXEXT":{
+         "CALLERID":"3333",
+         "EXTSTATE":"OK",
+         "CALLWAIT":"false",
+         "EXTID":"7a369f0c-7d7d-4af9-8c15-992c57207d5f",
+         "PHONETYPE":"WebRTCPhone-AudioOnly",
+         "SECRET":"3333",
+         "EXTEN":"3333",
+         "dataRowState":"Unchanged"
+      },
+      "PHOTOURL":"/Tobe/image/themes/flat2/tegsoft_user_default.png",
+      "rowTBLCCAGENT":{
+         "PNLSCRLSTATUS":"true",
+         "QUEUESELECTION":"false",
+         "CHAT":"true",
+         "PNLPAGESIZE":"25",
+         "EMAIL":"true",
+         "MRAFTERLOGIN":"false",
+         "INBOUND":"true",
+         "NRRMEETING":"KEEPNOTREADY",
+         "PNLSCRLEXTENSIONS":"false",
+         "NRRFOOD":"AUTOREADY",
+         "CAMP":"true",
+         "PNLTIMER":"10",
+         "PNLSCRLINBOUND":"true",
+         "NRDIALALLOWED":"true",
+         "NRROPERATION":"AUTOREADY",
+         "NRRMEDICAL":"AUTOREADY",
+         "PNLSCRLOUTBOUND":"false",
+         "NRROTHER":"KEEPNOTREADY",
+         "PNLSCRLRTD":"true",
+         "NRRINTERNALSERVICE":"KEEPNOTREADY",
+         "dataRowState":"Unchanged",
+         "UID":"aa5a660a-1a6c-45fa-bc4c-d1ab9efa1203",
+         "PNLSCRLAGENTS":"true",
+         "NRRSYSTEMFAILURE":"KEEPNOTREADY",
+         "NRRAFTERLOGIN":"AUTOREADY",
+         "PNLSCRLTRUNKS":"true",
+         "NRRREQUIREMENT":"AUTOREADY",
+         "NRRTRAINING":"AUTOREADY"
+      },
+      "INBOUND":0,
+      "seatType":"Extension",
+      "INTERFACE":"PJSIP/3333",
+      "ready":false,
+      "holdNotificationSoundDuration":"30",
+      "busy":0,
+      "lastStateChangeDuration":77,
+      "PHONETYPE":"WebRTCPhone-AudioOnly",
+      "USERNAME":"Agent",
+      "holdNotificationSoundUrl":"holdBeep.mp3",
+      "AVGTALK":0,
+      "dialoutpopup":true,
+      "CAMPAIGN":0,
+      "EXTEN":"3333",
+      "cc_popup_close":true,
+      "CONTID":"78aba3ac-436c-4e09-8c5f-a60a69ad9641",
+      "TALKDURATION":0,
+      "DISPLAYNAME":"Agent Test",
+      "audioWebChatAutoAnswer":"holdBeep.mp3",
+      "SURNAME":"Test",
+      "holdRecordControl":"false",
+      "EXTID":"7a369f0c-7d7d-4af9-8c15-992c57207d5f",
+      "phoneAccessNewContact":false,
+      "audioWebchatRingSound":"newMessage.mp3",
+      "isActivityMandatoryAfterAnswer":false,
+      "UID":"aa5a660a-1a6c-45fa-bc4c-d1ab9efa1203",
+      "USERCODE":"agent.test",
+      "WEBCHAT":0,
+      "TOTALLOGINDURATION":128,
+      "isActivityMandatory":false,
+      "TOTALNOTREADYDURATION":128,
+      "OUTBOUND":0,
+      "REMOTEINTERFACE":"Local/003333-05f4e9b2-0c19-4a3e-8802-cda69d44e446@tegsoft-CLUSTER-AGENT",
+      "TOTALCALLCOUNT":0
+   },
+   "SKILL":"7000",
+   "offerCount":0,
+   "QEHOLDTIME":40,
+   "PBXID":"afc074cd-3a20-46be-be64-90ffeb8828d9",
+   "AUTOANSWER":"false",
+   "PRIORITY":"3",
+   "waitDurationMillis":40754,
+   "RINGTIME":"15",
+   "ROUTERID":"743a61e3-6662-4d13-86d0-02deed725479",
+   "usercode":"agent.test",
+   "DID":"YYYYYYYYYYYY",
+   "dumpReason":"BUSY",
+   "DST":"YYYYYYYYYYYY",
+   "waitStart":1706639492037,
+   "assignDate":1706639540700,
+   "DIRECTION":"INBOUND",
+   "WRAPUPTIME":"2",
+   "dialBegin":1706639540968,
+   "CALLDATE":"30/01/2024 21:31:21",
+   "CONTTYPE":"VOICE",
+   "QEORIGINALPOS":1,
+   "UID":"aa5a660a-1a6c-45fa-bc4c-d1ab9efa1203",
+   "UNIQUEID":"1706639481.104",
+   "CHANNEL":"PJSIP/c96b01a3-81fa-4392-8903-af17b34b2b56-00000010",
+   "offerDate":1706639540922,
+   "EXTSTATE":"OK",
+   "waitDurationSeconds":40,
+   "AUTONOTREADY":"true",
+   "callerIdName":"XXXXXXXXXX",
+   "ACTIVITYMANDATORY":"no",
+   "status":"AGENTDUMP"
+}
+Agent hangup
+
+If the agent hangs up on the caller COMPLETEAGENT event will occur and a webhook fired with the content below.
+
+View More
+json
+{
+    "offerDateMillis": 1708543091171,
+    "callerIdNumber": "XXXXXXXXXX",
+    "agent": {
+        "phoneAccess": true,
+        "popup_mode": "both",
+        "lastStateChange": 1708543019813,
+        "beepSound": "beep.mp3",
+        "ANSWERED": 35,
+        "LOGINDURATION": 436,
+        "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+        "autoAnswerActive": false,
+        "STATEDURATION": 71,
+        "NOTREADYDURATION": 0,
+        "rowTBLPBXEXT": {
+            "CALLERID": "1932",
+            "EXTSTATE": "OK",
+            "CALLWAIT": "false",
+            "EXTID": "b387879f-8418-4002-b48a-bb0a8e0f98f5",
+            "PHONETYPE": "WebRTCPhone",
+            "SECRET": "tegsoft13591932",
+            "dataRowState": "Unchanged",
+            "EXTEN": "1932"
+        },
+        "PHOTOURL": "/Tobe/image/themes/flat2/tegsoft_user_default.png",
+        "rowTBLCCAGENT": {
+            "PNLSCRLSTATUS": "true",
+            "OUTANNOUNCE": "false",
+            "QUEUESELECTION": "false",
+            "CHAT": "true",
+            "PNLPAGESIZE": "25",
+            "EMAIL": "true",
+            "MRAFTERLOGIN": "false",
+            "MODUID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+            "INBOUND": "true",
+            "NRRMEETING": "KEEPNOTREADY",
+            "INANNOUNCEFILE": "46e4417d-43c5-4233-aa76-c943c599b7cf",
+            "PNLSCRLEXTENSIONS": "false",
+            "NRRFOOD": "AUTOREADY",
+            "PLAYANNOUNCE": "true",
+            "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+            "CAMPANNOUNCE": "false",
+            "CAMP": "true",
+            "PNLTIMER": "10",
+            "PNLSCRLINBOUND": "true",
+            "NRDIALALLOWED": "true",
+            "NRROPERATION": "AUTOREADY",
+            "NRRMEDICAL": "AUTOREADY",
+            "PNLSCRLOUTBOUND": "false",
+            "NRROTHER": "KEEPNOTREADY",
+            "PNLSCRLRTD": "true",
+            "NRRINTERNALSERVICE": "KEEPNOTREADY",
+            "dataRowState": "Unchanged",
+            "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+            "CONTEXTID": "53ed25f3-36b1-45f6-8ae6-34dff98fb50a",
+            "INANNOUNCE": "true",
+            "PNLSCRLAGENTS": "true",
+            "NRRSYSTEMFAILURE": "KEEPNOTREADY",
+            "NRRAFTERLOGIN": "AUTOREADY",
+            "PNLSCRLTRUNKS": "true",
+            "NRRREQUIREMENT": "AUTOREADY",
+            "MODDATE": "2024-02-13 18:29:18.223",
+            "NRRTRAINING": "AUTOREADY"
+        },
+        "INBOUND": 6,
+        "seatType": "Extension",
+        "INTERFACE": "PJSIP/1932",
+        "holdNotificationSoundDuration": "30",
+        "ready": true,
+        "busy": 0,
+        "lastStateChangeDuration": 71,
+        "USERNAME": "Test",
+        "PHONETYPE": "WebRTCPhone",
+        "holdNotificationSoundUrl": "holdBeep.mp3",
+        "AVGTALK": 86,
+        "dialoutpopup": true,
+        "CAMPAIGN": 0,
+        "CONTID": "21aec9e8-4265-4b61-b956-ff3556441a7e",
+        "EXTEN": "1932",
+        "cc_popup_close": true,
+        "TALKDURATION": 3180,
+        "DISPLAYNAME": "Test Agent",
+        "audioWebChatAutoAnswer": "holdBeep.mp3",
+        "SURNAME": "Agent",
+        "holdRecordControl": "false",
+        "EXTID": "b387879f-8418-4002-b48a-bb0a8e0f98f5",
+        "phoneAccessNewContact": false,
+        "audioWebchatRingSound": "newMessage.mp3",
+        "isActivityMandatoryAfterAnswer": false,
+        "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+        "USERCODE": "test.agent",
+        "WEBCHAT": 0,
+        "TOTALLOGINDURATION": 41008,
+        "isActivityMandatory": false,
+        "TOTALNOTREADYDURATION": 6208,
+        "OUTBOUND": 17,
+        "REMOTEINTERFACE": "Local/001932-91e5c35d-3849-434d-8ca7-9e349f01f6ff@tegsoft-CLUSTER-AGENT",
+        "TOTALCALLCOUNT": 37
+    },
+    "connectDate": "21/02/2024 22:18:23",
+    "talkDurationSeconds": 483,
+    "assignDateMillis": 1708543090961,
+    "SKILL": "7000",
+    "offerCount": 1,
+    "QEHOLDTIME": 9,
+    "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+    "AUTOANSWER": "false",
+    "DTMF": "WELCOME5",
+    "WELCOME": "5",
+    "PRIORITY": "3",
+    "ivrDurationMillis": 5489,
+    "waitStartMillis": 1708543078455,
+    "waitDurationMillis": 9208,
+    "talkDurationMillis": 483685,
+    "RINGTIME": "15",
+    "completeDate": "21/02/2024 22:26:26",
+    "ctiVariableNames": [
+        "WELCOME"
+    ],
+    "ROUTERID": "e06849c6-c6ae-4e24-a285-7648367bb69f",
+    "connectMillis": 1708543103150,
+    "DID": "XXXXXXXXXX",
+    "ivrDurationSeconds": 5,
+    "CONTID": "8c6d3bb9-389b-4a13-ae05-43f05662ddf0",
+    "completeMillis": 1708543586835,
+    "DST": "XXXXXXXXXX",
+    "assignDate": "21/02/2024 22:18:10",
+    "DIRECTION": "INBOUND",
+    "WRAPUPTIME": "2",
+    "CALLDATE": "21/02/2024 22:17:52",
+    "CONTTYPE": "VOICE",
+    "QEORIGINALPOS": 1,
+    "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+    "USERCODE": "test.agent",
+    "UNIQUEID": "1708543072.368",
+    "CHANNEL": "PJSIP/ea27068e-41c6-4ddd-8508-7cf303baaf69-0000008b",
+    "offerDate": "21/02/2024 22:18:11",
+    "waitDurationSeconds": 508,
+    "waitStartDate": "21/02/2024 22:17:58",
+    "AUTONOTREADY": "true",
+    "callerIdName": "John Doe",
+    "status": "COMPLETEAGENT"
+}
+Caller hangup
+
+If the caller hangs up while speaking with an agent COMPLETECALLER event will occur and a webhook fired with the content below.
+
+View More
+json
+{
+    "offerDateMillis": 1708543091171,
+    "callerIdNumber": "XXXXXXXXXX",
+    "agent": {
+        "phoneAccess": true,
+        "popup_mode": "both",
+        "lastStateChange": 1708543019813,
+        "beepSound": "beep.mp3",
+        "ANSWERED": 35,
+        "LOGINDURATION": 436,
+        "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+        "autoAnswerActive": false,
+        "STATEDURATION": 71,
+        "NOTREADYDURATION": 0,
+        "rowTBLPBXEXT": {
+            "CALLERID": "1932",
+            "EXTSTATE": "OK",
+            "CALLWAIT": "false",
+            "EXTID": "b387879f-8418-4002-b48a-bb0a8e0f98f5",
+            "PHONETYPE": "WebRTCPhone",
+            "SECRET": "tegsoft13591932",
+            "dataRowState": "Unchanged",
+            "EXTEN": "1932"
+        },
+        "PHOTOURL": "/Tobe/image/themes/flat2/tegsoft_user_default.png",
+        "rowTBLCCAGENT": {
+            "PNLSCRLSTATUS": "true",
+            "OUTANNOUNCE": "false",
+            "QUEUESELECTION": "false",
+            "CHAT": "true",
+            "PNLPAGESIZE": "25",
+            "EMAIL": "true",
+            "MRAFTERLOGIN": "false",
+            "MODUID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+            "INBOUND": "true",
+            "NRRMEETING": "KEEPNOTREADY",
+            "INANNOUNCEFILE": "46e4417d-43c5-4233-aa76-c943c599b7cf",
+            "PNLSCRLEXTENSIONS": "false",
+            "NRRFOOD": "AUTOREADY",
+            "PLAYANNOUNCE": "true",
+            "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+            "CAMPANNOUNCE": "false",
+            "CAMP": "true",
+            "PNLTIMER": "10",
+            "PNLSCRLINBOUND": "true",
+            "NRDIALALLOWED": "true",
+            "NRROPERATION": "AUTOREADY",
+            "NRRMEDICAL": "AUTOREADY",
+            "PNLSCRLOUTBOUND": "false",
+            "NRROTHER": "KEEPNOTREADY",
+            "PNLSCRLRTD": "true",
+            "NRRINTERNALSERVICE": "KEEPNOTREADY",
+            "dataRowState": "Unchanged",
+            "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+            "CONTEXTID": "53ed25f3-36b1-45f6-8ae6-34dff98fb50a",
+            "INANNOUNCE": "true",
+            "PNLSCRLAGENTS": "true",
+            "NRRSYSTEMFAILURE": "KEEPNOTREADY",
+            "NRRAFTERLOGIN": "AUTOREADY",
+            "PNLSCRLTRUNKS": "true",
+            "NRRREQUIREMENT": "AUTOREADY",
+            "MODDATE": "2024-02-13 18:29:18.223",
+            "NRRTRAINING": "AUTOREADY"
+        },
+        "INBOUND": 6,
+        "seatType": "Extension",
+        "INTERFACE": "PJSIP/1932",
+        "holdNotificationSoundDuration": "30",
+        "ready": true,
+        "busy": 0,
+        "lastStateChangeDuration": 71,
+        "USERNAME": "Test",
+        "PHONETYPE": "WebRTCPhone",
+        "holdNotificationSoundUrl": "holdBeep.mp3",
+        "AVGTALK": 86,
+        "dialoutpopup": true,
+        "CAMPAIGN": 0,
+        "CONTID": "21aec9e8-4265-4b61-b956-ff3556441a7e",
+        "EXTEN": "1932",
+        "cc_popup_close": true,
+        "TALKDURATION": 3180,
+        "DISPLAYNAME": "Test Agent",
+        "audioWebChatAutoAnswer": "holdBeep.mp3",
+        "SURNAME": "Agent",
+        "holdRecordControl": "false",
+        "EXTID": "b387879f-8418-4002-b48a-bb0a8e0f98f5",
+        "phoneAccessNewContact": false,
+        "audioWebchatRingSound": "newMessage.mp3",
+        "isActivityMandatoryAfterAnswer": false,
+        "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+        "USERCODE": "test.agent",
+        "WEBCHAT": 0,
+        "TOTALLOGINDURATION": 41008,
+        "isActivityMandatory": false,
+        "TOTALNOTREADYDURATION": 6208,
+        "OUTBOUND": 17,
+        "REMOTEINTERFACE": "Local/001932-91e5c35d-3849-434d-8ca7-9e349f01f6ff@tegsoft-CLUSTER-AGENT",
+        "TOTALCALLCOUNT": 37
+    },
+    "connectDate": "21/02/2024 22:18:23",
+    "talkDurationSeconds": 483,
+    "assignDateMillis": 1708543090961,
+    "SKILL": "7000",
+    "offerCount": 1,
+    "QEHOLDTIME": 9,
+    "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+    "AUTOANSWER": "false",
+    "DTMF": "WELCOME5",
+    "WELCOME": "5",
+    "PRIORITY": "3",
+    "ivrDurationMillis": 5489,
+    "waitStartMillis": 1708543078455,
+    "waitDurationMillis": 9208,
+    "talkDurationMillis": 483685,
+    "RINGTIME": "15",
+    "completeDate": "21/02/2024 22:26:26",
+    "ctiVariableNames": [
+        "WELCOME"
+    ],
+    "ROUTERID": "e06849c6-c6ae-4e24-a285-7648367bb69f",
+    "connectMillis": 1708543103150,
+    "DID": "XXXXXXXXXX",
+    "ivrDurationSeconds": 5,
+    "CONTID": "8c6d3bb9-389b-4a13-ae05-43f05662ddf0",
+    "completeMillis": 1708543586835,
+    "DST": "XXXXXXXXXX",
+    "assignDate": "21/02/2024 22:18:10",
+    "DIRECTION": "INBOUND",
+    "WRAPUPTIME": "2",
+    "CALLDATE": "21/02/2024 22:17:52",
+    "CONTTYPE": "VOICE",
+    "QEORIGINALPOS": 1,
+    "UID": "f267ec3a-ec00-4e32-938e-21788880d45a",
+    "USERCODE": "test.agent",
+    "UNIQUEID": "1708543072.368",
+    "CHANNEL": "PJSIP/ea27068e-41c6-4ddd-8508-7cf303baaf69-0000008b",
+    "offerDate": "21/02/2024 22:18:11",
+    "waitDurationSeconds": 508,
+    "waitStartDate": "21/02/2024 22:17:58",
+    "AUTONOTREADY": "true",
+    "callerIdName": "John Doe",
+    "status": "COMPLETECALLER"
+}
+Attended transfer
+
+Reserved webhook.
+
+Blind transfer
+
+Reserved webhook.
+
+Transfer2
+
+Reserved webhook.
+
+Abandon
+
+If the caller hangs up before speaking with an agent ABANDON event will occur.
+
+View More
+json
+{
+    "callerIdNumber": "XXXXXXXXXX",
+    "SKILL": "7000",
+    "offerCount": 0,
+    "PBXID": "91e5c35d-3849-434d-8ca7-9e349f01f6ff",
+    "AUTOANSWER": "false",
+    "DTMF": "WELCOME5",
+    "WELCOME": "5",
+    "PRIORITY": "3",
+    "ivrDurationMillis": 6230,
+    "waitStartMillis": 1708545229117,
+    "RINGTIME": "15",
+    "completeDate": "21/02/2024 22:53:56",
+    "ctiVariableNames": [
+        "WELCOME"
+    ],
+    "ROUTERID": "e06849c6-c6ae-4e24-a285-7648367bb69f",
+    "DID": "XXXXXXXXXX",
+    "ivrDurationSeconds": 6,
+    "CONTID": "8c6d3bb9-389b-4a13-ae05-43f05662ddf0",
+    "completeMillis": 1708545236862,
+    "DST": "XXXXXXXXXX",
+    "DIRECTION": "INBOUND",
+    "WRAPUPTIME": "2",
+    "CALLDATE": "21/02/2024 22:53:42",
+    "CONTTYPE": "VOICE",
+    "QEORIGINALPOS": 1,
+    "UNIQUEID": "1708545222.392",
+    "CHANNEL": "PJSIP/ea27068e-41c6-4ddd-8508-7cf303baaf69-00000093",
+    "waitDurationSeconds": 7,
+    "waitStartDate": "21/02/2024 22:53:49",
+    "AUTONOTREADY": "true",
+    "callerIdName": "John Doe",
+    "status": "ABANDON"
+}
+Exitempty event
+
+Reserved webhook.
+
+Exitwithtimeout event
+
+Reserved webhook.
+
+GET
+Real time status of campaigns
+https://sample.tegsoftcloud.com/Tobe/view/RealTimeCampaignData
+
+Using this API, users can build custom dashboards for contact center supervisors to monitor campaigns data such as
+
+Active agents in campaign and their details
+Campaign settings
+
+in real-time.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+agentId
+
+e0f9a65e-4745-464f-a372-5e54965ce73a
+
+Agent's UID
+
+agentGroup
+
+7000
+
+Skill id value must be given
+
+campaignId
+
+40f2dc20-6bda-4de0-91c0-4e72bb7ce1c5
+
+Campaign ID
+
+campaignType
+
+ATTENDED
+
+Campaign Types should be one of these (ATTENDED, UNATTENDED, ABANDON_ATTENDED, ABANDON_UNATTENDED, SMS, EMAIL )
+
+campaignGroupId
+
+01cac84c-1302-401b-a556-b4bae093ed40
+
+Campaign Group ID
+
+projectId
+
+61caf0af-0ec8-48c6-b332-2c8935b39932
+
+Project ID
+
+service
+
+campaignDetailsOnly
+
+"campaignDetailsOnly" brings only campaign details as result
+
+service
+
+campaignMembersOnly
+
+"campaignMembersOnly" brings only campaign members as result
+
+service
+
+isEligibleToDial
+
+Example Request
+Sample status of campaigns
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/RealTimeCampaignData'
+200 OK
+Example Response
+Body
+Headers (8)
+View More
+json
+{
+  "duration": 2,
+  "campaigns": [
+    {
+      "SCHME": "0",
+      "CLOSED": "0",
+      "STARTDATE": "2021-10-26 00:00:00.0",
+      "SCHMEORALL": "0",
+      "ENDTIME": "1730",
+      "QUOTABALANCE": "0",
+      "MAXCHANNEL": "10",
+      "CAMPTYPE": "ATTENDED",
+      "SCHEDULED": "0",
+      "CAMPAIGNNAME": "Sample voice campaign",
+      "ENDDATE": "2021-10-27 00:00:00.0",
+      "dataRowState": "Unchanged",
+      "STARTTIME": "0930",
+      "ALLINLIST": "93",
+      "PROGRESS": "0",
+      "CLOSED2": "0",
+      "members": [],
+      "CAMPGRPID": "default",
+      "CAMPAIGNID": "05e6a4bb-76dd-4272-bcfc-2703df2a512c",
+      "NOTCALLED": "93"
+    },
+    {
+      "SCHME": "0",
+      "NEWCALLSTATUS": "Passive_NoData",
+      "CLOSED": "1",
+      "STARTDATE": "2021-09-03 00:00:00.0",
+      "SCHMEORALL": "0",
+      "ENDTIME": "2330",
+      "QUOTABALANCE": "0",
+      "MAXCHANNEL": "10",
+      "CAMPTYPE": "ATTENDED",
+      "ADDITIONALCOUNT": "0+0=0",
+      "SCHEDULED": "0",
+      "CAMPAIGNNAME": "Overflow Test",
+      "ENDDATE": "2021-10-29 00:00:00.0",
+      "IDLEAGENTCOUNT": "1",
+      "dataRowState": "Unchanged",
+      "STARTTIME": "0000",
+      "ACTIVECOUNT": "0",
+      "ALLINLIST": "1",
+      "PROGRESS": "0",
+      "CLOSED2": "0",
+      "members": [
+        {
+          "lastStateChange": 1635270663173,
+          "phoneAccess": true,
+          "popup_mode": "both",
+          "notReadyReason": "AFTERLOGIN",
+          "ANSWERED": 11,
+          "LOGINDURATION": 10,
+          "autoAnswerActive": false,
+          "STATEDURATION": 10,
+          "NOTREADYDURATION": 10,
+          "rowTBLPBXEXT": {
+            "PINLESSDIAL": "true",
+            "NAT": "yes",
+            "CALLERID": "1002",
+            "PBXID": "ebd37af5-260a-436f-9bdf-44bcc9b1b946",
+            "ENCALLERID": "1002",
+            "HOST": "dynamic",
+            "CLIPENABLE": "default",
+            "RINGTIME": 40,
+            "DIRECTEDPICKUPGROUP": "2",
+            "CALLSCREEN": "DISABLED",
+            "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+            "VMPINREQUIRED": "default",
+            "LASTIP": "192.168.47.103",
+            "PHONETYPE": "WebRTCPhone-AudioOnly",
+            "VMACTIVE": "true",
+            "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+            "TYPE": "udp",
+            "LOGLEVEL": "ERROR",
+            "ALLOW": "ulaw&alaw&g729&h261&h263&h264",
+            "EXTEN": "1002",
+            "CANREINVITE": "true",
+            "PORT": 5060,
+            "EXTID": "98daf7d2-bf33-43e8-9b85-850c030191fe",
+            "PICKUPGROUP": "2",
+            "RECORDOUT": "Always",
+            "CALLGROUP": "0",
+            "dataRowState": "Unchanged",
+            "DISABLED": "false",
+            "DISPLAYINFOP": "true",
+            "QUALIFY": "yes",
+            "CONTEXTID": "53ed25f3-36b1-45f6-8ae6-34dff98fb50a",
+            "DTMFMODE": "RFC2833",
+            "RECORDIN": "Always",
+            "EXTSTATE": "OK",
+            "CALLWAIT": "false",
+            "DIALGROUP": "0",
+            "MODDATE": "2021-08-29 16:55:28.412",
+            "SECRET": "tegsoft13591002",
+            "VMMWIACTIVE": "default"
+          },
+          "PHOTOURL": "/Tobe/image/themes/flat2/tegsoft_user_default.png",
+          "rowTBLCCAGENT": {
+            "PNLSCRLSTATUS": "true",
+            "QUEUESELECTION": "false",
+            "CHAT": "true",
+            "PNLPAGESIZE": "25",
+            "EMAIL": "true",
+            "MRAFTERLOGIN": "false",
+            "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+            "INBOUND": "true",
+            "NRRMEETING": "KEEPNOTREADY",
+            "PNLSCRLEXTENSIONS": "false",
+            "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+            "NRRFOOD": "AUTOREADY",
+            "CAMP": "true",
+            "PNLTIMER": "10",
+            "PNLSCRLINBOUND": "true",
+            "NRDIALALLOWED": "true",
+            "NRROPERATION": "AUTOREADY",
+            "NRRMEDICAL": "AUTOREADY",
+            "PNLSCRLOUTBOUND": "false",
+            "NRROTHER": "KEEPNOTREADY",
+            "PNLSCRLRTD": "true",
+            "NRRINTERNALSERVICE": "KEEPNOTREADY",
+            "dataRowState": "Unchanged",
+            "UID": "57bcaee3-d33b-48ea-89af-877fdb5d649b",
+            "PNLSCRLAGENTS": "true",
+            "NRRSYSTEMFAILURE": "KEEPNOTREADY",
+            "NRRAFTERLOGIN": "AUTOREADY",
+            "PNLSCRLTRUNKS": "true",
+            "NRRREQUIREMENT": "AUTOREADY",
+            "MODDATE": "2021-09-08 14:58:11.461",
+            "NRRTRAINING": "AUTOREADY"
+          },
+          "INBOUND": 5,
+          "seatType": "Extension",
+          "INTERFACE": "PJSIP/1002",
+          "ready": false,
+          "busy": 0,
+          "lastStateChangeDuration": 10,
+          "PHONETYPE": "WebRTCPhone-AudioOnly",
+          "USERNAME": "Test",
+          "AVGTALK": 14,
+          "dialoutpopup": true,
+          "EXTEN": "1002",
+          "cc_popup_close": false,
+          "CONTID": "28da8ae6-58b3-43a7-ac83-e8f9a17db710",
+          "TALKDURATION": 282,
+          "DISPLAYNAME": "Test Agent",
+          "SURNAME": "Agent",
+          "loginTBLCCAGENTLOG": {
+            "SESSIONID": "jzVMTf7LD3uim6UtylYCcrSGDAun2YaHkut5mhCZ",
+            "LOGTYPE": "LOGIN",
+            "LOGID": "836e5f83-88d2-4f6a-8492-a91026f3474b",
+            "dataRowState": "Unchanged",
+            "MODUID": "57bcaee3-d33b-48ea-89af-877fdb5d649b",
+            "UID": "57bcaee3-d33b-48ea-89af-877fdb5d649b",
+            "STATUS": "LOGIN",
+            "INTERFACE": "PJSIP/1002",
+            "RINTERFACE": "PJSIP/ebd37af5-260a-436f-9bdf-44bcc9b1b946/1002",
+            "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+            "BEGINDATE": "2021-10-26 20:51:02.969",
+            "REASON": "DEFAULT",
+            "MODDATE": "2021-10-26 20:51:02.969"
+          },
+          "EXTID": "98daf7d2-bf33-43e8-9b85-850c030191fe",
+          "isActivityMandatoryAfterAnswer": false,
+          "UID": "57bcaee3-d33b-48ea-89af-877fdb5d649b",
+          "USERCODE": "test.agent",
+          "TOTALLOGINDURATION": 15709,
+          "TBLCCPOPUP": {
+            "currentRowIndex": 0,
+            "columns": [
+              {
+                "clob": false,
+                "nullable": false,
+                "precision": 40,
+                "autoIncrement": false,
+                "scale": 0,
+                "dataColumnType": "STRING",
+                "defaultValueType": "Object",
+                "defaultValueParameterType": "",
+                "classDataColumnType": "class java.lang.String",
+                "columnName": "UNITUID",
+                "dbColumn": true
+              },
+              {
+                "nullable": false,
+                "defaultValue": "",
+                "precision": 40,
+                "autoIncrement": false,
+                "scale": 0,
+                "defaultValueParameterType": "",
+                "counterId": "UUID",
+                "dbColumn": true,
+                "clob": false,
+                "dataColumnType": "STRING",
+                "defaultValueType": "UUID",
+                "classDataColumnType": "class java.lang.String",
+                "columnName": "POPUPID"
+              },
+              {
+                "clob": false,
+                "nullable": false,
+                "precision": 50,
+                "autoIncrement": false,
+                "scale": 0,
+                "dataColumnType": "STRING",
+                "defaultValueType": "Object",
+                "defaultValueParameterType": "",
+                "classDataColumnType": "class java.lang.String",
+                "columnName": "NAME",
+                "dbColumn": true
+              },
+              {
+                "clob": false,
+                "nullable": true,
+                "precision": 500,
+                "autoIncrement": false,
+                "scale": 0,
+                "dataColumnType": "STRING",
+                "defaultValueType": "Object",
+                "defaultValueParameterType": "",
+                "classDataColumnType": "class java.lang.String",
+                "columnName": "POPUPURL",
+                "dbColumn": true
+              },
+              {
+                "clob": false,
+                "nullable": true,
+                "precision": 500,
+                "autoIncrement": false,
+                "scale": 0,
+                "dataColumnType": "STRING",
+                "defaultValueType": "Object",
+                "defaultValueParameterType": "",
+                "classDataColumnType": "class java.lang.String",
+                "columnName": "AFTERCALLURL",
+                "dbColumn": true
+              },
+              {
+                "clob": false,
+                "nullable": true,
+                "precision": 500,
+                "autoIncrement": false,
+                "scale": 0,
+                "dataColumnType": "STRING",
+                "defaultValueType": "Object",
+                "defaultValueParameterType": "",
+                "classDataColumnType": "class java.lang.String",
+                "columnName": "LOGINURL",
+                "dbColumn": true
+              },
+              {
+                "clob": false,
+                "nullable": true,
+                "precision": 150,
+                "autoIncrement": false,
+                "scale": 0,
+                "dataColumnType": "STRING",
+                "defaultValueType": "Object",
+                "defaultValueParameterType": "",
+                "classDataColumnType": "class java.lang.String",
+                "columnName": "NOTES",
+                "dbColumn": true
+              },
+              {
+                "clob": false,
+                "nullable": false,
+                "precision": 40,
+                "autoIncrement": false,
+                "scale": 0,
+                "dataColumnType": "STRING",
+                "defaultValueType": "Object",
+                "defaultValueParameterType": "",
+                "classDataColumnType": "class java.lang.String",
+                "columnName": "MODUID",
+                "dbColumn": true
+              },
+              {
+                "clob": false,
+                "nullable": false,
+                "precision": 26,
+                "autoIncrement": false,
+                "scale": 6,
+                "dataColumnType": "DATE",
+                "defaultValueType": "Object",
+                "defaultValueParameterType": "",
+                "classDataColumnType": "class java.sql.Timestamp",
+                "columnName": "MODDATE",
+                "dbColumn": true
+              },
+              {
+                "clob": false,
+                "nullable": true,
+                "precision": 500,
+                "autoIncrement": false,
+                "scale": 0,
+                "dataColumnType": "STRING",
+                "defaultValueType": "Object",
+                "defaultValueParameterType": "",
+                "classDataColumnType": "class java.lang.String",
+                "columnName": "OFFERURL",
+                "dbColumn": true
+              }
+            ],
+            "currentRow": [],
+            "name": "TBLCCPOPUP",
+            "rows": [
+              {
+                "MODUID": "99c8404d-ab38-4874-83fd-28d9b8630c1a",
+                "LOGINURL": "http://www.bing.com/search?q={PHONE}%20CONNECTED%20SRC={SRC}%20DST={CLID}%20TIME={NOW}%20CALLID={UNIQUEID}%20CampaignID=%7bCAMPAIGNID%7d&%20{DID}",
+                "POPUPURL": "http://www.bing.com/search?q={PHONE}%20CONNECTED%20SRC={SRC}%20DST={CLID}%20TIME={NOW}%20CALLID={UNIQUEID}%20CampaignID=%7bCAMPAIGNID%7d&%20{DID}",
+                "OFFERURL": "http://www.bing.com/search?q={PHONE}%20CONNECTED%20SRC={SRC}%20DST={CLID}%20TIME={NOW}%20CALLID={UNIQUEID}%20CampaignID=%7bCAMPAIGNID%7d&%20{DID}",
+                "POPUPID": "2f049e68-2b2d-48d3-921b-31420a1117b7",
+                "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+                "AFTERCALLURL": "http://www.bing.com/search?q={PHONE}%20CONNECTED%20SRC={SRC}%20DST={CLID}%20TIME={NOW}%20CALLID={UNIQUEID}%20CampaignID=%7bCAMPAIGNID%7d&%20{DID}",
+                "MODDATE": "2021-09-03 17:31:20.524",
+                "NAME": "09_HTTP_GET",
+                "dataRowState": "Unchanged"
+              },
+              {
+                "MODUID": "99c8404d-ab38-4874-83fd-28d9b8630c1a",
+                "LOGINURL": "https://www.bing.com/",
+                "NOTES": "http://www.bing.com/search?q={PHONE}%20CONNECTED%20SRC={SRC}%20DST={CLID}",
+                "POPUPURL": "https://www.bing.com/search?q={PHONE}%20CONNECTED%20SRC={SRC}%20DST={CLID}%20TIME={NOW}%20CALLID={UNIQUEID}%20CampaignID=%7bCAMPAIGNID%7d&%20{DID}",
+                "OFFERURL": "https://www.bing.com/search?q={PHONE}%20RINGING%20{DID}",
+                "POPUPID": "5cac8f30-8a08-43b2-a037-59ed15575f19",
+                "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+                "AFTERCALLURL": "https://www.bing.com/",
+                "MODDATE": "2021-09-15 13:54:08.966",
+                "NAME": "07_Search",
+                "dataRowState": "Unchanged"
+              },
+              {
+                "MODUID": "55c3734e-baec-40f2-8039-b11319835d4f",
+                "LOGINURL": "https://sample.tegsoftcloud.com/sample.php?text=IDLE AGENT WAITING",
+                "POPUPURL": "https://sample.tegsoftcloud.com/sample.php?text={PHONE}%20CONNECTED%20{DIRECTION}",
+                "OFFERURL": "https://sample.tegsoftcloud.com/sample.php?text={PHONE}%20RINGING%20{DIRECTION}",
+                "POPUPID": "9b2dc31a-6b04-4cdc-aba4-4df3966f6379",
+                "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+                "AFTERCALLURL": "https://sample.tegsoftcloud.com/sample.php?text=IDLE AGENT WAITING AFTER HANGUP",
+                "MODDATE": "2019-01-29 16:48:27.71",
+                "NAME": "07_Sample Application",
+                "dataRowState": "Unchanged"
+              },
+              {
+                "MODUID": "55c3734e-baec-40f2-8039-b11319835d4f",
+                "LOGINURL": "http://ccms.volt.com.tr",
+                "POPUPURL": "http://ccms.volt.com.tr",
+                "OFFERURL": "http://ccms.volt.com.tr",
+                "POPUPID": "476dda8d-9535-4e68-b94e-43784e18c27a",
+                "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+                "MODDATE": "2019-01-29 16:48:27.654",
+                "NAME": "0 Volt",
+                "dataRowState": "Unchanged"
+              }
+            ]
+          },
+          "isActivityMandatory": false,
+          "TOTALNOTREADYDURATION": 11124,
+          "OUTBOUND": 15,
+          "notReadyTBLCCAGENTLOG": {
+            "SESSIONID": "jzVMTf7LD3uim6UtylYCcrSGDAun2YaHkut5mhCZ",
+            "LOGTYPE": "READY",
+            "LOGID": "e562982e-2875-4620-a383-de97e4ab5cfe",
+            "dataRowState": "Unchanged",
+            "MODUID": "57bcaee3-d33b-48ea-89af-877fdb5d649b",
+            "UID": "57bcaee3-d33b-48ea-89af-877fdb5d649b",
+            "STATUS": "NOTREADY",
+            "INTERFACE": "PJSIP/1002",
+            "RINTERFACE": "PJSIP/ebd37af5-260a-436f-9bdf-44bcc9b1b946/1002",
+            "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+            "BEGINDATE": "2021-10-26 20:51:03.163",
+            "REASON": "AFTERLOGIN",
+            "MODDATE": "2021-10-26 20:51:03.163"
+          },
+          "REMOTEINTERFACE": "PJSIP/ebd37af5-260a-436f-9bdf-44bcc9b1b946/1002",
+          "TOTALCALLCOUNT": 20
+        }
+      ],
+      "CAMPGRPID": "default",
+      "CAMPAIGNID": "4d0dea79-8462-4274-8049-f22160818ba1",
+      "NOTCALLED": "0"
+    },
+    {
+      "SCHME": "0",
+      "CLOSED": "0",
+      "STARTDATE": "2021-10-26 00:00:00.0",
+      "SCHMEORALL": "0",
+      "ENDTIME": "1730",
+      "QUOTABALANCE": "0",
+      "MAXCHANNEL": "100",
+      "CAMPTYPE": "EMAIL",
+      "SCHEDULED": "0",
+      "CAMPAIGNNAME": "Sample e-mail campaign",
+      "ENDDATE": "2021-10-27 00:00:00.0",
+      "dataRowState": "Unchanged",
+      "STARTTIME": "0930",
+      "ALLINLIST": "30",
+      "PROGRESS": "0",
+      "CLOSED2": "0",
+      "members": [],
+      "CAMPGRPID": "default",
+      "CAMPAIGNID": "53d14603-694e-4a87-acf8-ca1a45f7f575",
+      "NOTCALLED": "30"
+    },
+    {
+      "NEWCALLSTATUS": "Passive_InvalidIVR",
+      "STARTTIME": "0930",
+      "STARTDATE": "2021-10-14 00:00:00.0",
+      "ENDTIME": "1730",
+      "members": [],
+      "CAMPGRPID": "default",
+      "MAXCHANNEL": "10",
+      "CAMPTYPE": "UNATTENDED",
+      "CAMPAIGNID": "7999c321-8955-4f99-81a1-ac1d17efb13d",
+      "CAMPAIGNNAME": "My queue callback",
+      "ENDDATE": "2021-10-29 00:00:00.0",
+      "dataRowState": "Unchanged"
+    },
+    {
+      "SCHME": "0",
+      "CLOSED": "0",
+      "STARTDATE": "2017-06-05 00:00:00.0",
+      "SCHMEORALL": "0",
+      "ENDTIME": "1930",
+      "QUOTABALANCE": "0",
+      "MAXCHANNEL": "100",
+      "CAMPTYPE": "SMS",
+      "SCHEDULED": "0",
+      "CAMPAIGNNAME": "Test SMS Campaign",
+      "ENDDATE": "2021-10-27 00:00:00.0",
+      "dataRowState": "Unchanged",
+      "STARTTIME": "0930",
+      "ALLINLIST": "2",
+      "PROGRESS": "0",
+      "CLOSED2": "0",
+      "members": [],
+      "CAMPGRPID": "default",
+      "CAMPAIGNID": "e8c9eed3-6311-4fdd-8a6a-f6a2039d4881",
+      "NOTCALLED": "2"
+    }
+  ],
+  "endService": 1635270673659,
+  "beginService": 1635270673657,
+  "serviceName": "/RealTimeCampaignData",
+  "clientSideActions": [],
+  "serverDateTime": "26/10/2021 20:51"
+}
+GET
+Real time status of webchats
+https://sample.tegsoftcloud.com/Tobe/view/RealTimeWebchatData
+
+Using this API, users can build custom dashboards for contact center supervisors to monitor webchat data such as
+
+Webchat summary (total call number, max and average wait time, max and average talk times, answered/abandon/overflow call number, SL, etc.)
+Webchat session count based on channel
+
+in real-time.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+isEligibleToJoin
+
+Example Request
+RealTimeWebchatData
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/RealTimeEndPointData'
+200 OK
+Example Response
+Body
+Headers (8)
+View More
+json
+{
+  "engineLicenseStatus": {
+    "currentRowIndex": 0,
+    "currentRow": [],
+    "name": "tableDefaultTableName",
+    "rows": [
+      {
+        "FACEBOOK": "0",
+        "WEBCHAT": "0",
+        "INSTAGRAM": "0",
+        "WHATSAPP": "1",
+        "dataRowState": "Unchanged"
+      }
+    ]
+  },
+  "busyWebchat": 0,
+  "waitingWebchat": 0,
+  "engineStatistics": {
+    "currentRowIndex": 0,
+    "currentRow": [],
+    "name": "tableDefaultTableName",
+    "rows": [
+      {
+        "TOTAL": "0",
+        "FACEBOOK": "0",
+        "WEBCHAT": "0",
+        "INSTAGRAM": "0",
+        "WHATSAPP": "0",
+        "dataRowState": "Unchanged"
+      }
+    ]
+  },
+  "webchatskills": {
+    "currentRowIndex": 0,
+    "currentRow": [],
+    "name": "tableDefaultTableName",
+    "rows": []
+  },
+  "serverDateTime": "09/09/2022 13:47"
+}
+GET
+Real time status of infrastructure and active users
+https://sample.tegsoftcloud.com/Tobe/view/RealTimeInfrastructureData
+
+Using this API, users can build custom dashboards for contact center supervisors to monitor infrastructure and active users data such as
+
+Active calls/channel
+External channel count
+Login/Ready agents
+Web memory
+Load average
+Disk details
+
+in real-time.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+Example Request
+Sample infrastructure data
+View More
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/RealTimeInfrastructureData'
+200 OK
+Example Response
+Body
+Headers (8)
+View More
+json
+{
+  "usedMemory": 200,
+  "usageMem": 19,
+  "diskData": {
+    "currentRowIndex": 0,
+    "columns": [
+      {
+        "clob": false,
+        "nullable": true,
+        "precision": 0,
+        "autoIncrement": false,
+        "scale": 0,
+        "dataColumnType": "STRING",
+        "defaultValueType": "Object",
+        "defaultValueParameterType": "",
+        "classDataColumnType": "class java.lang.String",
+        "columnName": "DEVICE",
+        "dbColumn": false
+      },
+      {
+        "clob": false,
+        "nullable": true,
+        "precision": 0,
+        "autoIncrement": false,
+        "scale": 0,
+        "dataColumnType": "STRING",
+        "defaultValueType": "Object",
+        "defaultValueParameterType": "",
+        "classDataColumnType": "class java.lang.String",
+        "columnName": "SIZE",
+        "dbColumn": false
+      },
+      {
+        "clob": false,
+        "nullable": true,
+        "precision": 0,
+        "autoIncrement": false,
+        "scale": 0,
+        "dataColumnType": "STRING",
+        "defaultValueType": "Object",
+        "defaultValueParameterType": "",
+        "classDataColumnType": "class java.lang.String",
+        "columnName": "USED",
+        "dbColumn": false
+      },
+      {
+        "clob": false,
+        "nullable": true,
+        "precision": 0,
+        "autoIncrement": false,
+        "scale": 0,
+        "dataColumnType": "STRING",
+        "defaultValueType": "Object",
+        "defaultValueParameterType": "",
+        "classDataColumnType": "class java.lang.String",
+        "columnName": "AVAIL",
+        "dbColumn": false
+      },
+      {
+        "clob": false,
+        "nullable": true,
+        "precision": 0,
+        "autoIncrement": false,
+        "scale": 0,
+        "dataColumnType": "STRING",
+        "defaultValueType": "Object",
+        "defaultValueParameterType": "",
+        "classDataColumnType": "class java.lang.String",
+        "columnName": "USAGE",
+        "dbColumn": false
+      },
+      {
+        "clob": false,
+        "nullable": true,
+        "precision": 0,
+        "autoIncrement": false,
+        "scale": 0,
+        "dataColumnType": "STRING",
+        "defaultValueType": "Object",
+        "defaultValueParameterType": "",
+        "classDataColumnType": "class java.lang.String",
+        "columnName": "MOUNT",
+        "dbColumn": false
+      }
+    ],
+    "currentRow": [],
+    "name": "monitorDISK",
+    "rows": [
+      {
+        "AVAIL": "8.9G",
+        "USAGE": "79%",
+        "SIZE": "45G",
+        "DEVICE": "/dev/vda5",
+        "USED": "34G",
+        "MOUNT": "/",
+        "dataRowState": "Modified"
+      },
+      {
+        "AVAIL": "700M",
+        "USAGE": "24%",
+        "SIZE": "976M",
+        "DEVICE": "/dev/vda2",
+        "USED": "210M",
+        "MOUNT": "/boot",
+        "dataRowState": "Modified"
+      }
+    ]
+  },
+  "loadAvarage": 0.37,
+  "endService": 1635273220486,
+  "serviceName": "/RealTimeInfrastructureData",
+  "maxMemory": 1071,
+  "clientSideActions": [],
+  "activeChannels": "0",
+  "duration": 522,
+  "totalActiveCalls": "0",
+  "loginUsers": [
+    {
+      "DISPLAYNAME": "Test Admin",
+      "rowTBLLOGINS": {
+        "MODUID": "0",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "STATUS": "ACTIVE",
+        "SESSIONID": "2adde774-d448-4f96-8450-7fce1dcc0bab",
+        "LOGINID": "6afa3679-dd6a-4427-aef0-0549062599c4",
+        "PING": "2021-10-26 21:33:40.318",
+        "LOGIN": "2021-10-26 21:33:40.318",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-10-26 21:33:40.318",
+        "dataRowState": "Unchanged"
+      },
+      "logintime": 1635273220131,
+      "SURNAME": "Admin",
+      "EXTID": "98daf7d2-bf33-43e8-9b85-850c030191fe",
+      "sessionid": "0a7b258b-fd87-4d52-8aaf-1198c7a1c961",
+      "SERVERNAME": "arge17.tegsoft.local",
+      "PHOTOURL": "/Tobe/image/themes/flat2/tegsoft_user_default.png",
+      "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+      "IVRGRPID": "default",
+      "USERCODE": "test.admin",
+      "CAMPGRPID": "default",
+      "USERNAME": "Test",
+      "rowVIEWUSERS": {
+        "SURNAME": "Admin",
+        "EXTID": "98daf7d2-bf33-43e8-9b85-850c030191fe",
+        "PNLAGENTICON": "true",
+        "dataRowState": "Unchanged",
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "USERROLE": "admin",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "IVRGRPID": "default",
+        "ALLOWED": "0.0.0.0",
+        "USERCODE": "test.admin",
+        "PASS": "test123",
+        "CAMPGRPID": "default",
+        "USERNAME": "Test",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "MODDATE": "2021-09-01 23:48:22.15",
+        "CONTGRPID": "default",
+        "UCSTATE": "passive"
+      },
+      "rowTBLCRMCONTACTS": {
+        "ENFIRSTNAME": "TEST",
+        "CREATORUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "FIRSTNAME": "Test",
+        "EMAILTYPE3": "other",
+        "INSTTYPE4": "ICQ",
+        "MODUID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "ENLASTNAME": "ADMIN",
+        "EMAILTYPE2": "home",
+        "HOMECOUNTRY": "TÜRKİYE",
+        "EMAILTYPE4": "other",
+        "LASTNAME": "Admin",
+        "INSTTYPE1": "AIM",
+        "EMAILTYPE1": "work",
+        "INSTTYPE2": "MSN",
+        "INSTTYPE3": "YAHOO",
+        "UNITUID": "4a55c1e3-edd5-46ef-b66f-d74634e8469a",
+        "CONTGRPID": "default",
+        "CONTID": "e1b6b769-4b3c-4144-a5b5-8de9dd68ec92",
+        "CREATEDATE": "2021-04-29 21:13:51.825",
+        "PHONETYPE8": "other",
+        "ENFULLNAME": "TEST ADMIN",
+        "dataRowState": "Unchanged",
+        "PHONETYPE5": "work fax",
+        "PHONETYPE4": "home fax",
+        "UID": "fe7f0749-e018-4b0c-9b65-69f7f5511392",
+        "PHONETYPE7": "other",
+        "PHONETYPE6": "pager",
+        "PHONETYPE1": "home",
+        "PHONETYPE3": "mobile",
+        "PHONETYPE2": "work",
+        "PREFCONTACT": "EMAIL",
+        "MODDATE": "2021-04-29 21:14:01.954"
+      },
+      "CONTGRPID": "default",
+      "CONTID": "e1b6b769-4b3c-4144-a5b5-8de9dd68ec92"
+    }
+  ],
+  "beginService": 1635273219964,
+  "serverDateTime": "26/10/2021 21:33"
+}
+GET
+Active Project List
+https://sample.tegsoftcloud.com/Tobe/view/ProjectsDataServlet
+
+Using this API, users can build custom dashboards for contact center supervisors to monitor active project list in real-time.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+Example Request
+Active Project List
+View More
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/RealTimeInfrastructureData'
+200 OK
+Example Response
+Body
+Headers (8)
+json
+{
+    "projects": [
+        {
+            "PRJNAME": "Academy",
+            "PRJID": "4f299c8e-6c3e-4094-ba86-6511d5657037",
+            "dataRowState": "Unchanged"
+        },
+           ],
+    "serverDateTime": "09/09/2022 13:54"
+}
+GET
+Real Time Activity Data
+https://sample.tegsoftcloud.com/Tobe/view/RealTimeActivityData?channel=ALL
+
+Using this API, users can build custom dashboards for contact center supervisors to monitor activity data based on full day and last hour in real-time.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+channel
+
+ALL
+
+channel parameter values (ALL, INBOUND, OUTBOUND, WEBCHAT)
+
+Example Request
+Real Time Activity Data
+View More
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/RealTimeActivityData?channel=ALL'
+Example Response
+Body
+Headers (0)
+View More
+json
+{
+  "activities": {
+    "TOTALACTCOUNTFULLDAY": 0,
+    "TOTALACTLASTHOUR": [],
+    "TOTALTOPGROUPLASTHOUR": [],
+    "TOTALTOPGROUPFULLDAY": [],
+    "TOTALGROUPLASTHOUR": [],
+    "cacheDate": 1662721227621,
+    "TOTALACTCOUNTLASTHOUR": 0,
+    "TOTALGROUPFULLDAY": [],
+    "TOTALACTFULLDAY": []
+  },
+  "serverDateTime": "09/09/2022 14:00"
+}
+Data and Functional Services
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+DB Data Services
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+Data Load Services
+
+Data Load services are used to load data to the database in your Tegsoft.
+
+AUTHORIZATION
+Bearer Token
+This folder is using Bearer Token from folderDB Data Services
+POST
+Insert Data into a Database Table
+https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=DataServices&method=loadData&tableName={{TABLE}}
+
+This method is used to add specific data set to a specific database table.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+DataServices
+
+method
+
+loadData
+
+tableName
+
+{{TABLE}}
+
+Body
+raw (xml)
+xml
+<?xml version="1.0" encoding="UTF-8"?><Dataset>
+<Columns>
+...
+</Columns>
+<Rows>
+...
+</Rows>
+</Dataset>
+Example Request
+Insert Data into a Database Table
+View More
+curl
+curl --location -g --request GET 'https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=DataServices&method=loadData&tableName={{TABLE}}' \
+--header 'Content-Type: application/x-www-form-urlencoded' \
+--data-urlencode '='
+200 OK
+Example Response
+Body
+Headers (4)
+html
+{
+  "duration": 130,
+  "operationName": "loadData",
+  "errorCode": "NOERROR",
+  "endService": "Fri Apr 26 16:46:05 EET 2019",
+  "beginService": "Fri Apr 26 16:46:04 EET 2019",
+  "errorOccurred": false,
+  "serviceName": "DataLoader",
+  "statusMessage": "NOERROR"
+}
+POST
+Create CTI Integration
+https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=DataServices&method=loadData&tableName=TBLCCPOPUP
+
+This method is used to define CTI Integration data once in your Tegsoft database.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+DataServices
+
+method
+
+loadData
+
+tableName
+
+TBLCCPOPUP
+
+Body
+raw (xml)
+View More
+xml
+<?xml version="1.0" encoding="UTF-8"?><Dataset>
+   <Columns>
+      <Column name="POPUPID" type="STRING" />
+      <Column name="NAME" type="STRING" />
+      <Column name="LOGINURL" type="STRING" />
+   </Columns>
+   <Rows>
+      <Row POPUPID="CTI_INTEGRATION" NAME="CTI Integretion" LOGINURL="clientSideCTI://parentWindowEvent|eventList=all" />
+   </Rows>
+</Dataset>
+Example Request
+Create CTI Integration
+View More
+curl
+curl --location --request GET 'https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=DataServices&method=loadData&tableName=TBLCCPOPUP' \
+--data '<?xml version="1.0" encoding="UTF-8"?><Dataset>
+   <Columns>
+      <Column name="POPUPID" type="STRING" />
+      <Column name="NAME" type="STRING" />
+      <Column name="LOGINURL" type="STRING" />
+   </Columns>
+   <Rows>
+      <Row POPUPID="CTI_INTEGRATION" NAME="CTI Integretion" LOGINURL="clientSideCTI://parentWindowEvent|eventList=all" />
+   </Rows>
+</Dataset>'
+Example Response
+Body
+Headers (0)
+No response body
+This request doesn't return any response body
+POST
+Create Voice Trunk
+https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=DataServices&method=loadData&tableName=TBLPBXTRUNK
+
+This method is used to define voice trunk data once in your Tegsoft database.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+DataServices
+
+method
+
+loadData
+
+tableName
+
+TBLPBXTRUNK
+
+Body
+raw (xml)
+xml
+<?xml version="1.0" encoding="UTF-8"?><Dataset>
+   <Columns>
+      <Column name="TRUNKID" type="STRING" />
+      <Column name="TRUNKNAME" type="STRING" />
+      <Column name="HOST" type="STRING" />
+   </Columns>
+   <Rows>
+      <Row TRUNKID="TRUNKID" TRUNKNAME="TRUNKNAME" HOST="XXX.XXX.XX.XXX" />
+   </Rows>
+</Dataset>
+Example Request
+Create Voice Trunk
+View More
+curl
+curl --location --request GET 'https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=DataServices&method=loadData&tableName=TBLPBXTRUNK' \
+--data '<?xml version="1.0" encoding="UTF-8"?><Dataset>
+   <Columns>
+      <Column name="TRUNKID" type="STRING" />
+      <Column name="TRUNKNAME" type="STRING" />
+      <Column name="HOST" type="STRING" />
+   </Columns>
+   <Rows>
+      <Row TRUNKID="TRUNKID" TRUNKNAME="TRUNKNAME" HOST="XXX.XXX.XX.XXX" />
+   </Rows>
+</Dataset>'
+Example Response
+Body
+Headers (0)
+No response body
+This request doesn't return any response body
+GET
+downloadChatHistory
+https://sample.tegsoftcloud.com/Tobe/view/Webchat?CHATID=92793c4d-2c90-4283-864a-6107d202a206&service=downloadChatHistory
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+CHATID
+
+92793c4d-2c90-4283-864a-6107d202a206
+
+service
+
+downloadChatHistory
+
+Example Request
+Example request
+View More
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/Webchat?service=downloadChatHistory&CHATID=92793c4d-2c90-4283-864a-6107d202a206'
+200 OK
+Example Response
+Body
+Headers (8)
+View More
+json
+{
+  "duration": 343,
+  "subService": "downloadChatHistory",
+  "downloadURL": "https://arge17.tegsoftcloud.com/Tobe/tempreports/32100abf-a72d-43e3-a600-b5e9e65274cc/fe7f0749-e018-4b0c-9b65-69f7f5511392/d2393921-f41e-469f-8e5e-ea25163db2b2.pdf",
+  "endService": 1636407596010,
+  "beginService": 1636407595667,
+  "serviceName": "/Webchat",
+  "clientSideActions": [],
+  "serverDateTime": "09/11/2021 00:39"
+}
+GET
+scoreWebchat
+https://sample.tegsoftcloud.com/Tobe/view/Webchat?CHATID=92793c4d-2c90-4283-864a-6107d202a206&score=1&service=scoreWebchat
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+CHATID
+
+92793c4d-2c90-4283-864a-6107d202a206
+
+score
+
+1
+
+service
+
+scoreWebchat
+
+Example Request
+scoreWebchat
+View More
+curl
+curl --location 'https://sample.tegsoftcloud.com/Tobe/view/Webchat?CHATID=92793c4d-2c90-4283-864a-6107d202a206&score=1&service=scoreWebchat'
+Example Response
+Body
+Headers (0)
+No response body
+This request doesn't return any response body
+GET
+Stream Audio File
+https://sample.tegsoftcloud.com/Tobe/view/Recordings?service=streamAudioFile&CALLID={CALLID}
+
+Download Audio File method downloads file or files according to the parameters edits of the call.
+
+All audio recordings can be downloaded from the start date by using the begindate parameter.(Example of downloading all audio recordings from the begin date)
+
+Files in the date range determined by using the begin date and end date parameters can be downloaded.(Example of downloading all files between begindate and enddate)
+
+If there is no CDR, 202 status code is returned instead of 404.
+If there is a CDR and 1 hour has passed and there is no file, 404 status code is returned.
+If there is a CDR and there is no file, status code 202 is returned for the first 1 hour.
+If there is a CDR and a file, 200 OK status code is returned
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+streamAudioFile
+
+CALLID
+
+{CALLID}
+
+Optional query parameter for quering audio recording files. When specified related audio files will be downloded.
+
+BEGINDATE
+
+2021-11-22
+
+Optional query parameter for quering audio recording files from specified date. Make sure to use YYYY-MM-DD format for proper results.
+
+ENDDATE
+
+2021-11-25
+
+Optional query parameter for quering audio recording files to specified date. Make sure to use YYYY-MM-DD format for proper results.
+
+audioFileName
+
+rec0120211125-123121.221.mp3
+
+Optional query parameter to download audio file.
+
+Example Request
+Stream Audio File - Unauthorized user
+View More
+curl
+curl --location -g 'https://sample.tegsoftcloud.com/Tobe/view/Recordings?service=streamAudioFile&CALLID={CALLID}'
+200 OK
+Example Response
+Body
+Headers (11)
+No response body
+This request doesn't return any response body
+GET
+Download Audio File Analysis Image
+https://sample.tegsoftcloud.com/Tobe/view/Recordings?service=downloadSpeechAnalysisImage&CALLID={CALLID}
+
+Download Audio File Analysis Image method downloads image that includes voice recording analysis.
+
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+downloadSpeechAnalysisImage
+
+CALLID
+
+{CALLID}
+
+Example Request
+Example of an audio file analysis
+View More
+curl
+curl --location -g 'https://sample.tegsoftcloud.com/Tobe/view/Recordings?service=downloadSpeechAnalysisImage&CALLID={CALLID}'
+200 OK
+Example Response
+Body
+Headers (8)
+View More
+json
+{
+  "imagePath": "https://arge17.tegsoftcloud.com/Tobe/tempreports/019b6710-3698-4e10-8e76-857b8f61341f/fe7f0749-e018-4b0c-9b65-69f7f5511392/338cff2f-b259-47a9-8e56-68afa7227cce.png",
+  "imageExist": true,
+  "serverDateTime": "23/11/2021 16:53"
+}
+Originate Call
+
+This method is used to originate an outbound call and connect it to a specified extension via PBX. The system first dials the number that will initiate the call. After this number answers the call, it dials the number to be called.
+
+The function takes the Authentication__, extension and destination parameters and accesses the data through ServiceResult.
+
+Authentication : Verified with usercode and password. The user who will use the service must have Webservice access authorization.
+extension : Phone number or extension of the caller (agent).
+destination : Phone number of the called (customer).
+Bridge Calls with Announcements
+
+This method is used to originate two calls, then connect them to each other with announcements via PBX. After DMTF dialing, the system first dials the number that will initiate the call. After this number answers the call, it dials the number to be called. In all these processes, the announcements to be specified by the variables are listened to the parties.
+
+The function takes the Authentication, extension, destination, profile and variables parameters and accesses the data through ServiceResult.
+
+Authentication : Verified with usercode and password. The user who will use the service must have Webservice access authorization.
+
+extension : Phone number or extension of the caller (agent).
+
+destination : Phone number of the called (customer).
+
+profile : CONTEXTID for the Profile that will make outbound call.
+
+variables : A series of channel variables to set on the destination channel.
+
+The optional variables that can be used in this function are given below.
+
+__logDTMF={{DTMFVAR}} ➔ Variable of the DMTF.
+
+{{DTMFVAR}} ={{DTMFVAL}} ➔ Value of the DMTF.
+
+__CONTID={CONTID} ➔ ID number of the contact.
+
+__STARTREC=true/false ➔ Value for the voice recording rule. "true" to start, "false" to not start.
+
+__busyAnnounceIdL2={{BUSYANNID}} ➔ ID number of the announcement that the extension (caller) hears if the destination's phone (called) is busy.
+
+__noanswerAnnounceIdL2={{NOANSANNID}} ➔ ID number of the announcement that the extension (caller) hears if the destination (called) does not answer the call.
+
+__destinationAnnounceId={{DESTANID}} ➔ ID of the announcement the destination (called) hears after answering the call.
+
+__extensionAnnounceId={{EXTANID}} ➔ ID of the announcement the extension (caller) hears after answering the call.
+
+__executeMethodL2={{EXECUTEMETHOD}} ➔ Event to be triggered when destination answers the call.
+
+continueIVRID={{IVRID}} ➔ The parameter used to redirect to a different IVR destination after the call ends.
+
+GET
+bridgeWithAnnouncement
+https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=RemotePBX&method=bridgeWithAnnouncement&extension={{EXT_NUM}}&destination={{DST_NUM}}&profile={{CONTEXTID}}&variables=__logDTMF={{DTMFVAR}},{{DTMFVAR}}={{DTMFVAL}},__CONTID={CONTID},__STARTREC=true,__busyAnnounceIdL2={{BUSYANNID}},__noanswerAnnounceIdL2={{NOANSANNID}},__destinationAnnounceId={{DESTANID}},__extensionAnnounceId={{EXTANID}},__executeMethodL2={{EXECUTEMETHOD}}
+AUTHORIZATION
+Bearer Token
+Token
+
+{TOKEN}
+
+PARAMS
+service
+
+RemotePBX
+
+method
+
+bridgeWithAnnouncement
+
+extension
+
+{{EXT_NUM}}
+
+destination
+
+{{DST_NUM}}
+
+profile
+
+{{CONTEXTID}}
+
+variables
+
+__logDTMF={{DTMFVAR}},{{DTMFVAR}}={{DTMFVAL}},__CONTID={CONTID},__STARTREC=true,__busyAnnounceIdL2={{BUSYANNID}},__noanswerAnnounceIdL2={{NOANSANNID}},__destinationAnnounceId={{DESTANID}},__extensionAnnounceId={{EXTANID}},__executeMethodL2={{EXECUTEMETHOD}}
+
+Example Request
+bridgeWithAnnouncement
+View More
+curl
+curl --location -g 'https://sample.tegsoftcloud.com/Tobe/view/ServicesGateway?service=RemotePBX&method=bridgeWithAnnouncement&extension={{EXT_NUM}}&destination={{DST_NUM}}&profile={{CONTEXTID}}&variables=__logDTMF%3D{{DTMFVAR}}%2C{{DTMFVAR}}%3D{{DTMFVAL}}%2C__CONTID%3D{CONTID}%2C__STARTREC%3Dtrue%2C__busyAnnounceIdL2%3D{{BUSYANNID}}%2C__noanswerAnnounceIdL2%3D{{NOANSANNID}}%2C__destinationAnnounceId%3D{{DESTANID}}%2C__extensionAnnounceId%3D{{EXTANID}}%2C__executeMethodL2%3D{{EXECUTEMETHOD}}%2CcontinueIVRID%3D{{IVRID}}'
+Example Response
+Body
+Headers (1)
+json
+{
+  "duration": 67,
+  "operationName": "bridgeWithAnnouncement",
+  "errorCode": "NOERROR",
+  "endService": "Thu Apr 25 14:45:21 EET 2019",
+  "beginService": "Thu Apr 25 14:45:21 EET 2019",
+  "errorOccurred": false,
+  "serviceName": "RemotePBX",
+  "statusMessage": "NOERROR"
+}

@@ -1,0 +1,9 @@
+flask>=3.0
+clickhouse-connect>=0.7
+markupsafe>=2.1
+openpyxl>=3.1
+PyJWT>=2.8          # Supabase JWT verification (ES256/RS256 via JWKS + HS256 legacy) — api/core.py
+cryptography>=42.0  # требуется PyJWT для ES256/RS256 (асимметричная подпись Supabase)
+psycopg[binary]>=3.1  # anti-IDOR can_access_player (crm.*) + запись crm.calls — api/core.py, tegsoft/store.py
+flask-cors>=4.0     # CORS для SPA (:3000) — api/__init__.py
+requests>=2.31       # боевой адаптер Tegsoft (tegsoft/adapter.py); MockProvider работает и без него

@@ -1,0 +1,50 @@
+{
+  "name": "vip_churn",
+  "trained_at": "2026-07-15T15:02:18Z",
+  "artifacts": [
+    "model.cbm"
+  ],
+  "features": [
+    "vip_level_at_T",
+    "cum_dep_T",
+    "dep_recency",
+    "days_since_ftd",
+    "dep_count_life",
+    "dep_count_30d",
+    "dep_count_90d",
+    "dep_sum_30d",
+    "dep_sum_90d",
+    "avg_deposit",
+    "max_deposit",
+    "mean_dep_gap",
+    "dep_overdue_ratio",
+    "dep_momentum_30v30",
+    "failed_dep_90d",
+    "wd_count_90d",
+    "wd_sum_90d",
+    "bonus_count_90d",
+    "bonus_sum_90d",
+    "bets_30d",
+    "turnover_30d",
+    "active_days_30d",
+    "bet_recency",
+    "bets_momentum_7v7",
+    "country",
+    "affiliate_type",
+    "payment_method"
+  ],
+  "cat_features": [
+    "country",
+    "affiliate_type",
+    "payment_method"
+  ],
+  "metrics": {
+    "roc_auc": 0.782,
+    "pr_auc": 0.906,
+    "brier": 0.153
+  },
+  "target": "no_deposit_within_30d",
+  "population": "vip_level>=1 & dep_recency<=45",
+  "table": "player_vip_churn_ml",
+  "horizon_days": 30
+}

@@ -1,0 +1,457 @@
+# ClickHouse + дашборд одной командой:  docker compose up -d
+# schema.sql применяется автоматически при первом старте ClickHouse.
+# Данные грузишь отдельно (см. SETUP.md). Витрину собрать после загрузки:
+#   docker compose exec -T clickhouse clickhouse client --multiquery < player_features.sql
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./ch_users.d:/etc/clickhouse-server/users.d:ro     # пароль на пользователя default
+      - ./ch_config.d:/etc/clickhouse-server/config.d:ro   # SASL-доступ к Redpanda (kafka.xml)
+    ports:
+      - "127.0.0.1:8123:8123"   # HTTP — только localhost
+      - "127.0.0.1:9000:9000"   # native — только localhost
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  board:
+    build: .
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      BOARD_HOST: 0.0.0.0
+      BOARD_PORT: "8050"
+      BOARD_USER: ${BOARD_USER:-}   # задай в .env для basic-auth (пусто = выключено)
+      BOARD_PASS: ${BOARD_PASS:-}
+      # Supabase живёт на ХОСТЕ (supabase start), а не в этой compose-сети, поэтому
+      # адресуем его через host.docker.internal (см. extra_hosts ниже): внутри
+      # контейнера 127.0.0.1 — это сам контейнер.
+      # SUPABASE_URL нужен для JWKS (проверка подписи ES256), DB_URL — для
+      # anti-IDOR can_access_player. iss берём отдельной переменной: в токене он
+      # остаётся 127.0.0.1 (его проставляет сам Supabase) и с адресом не совпадает.
+      SUPABASE_URL: ${SUPABASE_URL_DOCKER:-}
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL_DOCKER:-}
+      SUPABASE_JWT_ISS: ${SUPABASE_JWT_ISS:-}
+      SUPABASE_JWT_AUD: ${SUPABASE_JWT_AUD:-authenticated}
+      ALLOW_AUTH_OFF: ${ALLOW_AUTH_OFF:-}   # 1 = разрешить dev-обход API_AUTH_OFF (НЕ в проде)
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}   # серверные операции борда
+      # Call Analyzer: борд ходит в пайплайн (переводы транскриптов, портальный API).
+      # В docker сервис доступен по имени, наружу не публикуется.
+      ANALYZER_URL: ${ANALYZER_URL:-http://analyzer-api:8090}
+      ANALYZER_SERVICE_TOKEN: ${ANALYZER_SERVICE_TOKEN:-}
+      # Звонилка. CALL_PROVIDER=mock -> заглушка (полный цикл без внешних вызовов);
+      # tegsoft -> живая АТС, включать после получения доступов от казино.
+      CALL_PROVIDER: ${CALL_PROVIDER:-mock}
+      TEGSOFT_BASE_URL: ${TEGSOFT_BASE_URL:-}
+      TEGSOFT_USERCODE: ${TEGSOFT_USERCODE:-}
+      TEGSOFT_PASSWORD: ${TEGSOFT_PASSWORD:-}
+      TEGSOFT_TOKEN: ${TEGSOFT_TOKEN:-}
+      TEGSOFT_PROFILE_CONTEXTID: ${TEGSOFT_PROFILE_CONTEXTID:-}
+      TEGSOFT_WEBHOOK_SECRET: ${TEGSOFT_WEBHOOK_SECRET:-}
+      TEGSOFT_EXT_MAP: ${TEGSOFT_EXT_MAP:-}
+      TEGSOFT_DEFAULT_EXT: ${TEGSOFT_DEFAULT_EXT:-}
+      TEGSOFT_ORIGINATE_VARS: ${TEGSOFT_ORIGINATE_VARS:-}   # авто-ответ и пр. (пусто = __STARTREC=true)
+      CALL_USE_OPERATOR_TOKEN: ${CALL_USE_OPERATOR_TOKEN:-} # 1 = звонок под токеном оператора (нужен Access_WS_Invoke)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./secrets:/secrets          # ключи интеграции (просмотр/регенерация из UI)
+    # порт на хост не пробрасываем — дашборд доступен только через caddy (HTTPS) по docker-сети
+    restart: unless-stopped
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.7
+    user: root   # чтобы rpk мог записать/chown конфиг в смонтированном /etc/redpanda
+    command:
+      - redpanda
+      - start
+      # listener'ы / TLS / SASL заданы в ./redpanda/redpanda.yaml; тут только ресурсы
+      - --smp=1
+      - --memory=1G
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --check=false
+    environment:
+      # создаёт superuser-аккаунт при первом старте свежего кластера (для управления users/ACL)
+      RP_BOOTSTRAP_USER: "admin:${KAFKA_ADMIN_PASS:?set KAFKA_ADMIN_PASS in .env}"
+    ports:
+      - "0.0.0.0:19092:19092"   # Kafka API наружу: SASL_SSL + IP-allowlist (kafka_firewall.sh)
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+      - ./redpanda:/etc/redpanda          # redpanda.yaml + .bootstrap.yaml (RW: rpk дописывает конфиг)
+      - ./certs:/certs:ro                  # самоподписанный (на случай отката)
+      - caddy_data:/caddy-certs:ro         # LE-сертификат cas.21do.xyz от Caddy (общий, авто-продление)
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  ingest:
+    build: ./ingest
+    depends_on:
+      - redpanda
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      KAFKA_TOPIC: casino.events
+      SASL_USER: ${INGEST_KAFKA_USER:?set INGEST_KAFKA_USER in .env}
+      SASL_PASS: ${INGEST_KAFKA_PASS:?set INGEST_KAFKA_PASS in .env}
+      INGEST_TOKEN: ${INGEST_TOKEN:-}   # фолбэк, если secrets/tokens.json недоступен
+      DEBUG_FIELDS: ${DEBUG_FIELDS:-0}   # 1 = логировать поля игрового события (диагностика)
+    volumes:
+      - ./secrets:/secrets:ro          # токены (общий источник с дашбордом, hot-reload)
+    # порт наружу не публикуем — доступ только через caddy (https://cas.21do.xyz/ingest/*)
+    restart: unless-stopped
+
+  # Пушер сигналов модели -> колбэк казино. Батч-задача (profiles: не стартует с up).
+  #   запуск:  docker compose run --rm pusher
+  pusher:
+    build: ./signals
+    profiles: ["tools"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      CALLBACK_URL: ${CALLBACK_URL:-}
+      CALLBACK_HEALTH_URL: ${CALLBACK_HEALTH_URL:-}
+      CALLBACK_TOKEN: ${CALLBACK_TOKEN:-}
+      SIGNALS_DRY_RUN: ${SIGNALS_DRY_RUN:-1}
+      INCLUDE_MONITOR: ${INCLUDE_MONITOR:-0}   # казино приняло MONITOR в enum -> полный фид
+      BATCH_SIZE: "500"
+
+  # RT-триггер: мгновенная реакция на события (~1с) поверх батч-прогнозов.
+  # Правила/пороги — env TRIGGER_* (см. signals/rt_trigger.py).
+  rt-trigger:
+    build: ./signals
+    command: ["python", "rt_trigger.py"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      CALLBACK_URL: ${CALLBACK_URL:-}
+      CALLBACK_TOKEN: ${CALLBACK_TOKEN:-}
+      TRIGGER_POLL_MS: ${TRIGGER_POLL_MS:-1000}
+      TRIGGER_LOSS_TH: ${TRIGGER_LOSS_TH:-1000}
+      TRIGGER_LTV_MIN: ${TRIGGER_LTV_MIN:-10000}
+      TRIGGER_DEP_BIG: ${TRIGGER_DEP_BIG:-1000}
+      TRIGGER_COOLDOWN_MIN: ${TRIGGER_COOLDOWN_MIN:-30}
+    volumes:
+      # каталог, а не одиночный файл: редакторы/sed пересоздают .env с новым inode,
+      # и файловый bind-mount перестал бы видеть изменения
+      - ./:/host:ro
+    restart: unless-stopped
+
+  # Chain-runner: исполнитель цепочек автоматизации (~5с). Определения — Postgres
+  # automation.* (миграция 0014), факты исполнения — ClickHouse chain_events/send_log.
+  # Гейт исполнения — PREDICTIONS_ENABLED из смонтированного .env (fail-closed, как
+  # rt-trigger): поднимается со стеком, но без явного «1» ничего не шлёт и не
+  # продвигает. Контекст сборки — корень репо: образу нужен api/segment_compiler
+  # для узлов-condition (см. chains/Dockerfile).
+  chain-runner:
+    build:
+      context: .
+      dockerfile: chains/Dockerfile
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      # Supabase на ХОСТЕ: из контейнера 127.0.0.1 — это он сам, поэтому нужен
+      # docker-адрес (host.docker.internal, см. extra_hosts). Хостовый
+      # SUPABASE_DB_URL здесь не сработал бы — chain-runner читает определения
+      # цепочек из automation.* именно тут.
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL_DOCKER:-}
+      CALLBACK_URL: ${CALLBACK_URL:-}
+      CALLBACK_TOKEN: ${CALLBACK_TOKEN:-}
+      SIGNALS_DRY_RUN: ${SIGNALS_DRY_RUN:-1}
+      CHAINS_POLL_MS: ${CHAINS_POLL_MS:-5000}
+      CHAINS_ADVANCE_BATCH: ${CHAINS_ADVANCE_BATCH:-2000}
+      CHAINS_DEFAULT_CONTROL_PCT: ${CHAINS_DEFAULT_CONTROL_PCT:-16}
+      FATIGUE_MAX_SENDS: ${FATIGUE_MAX_SENDS:-3}
+      FATIGUE_WINDOW_DAYS: ${FATIGUE_WINDOW_DAYS:-7}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Supabase живёт на хосте
+    volumes:
+      # каталог (не файл): .env пересоздаётся с новым inode при правках — как rt-trigger
+      - ./:/host:ro
+    restart: unless-stopped
+
+  # Telegram-бот алертов: /add подписывает чат (лс или группу), /status — состояние.
+  # Подписки пишет в secrets/tg_chats.json — оттуда их читает monitor.sh.
+  tg-bot:
+    build: ./signals
+    command: ["python", "tg_bot.py"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      MONITOR_SITE_URL: ${MONITOR_SITE_URL:-https://billionbahis279.com}
+      MONITOR_STREAM_MAX_SILENCE: ${MONITOR_STREAM_MAX_SILENCE:-900}
+      CALLBACK_HEALTH_URL: ${CALLBACK_HEALTH_URL:-}
+      RETENTION_BOARD_CALLBACK_TOKEN: ${RETENTION_BOARD_CALLBACK_TOKEN:-}
+    volumes:
+      - ./secrets:/secrets      # подписки чатов (rw)
+    restart: unless-stopped
+
+  # Warm-сервис скоринга: библиотеки/Python загружены один раз, POST /score
+  # выполняет те же *_model.py в тёплом процессе (~секунды вместо ~25с).
+  scorer-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile.scorer
+    command: ["python", "scorer_service.py"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      SCORE_ONLY: "1"
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_USER: default
+      CH_PASSWORD: ${CH_PASSWORD:-}
+    ports:
+      - "127.0.0.1:8099:8099"   # только localhost — дергает run_loop.sh
+    restart: unless-stopped
+
+  # Ре-скоринг одноразовым контейнером (fallback, если warm-сервис лежит):
+  #   запуск:  SCORE_ONLY=1 docker compose run --rm scorer
+  scorer:
+    build:
+      context: .
+      dockerfile: Dockerfile.scorer
+    profiles: ["tools"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      SCORE_ONLY: ${SCORE_ONLY:-1}
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_USER: default
+      CH_PASSWORD: ${CH_PASSWORD:-}
+
+  # CRM-SPA (Next.js). Раздаётся через Caddy по пути https://cas.21do.xyz/crm.
+  # Образ собирается из исходников (multi-stage), NEXT_PUBLIC_* вшиваются на этапе
+  # build — поэтому они переданы аргументами, а не только окружением.
+  crm-spa:
+    build:
+      context: ./crm-spa
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://cas.21do.xyz/supabase}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_FLASK_API_URL: ${NEXT_PUBLIC_FLASK_API_URL:-https://cas.21do.xyz}
+    environment:
+      # Серверные (в браузер не уходят): service_role для Route Handlers SPA.
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://cas.21do.xyz/supabase}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      NEXT_PUBLIC_FLASK_API_URL: ${NEXT_PUBLIC_FLASK_API_URL:-https://cas.21do.xyz}
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Supabase живёт на хосте
+    # порт наружу не публикуем — только через Caddy
+    restart: unless-stopped
+
+  # ── Call Analyzer (анализ звонков КЦ) — dev spec §12 ────────────────────────────
+  # Брокер очереди пайплайна. Только внутренняя сеть — порт наружу не публикуем.
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # очередь эфемерна
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # Приёмник ingest + синхронный перевод (FastAPI). Слушает 8090 ТОЛЬКО во
+  # внутренней docker-сети (наружу не публикуется — как board/crm-spa, ходит Flask).
+  analyzer-api:
+    build:
+      context: .
+      dockerfile: call_analyzer/Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      # Postgres (схема analyzer) + ClickHouse (call_audits_flat) как у соседей
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL_DOCKER:-}
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_USER: default
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      REDIS_URL: redis://redis:6379/0
+      # секреты пайплайна: OpenRouter (LLM) + Gladia (ASR) + сервис-токен ingest
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      GLADIA_API_KEY: ${GLADIA_API_KEY:-}
+      ASR_PROVIDER: ${ASR_PROVIDER:-gladia}
+      ANALYZER_SERVICE_TOKEN: ${ANALYZER_SERVICE_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Supabase живёт на хосте
+    # порт наружу НЕ публикуем — доступ только по docker-сети (dev spec §5)
+    restart: unless-stopped
+
+  # Воркер пайплайна + встроенный beat (discover каждые 60с, дневная выборка).
+  analyzer-worker:
+    build:
+      context: .
+      dockerfile: call_analyzer/Dockerfile
+    command: ["celery", "-A", "call_analyzer.worker", "worker",
+              "-Q", "analyzer", "--loglevel=info"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    environment:
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL_DOCKER:-}
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_USER: default
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      REDIS_URL: redis://redis:6379/0
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      GLADIA_API_KEY: ${GLADIA_API_KEY:-}
+      ASR_PROVIDER: ${ASR_PROVIDER:-gladia}
+      ANALYZER_SERVICE_TOKEN: ${ANALYZER_SERVICE_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # beat строго ОДИН (discover + случайная выборка): N воркеров с -B давали бы
+  # N планировщиков → двойная постановка звонков и двойной счёт за ASR/LLM.
+  analyzer-beat:
+    build:
+      context: .
+      dockerfile: call_analyzer/Dockerfile
+    command: ["celery", "-A", "call_analyzer.worker", "beat", "--loglevel=info"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL_DOCKER:-}
+      REDIS_URL: redis://redis:6379/0
+    restart: unless-stopped
+
+  # ── ДЕМО-СТЕНД (demo.21do.xyz) ─────────────────────────────────────────────
+  # Тот же образ, что и прод, но смотрит в базу `demo` (синтетические игроки) и
+  # в свой Supabase (порты 544xx). Изоляция данных — на уровне ClickHouse:
+  # пользователь demo_user не имеет грантов на retention, поэтому даже при
+  # ошибке в конфиге демо физически не прочитает реальных игроков.
+  demo-board:
+    build: .
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: demo
+      CH_USER: demo_user
+      CH_PASSWORD: ${DEMO_CH_PASSWORD:-}
+      BOARD_HOST: 0.0.0.0
+      BOARD_PORT: "8050"
+      # basic-auth на демо не нужен: вход через /login CRM, данные синтетические
+      BOARD_USER: ""
+      BOARD_PASS: ""
+      SUPABASE_URL: ${DEMO_SUPABASE_URL_DOCKER:-}
+      SUPABASE_DB_URL: ${DEMO_SUPABASE_DB_URL_DOCKER:-}
+      SUPABASE_JWT_ISS: ${DEMO_SUPABASE_JWT_ISS:-}
+      SUPABASE_JWT_AUD: authenticated
+      SUPABASE_SERVICE_ROLE_KEY: ${DEMO_SUPABASE_SERVICE_ROLE_KEY:-}
+      # ЖЁСТКО: демо никогда не шлёт сигналы в казино и не звонит.
+      CALLBACK_URL: ""
+      CALLBACK_TOKEN: ""
+      PREDICTIONS_ENABLED: "0"
+      CALL_PROVIDER: mock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  demo-spa:
+    build:
+      context: ./crm-spa
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${DEMO_NEXT_PUBLIC_SUPABASE_URL:-https://demo.21do.xyz/supabase}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${DEMO_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_FLASK_API_URL: ${DEMO_NEXT_PUBLIC_FLASK_API_URL:-https://demo.21do.xyz}
+    environment:
+      SUPABASE_SERVICE_ROLE_KEY: ${DEMO_SUPABASE_SERVICE_ROLE_KEY:-}
+      NEXT_PUBLIC_SUPABASE_URL: ${DEMO_NEXT_PUBLIC_SUPABASE_URL:-https://demo.21do.xyz/supabase}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${DEMO_SUPABASE_ANON_KEY:-}
+      NEXT_PUBLIC_FLASK_API_URL: ${DEMO_NEXT_PUBLIC_FLASK_API_URL:-https://demo.21do.xyz}
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # проксируем Supabase (54321) с хоста
+    depends_on:
+      - board
+      - ingest
+      - crm-spa
+      - demo-board
+      - demo-spa
+    ports:
+      - "80:80"     # редирект на https
+      - "443:443"   # HTTPS наружу (basic-auth делает само приложение по .env)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/etc/caddy/certs:ro   # самоподписанный TLS-сертификат (IP в SAN)
+      - ./deploy/sellrise-site:/srv/sellrise-site:ro   # внешняя API-дока (только demo-блок)
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  ch_data:
+  caddy_data:
+  caddy_config:
+  redpanda_data:

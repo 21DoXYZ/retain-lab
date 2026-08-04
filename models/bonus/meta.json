@@ -1,0 +1,40 @@
+{
+  "name": "bonus",
+  "trained_at": "2026-07-15T10:29:16Z",
+  "artifacts": [
+    "model.cbm"
+  ],
+  "features": [
+    "recency_days",
+    "tenure_days",
+    "bets",
+    "turnover",
+    "active_days",
+    "avg_bet",
+    "freespin_ratio",
+    "night_share",
+    "dep_count",
+    "dep_sum",
+    "deposit_recency",
+    "provider",
+    "country",
+    "affiliate_type",
+    "bonus_type"
+  ],
+  "cat_features": [
+    "provider",
+    "country",
+    "affiliate_type",
+    "bonus_type"
+  ],
+  "metrics": {
+    "roc_auc": 0.647
+  },
+  "target": "retained_30d_after_bonus",
+  "table": "player_bonus_ml",
+  "bonus_types": [
+    "freespins",
+    "deposit-match",
+    "no-deposit"
+  ]
+}

@@ -1,0 +1,31 @@
+# Генератор синтетического потока ДЛЯ ДЕМО-СТЕНДА.
+#
+# ВАЖНО: топик demo.events, НЕ casino.events. Пустить его в боевой топик значит
+# смешать выдуманных игроков с реальными данными казино — данные не разделить.
+# Диапазон id совпадает с демо-игроками (900000+), чтобы события ложились на
+# существующие карточки, а не плодили безымянных.
+#
+# Запуск:   docker compose -f docker-compose.demo-gen.yml up -d
+# Остановка: docker compose -f docker-compose.demo-gen.yml down
+services:
+  demo-gen:
+    build: /home/casino-event-simulator
+    environment:
+      BROKER: "redpanda:9092"          # внутренний listener (мы в той же docker-сети)
+      SECURITY_PROTOCOL: "SASL_PLAINTEXT"
+      SASL_MECHANISM: "SCRAM-SHA-256"
+      SASL_USER: "http_ingest"
+      SASL_PASS: "AM7heE8IrS1xG1RPD8g1tIcZ"
+      TOPIC: "demo.events"
+      PLAYER_ID_MIN: "900000"
+      PLAYER_ID_MAX: "904999"
+      WORKERS: "8"                      # умеренно: демо, а не нагрузочный тест
+      THINK_MIN_MS: "800"
+      THINK_MAX_MS: "6000"
+    networks: [board]
+    restart: unless-stopped
+
+networks:
+  board:
+    external: true
+    name: retention-board_default

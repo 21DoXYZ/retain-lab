@@ -1,0 +1,583 @@
+{
+  "_meta": {
+    "source": "BillionBahis_бонусы.md (https://billionbahis279.com/promotions)",
+    "collected": "2026-06 (акции 1–14) · 2026-07 (акции 15–17: лестница депозитов)",
+    "currency": "TRY",
+    "note": "Источник правды — .md-файл казино (акции и их условия). Этот JSON структурирует его для подбора бонусов. Русские поля (name_ru, wager, note, …) — базовые: на них падает фолбэк. Поля *_tr / *_en — переводы тех же условий для операторов (TR — рабочий язык) и англоязычного интерфейса; name_tr — ОРИГИНАЛЬНОЕ название акции с сайта казино, не перевод. Читать переводы только через bonus_catalog.loc_field(b, field, locale). При изменении акций правьте .md и все языковые варианты здесь."
+  },
+  "vip_tiers": [
+    "silver",
+    "gold",
+    "platinum",
+    "diamond",
+    "royal"
+  ],
+  "bonuses": [
+    {
+      "id": "monday_freespin_200",
+      "name_tr": "Sendromsuz Pazartesi %200 Freespin",
+      "name_ru": "Понедельник без синдрома — 200% фриспинов",
+      "name_en": "Monday Without the Syndrome — 200% Freespins",
+      "kind": "freespins",
+      "area": "slots",
+      "days": [
+        "monday"
+      ],
+      "trigger": "deposit",
+      "min_deposit": 1000,
+      "max_per_day_fs": 200,
+      "game": "Gates of Olympus 1000",
+      "spin_value": 50,
+      "ladder": [
+        [
+          1000,
+          40
+        ],
+        [
+          2000,
+          80
+        ],
+        [
+          3000,
+          120
+        ],
+        [
+          4000,
+          160
+        ],
+        [
+          5000,
+          200
+        ]
+      ],
+      "wager": "(выигрыш + депозит) ×10, слоты",
+      "wager_tr": "(kazanç + yatırım) ×10, slot",
+      "wager_en": "(win + deposit) ×10, slots",
+      "max_withdraw": "10× депозита",
+      "max_withdraw_tr": "yatırımın 10 katı",
+      "max_withdraw_en": "10× deposit",
+      "vip_only": false,
+      "excludes": [],
+      "fits_codes": [
+        "freespins"
+      ]
+    },
+    {
+      "id": "loyalty_4th_deposit",
+      "name_tr": "3 YATIRIM YAP 4.YATIRIM BİZDEN",
+      "name_ru": "Сделай 3 депозита — 4-й от нас",
+      "name_en": "Make 3 Deposits — the 4th Is on Us",
+      "kind": "reload",
+      "area": "all",
+      "days": [
+        "all"
+      ],
+      "trigger": "three_losing_deposits",
+      "min_bonus": 100,
+      "max_bonus": 2000,
+      "wager": "слоты/лайв ×10, спорт ×5 (кэф ≥1.80), томбала ×15, быстрые ×25",
+      "wager_tr": "slot/canlı ×10, spor ×5 (oran ≥1.80), tombala ×15, hızlı oyunlar ×25",
+      "wager_en": "slots/live ×10, sports ×5 (odds ≥1.80), tombala ×15, fast games ×25",
+      "max_withdraw": "10× бонуса",
+      "max_withdraw_tr": "bonusun 10 katı",
+      "max_withdraw_en": "10× bonus",
+      "vip_only": false,
+      "excludes": [
+        "welcome_casino_100",
+        "sport_welcome_200"
+      ],
+      "fits_codes": [
+        "second_deposit_reload",
+        "reload_cashback"
+      ]
+    },
+    {
+      "id": "end_of_day_freespin",
+      "name_tr": "BİLLİONBAHİS'TE GÜN SONU FREESPİN",
+      "name_ru": "Фриспины конца дня",
+      "name_en": "End-of-Day Freespins",
+      "kind": "freespins",
+      "area": "slots",
+      "days": [
+        "all"
+      ],
+      "trigger": "deposit_prev_day",
+      "min_deposit": 1000,
+      "game": "Sweet Bonanza",
+      "ladder": [
+        [
+          1000,
+          20
+        ],
+        [
+          3000,
+          30
+        ],
+        [
+          5000,
+          50
+        ]
+      ],
+      "wager": "выигрыш ×10, слоты",
+      "wager_tr": "kazanç ×10, slot",
+      "wager_en": "win ×10, slots",
+      "max_win": "10× стоимости FS, не более 5000₺",
+      "max_win_tr": "FS değerinin 10 katı, en fazla 5000₺",
+      "max_win_en": "10× FS value, no more than 5000₺",
+      "vip_only": false,
+      "excludes": [],
+      "fits_codes": [
+        "freespins"
+      ]
+    },
+    {
+      "id": "sport_welcome_200",
+      "name_tr": "%200 SPOR YATIRIM BONUSU",
+      "name_ru": "Спорт-велком 200%",
+      "name_en": "200% Sports Welcome Bonus",
+      "kind": "welcome",
+      "area": "sport",
+      "days": [
+        "all"
+      ],
+      "trigger": "first_deposit",
+      "min_deposit": 100,
+      "max_bonus": 5000,
+      "percent": 200,
+      "wager": "депозит ×1 (кэф ≥1.30), бонус ×20 (кэф ≥1.80)",
+      "wager_tr": "yatırım ×1 (oran ≥1.30), bonus ×20 (oran ≥1.80)",
+      "wager_en": "deposit ×1 (odds ≥1.30), bonus ×20 (odds ≥1.80)",
+      "max_withdraw": "10× бонуса",
+      "max_withdraw_tr": "bonusun 10 katı",
+      "max_withdraw_en": "10× bonus",
+      "vip_only": false,
+      "excludes": [
+        "cashback_instant_30",
+        "first_deposit_cashback_50"
+      ],
+      "fits_codes": [
+        "first_deposit_bonus"
+      ]
+    },
+    {
+      "id": "welcome_casino_100",
+      "name_tr": "%100 HOŞGELDİN CASİNO YATIRIM BONUSU",
+      "name_ru": "Казино-велком 100%",
+      "name_en": "100% Casino Welcome Deposit Bonus",
+      "kind": "welcome",
+      "area": "slots",
+      "days": [
+        "all"
+      ],
+      "trigger": "first_deposit",
+      "min_deposit": 500,
+      "max_bonus": 5000,
+      "percent": 100,
+      "claim_before": "23:59 того же дня",
+      "claim_before_tr": "aynı gün 23:59",
+      "claim_before_en": "23:59 the same day",
+      "wager": "депозит ×1, бонус ×20 (только слоты), spin buy запрещён",
+      "wager_tr": "yatırım ×1, bonus ×20 (sadece slot), spin buy yasak",
+      "wager_en": "deposit ×1, bonus ×20 (slots only), spin buy not allowed",
+      "max_withdraw": "10× бонуса",
+      "max_withdraw_tr": "bonusun 10 katı",
+      "max_withdraw_en": "10× bonus",
+      "vip_only": false,
+      "excludes": [
+        "cashback_instant_30",
+        "first_deposit_cashback_50"
+      ],
+      "fits_codes": [
+        "first_deposit_bonus"
+      ]
+    },
+    {
+      "id": "riskfree_first_deposit",
+      "name_tr": "%100 RİSKSİZ İADE BONUSU",
+      "name_ru": "Безрисковый возврат 100% (новичкам)",
+      "name_en": "100% Risk-Free Refund Bonus (new players)",
+      "kind": "insurance",
+      "area": "slots",
+      "days": [
+        "all"
+      ],
+      "trigger": "first_deposit_allin_bonus_buy",
+      "max_refund": 1000,
+      "wager": "возврат ×5, слоты",
+      "wager_tr": "iade ×5, slot",
+      "wager_en": "refund ×5, slots",
+      "max_win": "5× бонуса",
+      "max_win_tr": "bonusun 5 katı",
+      "max_win_en": "5× bonus",
+      "vip_only": false,
+      "excludes": [],
+      "note": "Кроме части игр Pragmatic / Hacksaw / NoLimit City",
+      "note_tr": "Bazı Pragmatic / Hacksaw / NoLimit City oyunları hariç",
+      "note_en": "Excludes some Pragmatic / Hacksaw / NoLimit City games",
+      "fits_codes": [
+        "first_deposit_bonus"
+      ]
+    },
+    {
+      "id": "vip_sport_nowager_30",
+      "name_tr": "%30 VIP ÇEVRİMSİZ SPOR YATIRIM BONUSU",
+      "name_ru": "VIP безвейджерный спорт до 30%",
+      "name_en": "VIP No-Wager Sports Bonus up to 30%",
+      "kind": "vip_deposit",
+      "area": "sport",
+      "days": [
+        "all"
+      ],
+      "trigger": "deposit",
+      "min_deposit": 100,
+      "max_bonus": 5000,
+      "vip_percent": {
+        "silver": 10,
+        "gold": 15,
+        "platinum": 20,
+        "diamond": 25,
+        "royal": 30
+      },
+      "wager": "депозит ×1 (≥1.30), бонус ×1 (≥1.80)",
+      "wager_tr": "yatırım ×1 (≥1.30), bonus ×1 (≥1.80)",
+      "wager_en": "deposit ×1 (≥1.30), bonus ×1 (≥1.80)",
+      "max_withdraw": "20× депозита",
+      "max_withdraw_tr": "yatırımın 20 katı",
+      "max_withdraw_en": "20× deposit",
+      "vip_only": true,
+      "excludes": [
+        "cashback_instant_30"
+      ],
+      "fits_codes": [
+        "vip_offer"
+      ]
+    },
+    {
+      "id": "vip_casino_nowager_30",
+      "name_tr": "%30 VIP ÇEVRİMSİZ CASINO YATIRIM BONUSU",
+      "name_ru": "VIP безвейджерное казино до 30%",
+      "name_en": "VIP No-Wager Casino Bonus up to 30%",
+      "kind": "vip_deposit",
+      "area": "slots",
+      "days": [
+        "all"
+      ],
+      "trigger": "deposit",
+      "min_deposit": 100,
+      "max_bonus": 5000,
+      "vip_percent": {
+        "silver": 10,
+        "gold": 15,
+        "platinum": 20,
+        "diamond": 25,
+        "royal": 30
+      },
+      "wager": "депозит ×1, бонус ×2, только слоты, spin buy запрещён",
+      "wager_tr": "yatırım ×1, bonus ×2, sadece slot, spin buy yasak",
+      "wager_en": "deposit ×1, bonus ×2, slots only, spin buy not allowed",
+      "max_withdraw": "20× депозита",
+      "max_withdraw_tr": "yatırımın 20 katı",
+      "max_withdraw_en": "20× deposit",
+      "vip_only": true,
+      "excludes": [
+        "cashback_instant_30"
+      ],
+      "fits_codes": [
+        "vip_offer"
+      ]
+    },
+    {
+      "id": "first_deposit_cashback_50",
+      "name_tr": "İLK YATIRIMA ÖZEL %50 KAYIP BONUSU",
+      "name_ru": "50% кэшбэк на первый депозит",
+      "name_en": "50% Cashback on the First Deposit",
+      "kind": "cashback",
+      "area": "slots",
+      "days": [
+        "all"
+      ],
+      "trigger": "first_deposit_loss",
+      "min_deposit": 1000,
+      "max_bonus": 5000,
+      "percent": 50,
+      "wager": "×1, слоты, spin buy запрещён",
+      "wager_tr": "×1, slot, spin buy yasak",
+      "wager_en": "×1, slots, spin buy not allowed",
+      "max_win": "10× бонуса, лимит 30 000₺",
+      "max_win_tr": "bonusun 10 katı, 30 000₺ limit",
+      "max_win_en": "10× bonus, capped at 30 000₺",
+      "conditions": "нет открытых ставок/выводов, баланс < 5₺",
+      "conditions_tr": "açık bahis/çekim yok, bakiye < 5₺",
+      "conditions_en": "no open bets/withdrawals, balance < 5₺",
+      "vip_only": false,
+      "excludes": [
+        "welcome_casino_100",
+        "sport_welcome_200"
+      ],
+      "fits_codes": [
+        "reload_cashback",
+        "first_deposit_bonus"
+      ]
+    },
+    {
+      "id": "cashback_instant_30",
+      "name_tr": "%30 ANLIK KAYIP BONUSU",
+      "name_ru": "Мгновенный кэшбэк до 30%",
+      "name_en": "Instant Cashback up to 30%",
+      "kind": "cashback",
+      "area": "all",
+      "days": [
+        "all"
+      ],
+      "trigger": "loss_within_24h",
+      "min_deposit": 100,
+      "vip_percent": {
+        "silver": 20,
+        "gold": 20,
+        "platinum": 25,
+        "diamond": 30,
+        "royal": 30
+      },
+      "wager": "казино/лайв ×1, спорт ×1 (≥1.80)",
+      "wager_tr": "casino/canlı ×1, spor ×1 (≥1.80)",
+      "wager_en": "casino/live ×1, sports ×1 (≥1.80)",
+      "max_win": "30× бонуса",
+      "max_win_tr": "bonusun 30 katı",
+      "max_win_en": "30× bonus",
+      "conditions": "нет открытых ставок/выводов, баланс < 5₺",
+      "conditions_tr": "açık bahis/çekim yok, bakiye < 5₺",
+      "conditions_en": "no open bets/withdrawals, balance < 5₺",
+      "vip_only": false,
+      "excludes": [
+        "welcome_casino_100",
+        "sport_welcome_200",
+        "vip_casino_nowager_30",
+        "vip_sport_nowager_30"
+      ],
+      "fits_codes": [
+        "reload_cashback"
+      ]
+    },
+    {
+      "id": "weekly_cashback_10",
+      "name_tr": "%10 HAFTALIK JEST BONUSU",
+      "name_ru": "Недельный кэшбэк до 10%",
+      "name_en": "Weekly Cashback up to 10%",
+      "kind": "cashback",
+      "area": "all",
+      "days": [
+        "monday"
+      ],
+      "trigger": "weekly_loss",
+      "min_loss": 1000,
+      "vip_percent": {
+        "silver": 5,
+        "gold": 6,
+        "platinum": 7,
+        "diamond": 8,
+        "royal": 10
+      },
+      "wager": "казино ×1, спорт ×1 (≥1.80)",
+      "wager_tr": "casino ×1, spor ×1 (≥1.80)",
+      "wager_en": "casino ×1, sports ×1 (≥1.80)",
+      "max_win": "5× бонуса",
+      "max_win_tr": "bonusun 5 katı",
+      "max_win_en": "5× bonus",
+      "vip_only": false,
+      "excludes": [],
+      "fits_codes": [
+        "reload_cashback"
+      ]
+    },
+    {
+      "id": "monthly_loyalty_5",
+      "name_tr": "%5 AYLIK SADAKAT BONUSU",
+      "name_ru": "Месячная лояльность до 5%",
+      "name_en": "Monthly Loyalty Bonus up to 5%",
+      "kind": "cashback",
+      "area": "all",
+      "days": [
+        "all"
+      ],
+      "trigger": "monthly_loss",
+      "claim_window": "1–5 число месяца",
+      "claim_window_tr": "ayın 1–5'i arası",
+      "claim_window_en": "1st–5th of the month",
+      "vip_percent": {
+        "silver": 1,
+        "gold": 2,
+        "platinum": 3,
+        "diamond": 4,
+        "royal": 5
+      },
+      "vip_min_loss": {
+        "silver": 2000,
+        "gold": 4000,
+        "platinum": 6000,
+        "diamond": 8000,
+        "royal": 10000
+      },
+      "wager": "казино ×1, спорт ×5",
+      "wager_tr": "casino ×1, spor ×5",
+      "wager_en": "casino ×1, sports ×5",
+      "max_win": "5× бонуса, лимит 100 000₺",
+      "max_win_tr": "bonusun 5 katı, 100 000₺ limit",
+      "max_win_en": "5× bonus, capped at 100 000₺",
+      "vip_only": false,
+      "excludes": [],
+      "fits_codes": [
+        "vip_offer",
+        "reload_cashback"
+      ]
+    },
+    {
+      "id": "refer_a_friend",
+      "name_tr": "ARKADAŞINI GETİR 1.000₺ KAZAN",
+      "name_ru": "Приведи друга — 1000₺",
+      "name_en": "Refer a Friend — Win 1000₺",
+      "kind": "referral",
+      "area": "all",
+      "days": [
+        "all"
+      ],
+      "trigger": "friend_first_deposit",
+      "min_deposit": 100,
+      "percent": 20,
+      "max_bonus": 1000,
+      "wager": "спорт ×1 (≥1.80) / полный отыгрыш кассы в казино",
+      "wager_tr": "spor ×1 (≥1.80) / casinoda kasanın tamamının çevrilmesi",
+      "wager_en": "sports ×1 (≥1.80) / full cash wagering in casino",
+      "max_win": "5× бонуса",
+      "max_win_tr": "bonusun 5 katı",
+      "max_win_en": "5× bonus",
+      "expires_days": 30,
+      "vip_only": false,
+      "excludes": [],
+      "fits_codes": []
+    },
+    {
+      "id": "share_withdrawal",
+      "name_tr": "ÇEKİMİNİ PAYLAŞ KAZAN",
+      "name_ru": "Поделись выводом — выиграй",
+      "name_en": "Share Your Withdrawal — Win",
+      "kind": "freespins",
+      "area": "slots",
+      "days": [
+        "all"
+      ],
+      "trigger": "withdrawal_shared",
+      "min_withdrawal": 1000,
+      "fixed_payout": 250,
+      "wager": "×1, слоты Pragmatic",
+      "wager_tr": "×1, Pragmatic slotları",
+      "wager_en": "×1, Pragmatic slots",
+      "vip_only": false,
+      "excludes": [],
+      "fits_codes": []
+    },
+    {
+      "id": "welcome_deposit_100",
+      "name_tr": "%100 HOŞGELDİN BONUS",
+      "name_ru": "Велком 100% на 1-й депозит",
+      "name_en": "100% Welcome Bonus on the 1st Deposit",
+      "kind": "welcome",
+      "area": "all",
+      "days": [
+        "all"
+      ],
+      "trigger": "first_deposit",
+      "min_deposit": 100,
+      "max_bonus": 10000,
+      "percent": 100,
+      "wager": "(деп+бонус): спорт ×10, казино/лайв ×20, crash ×30 (коэф ≥1.60)",
+      "wager_tr": "(yatırım+bonus): spor ×10, casino/canlı ×20, crash ×30 (oran ≥1.60)",
+      "wager_en": "(deposit+bonus): sports ×10, casino/live ×20, crash ×30 (odds ≥1.60)",
+      "max_withdraw": "10× депозита, не более 50 000₺",
+      "max_withdraw_tr": "yatırımın 10 katı, en fazla 50 000₺",
+      "max_withdraw_en": "10× deposit, no more than 50 000₺",
+      "vip_only": false,
+      "excludes": [
+        "cashback_instant_30",
+        "first_deposit_cashback_50",
+        "welcome_casino_100"
+      ],
+      "note": "Взявший этот бонус не может брать кэшбэк",
+      "note_tr": "Bu bonusu alan oyuncu kayıp bonusu alamaz",
+      "note_en": "Taking this bonus makes cashback unavailable",
+      "fits_codes": [
+        "first_deposit_bonus"
+      ]
+    },
+    {
+      "id": "second_deposit_200",
+      "name_tr": "%200 İKİNCİ YATIRIM BONUSU",
+      "name_ru": "200% на 2-й депозит",
+      "name_en": "200% Second Deposit Bonus",
+      "kind": "reload",
+      "area": "all",
+      "days": [
+        "all"
+      ],
+      "trigger": "second_deposit",
+      "requires": [
+        "welcome_deposit_100"
+      ],
+      "min_deposit": 100,
+      "max_bonus": 5000,
+      "percent": 200,
+      "wager": "(деп+бонус): спорт ×5, казино/лайв ×15, crash ×20 (коэф ≥1.60)",
+      "wager_tr": "(yatırım+bonus): spor ×5, casino/canlı ×15, crash ×20 (oran ≥1.60)",
+      "wager_en": "(deposit+bonus): sports ×5, casino/live ×15, crash ×20 (odds ≥1.60)",
+      "max_withdraw": "10× депозита, не более 25 000₺",
+      "max_withdraw_tr": "yatırımın 10 katı, en fazla 25 000₺",
+      "max_withdraw_en": "10× deposit, no more than 25 000₺",
+      "vip_only": false,
+      "excludes": [
+        "cashback_instant_30"
+      ],
+      "note": "Нужно взять и проиграть бонус на 1-й депозит",
+      "note_tr": "1. yatırım bonusunu alıp kaybetmiş olmak gerekir",
+      "note_en": "Requires taking and losing the 1st deposit bonus",
+      "fits_codes": [
+        "second_deposit_reload"
+      ]
+    },
+    {
+      "id": "third_deposit_300_fs",
+      "name_tr": "%300 ÇEVRİM ŞARTSIZ ÜÇÜNCÜ YATIRIM BONUSU",
+      "name_ru": "300% на 3-й депозит — 60 фриспинов без вейджера",
+      "name_en": "300% Third Deposit Bonus — 60 No-Wager Freespins",
+      "kind": "freespins",
+      "area": "slots",
+      "days": [
+        "all"
+      ],
+      "trigger": "third_deposit",
+      "requires": [
+        "welcome_deposit_100",
+        "second_deposit_200"
+      ],
+      "max_deposit": 1000,
+      "fs_count": 60,
+      "spin_value": 50,
+      "fs_value_try": 3000,
+      "game": "Sweet Bonanza (Pragmatic)",
+      "wager": "без отыгрыша; выигрыш только в слотах Pragmatic, bonus buy запрещён",
+      "wager_tr": "çevrim şartı yok; kazançlar sadece Pragmatic slotlarında, bonus buy yasak",
+      "wager_en": "no wagering; winnings on Pragmatic slots only, bonus buy not allowed",
+      "max_withdraw": "при балансе 20 000₺ — вывод ровно 10 000₺",
+      "max_withdraw_tr": "20 000₺ bakiyede — tam olarak 10 000₺ çekim",
+      "max_withdraw_en": "at a 20 000₺ balance — withdrawal of exactly 10 000₺",
+      "vip_only": false,
+      "excludes": [
+        "cashback_instant_30"
+      ],
+      "note": "Нужно взять и проиграть бонусы на 1-й и 2-й депозиты",
+      "note_tr": "1. ve 2. yatırım bonuslarını alıp kaybetmiş olmak gerekir",
+      "note_en": "Requires taking and losing the 1st and 2nd deposit bonuses",
+      "fits_codes": [
+        "freespins"
+      ]
+    }
+  ]
+}

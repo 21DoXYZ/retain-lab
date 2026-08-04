@@ -1,0 +1,41 @@
+{
+  "name": "early_vip",
+  "trained_at": "2026-07-15T15:09:33Z",
+  "artifacts": [
+    "model.cbm"
+  ],
+  "features": [
+    "ftd_amount",
+    "act_lag_days",
+    "dep_d0",
+    "dep_d7",
+    "ndep_d7",
+    "max_dep_d7",
+    "wd_d7",
+    "bets_d7",
+    "turnover_d7",
+    "avg_bet_d7",
+    "distinct_games_d7",
+    "active_days_d7",
+    "freespin_d7",
+    "night_d7",
+    "net_d7",
+    "provider_d7",
+    "payment_method",
+    "affiliate_type",
+    "country"
+  ],
+  "cat_features": [
+    "provider_d7",
+    "payment_method",
+    "affiliate_type",
+    "country"
+  ],
+  "metrics": {
+    "roc_auc": 0.945,
+    "pr_auc": 0.662,
+    "brier": 0.067
+  },
+  "target": "reach_gold_50000_within_90d",
+  "table": "player_early_vip_ml"
+}

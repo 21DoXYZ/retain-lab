@@ -1,0 +1,6 @@
+# chain-runner: ClickHouse (факты исполнения) + Postgres (определения цепочек) + HTTP-каналы.
+# Версии выровнены с signals/requirements.txt и слоем api/*_store.py (psycopg v3).
+clickhouse-connect==0.8.3
+psycopg[binary]==3.2.3
+requests==2.32.3
+tzdata==2024.2          # zoneinfo для окна отправки (11:00–22:00 по users.timezone) в slim-образе

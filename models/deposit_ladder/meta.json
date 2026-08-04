@@ -1,0 +1,32 @@
+{
+  "name": "deposit_ladder",
+  "trained_at": "2026-07-15T10:29:07Z",
+  "artifacts": [
+    "model.cbm"
+  ],
+  "features": [
+    "deposit_number",
+    "days_since_reg",
+    "gap_before",
+    "total_to_k",
+    "avg_to_k",
+    "max_to_k",
+    "ftd_amount",
+    "this_amount",
+    "mean_gap",
+    "payment_method",
+    "affiliate_type",
+    "country"
+  ],
+  "cat_features": [
+    "payment_method",
+    "affiliate_type",
+    "country"
+  ],
+  "metrics": {
+    "roc_auc": 0.871,
+    "pr_auc": 0.955
+  },
+  "target": "next_deposit_within_30d",
+  "table": "player_next_deposit_ml"
+}

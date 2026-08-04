@@ -1,0 +1,115 @@
+# Reverse-proxy для Retention Board.
+#
+# РАСКЛАДКА (после перехода на CRM-SPA как единственный интерфейс):
+#   /              -> crm-spa    вход /login (Supabase-аутентификация, роли в JWT)
+#   /api/v1/*      -> board      headless-API: ВСЕ расчёты, формулы и ML-скоры
+#   /api/*         -> crm-spa    её собственные Route Handlers (/api/admin/...)
+#   /ingest/*      -> ingest     приём событий казино
+#   /supabase/*    -> Kong       только auth + PostgREST (белый список, см. ниже)
+#
+# HTML-страницы борда наружу больше не отдаём: SPA их полностью заменила, а роуты
+# у них одинаковые (/report, /live, /games, /ggr…) и в корне столкнулись бы.
+# Сам player_board.py никуда не делся — он и считает данные для SPA.
+# Аварийный доступ к старому интерфейсу остался по IP (внизу файла).
+
+{
+	email simbagoapp@gmail.com   # для уведомлений Let's Encrypt
+}
+
+# Основной адрес: домен с автоматическим TLS (Let's Encrypt) + авто http→https редирект.
+cas.21do.xyz {
+	log {
+		output stdout    # видно IP клиентов (для проверки whitelist казино)
+	}
+
+	handle /ingest* {
+		# IP-allowlist проверяет сам шлюз (список в secrets/allowed_ips.json, правится из UI).
+		# Caddy передаёт реальный IP клиента доверенным заголовком (клиент подделать не может).
+		reverse_proxy ingest:8081 {
+			header_up X-Real-Client-IP {client_ip}
+		}
+	}
+
+	# ── Данные и расчёты (headless-борд) ───────────────────────────────────────
+	# Именно сюда SPA ходит за цифрами. Basic-auth на /api/* не действует (у него
+	# свой JWT по ролям), иначе Bearer затирал бы креды — заголовок Authorization
+	# у них общий.
+	handle /api/v1/* {
+		reverse_proxy board:8050
+	}
+
+	# ── Supabase (Kong) ────────────────────────────────────────────────────────
+	# SPA ходит в Supabase ИЗ БРАУЗЕРА (auth + PostgREST под RLS), поэтому он
+	# обязан быть публичным. Порт 54321 наружу закрыт файрволом — сюда попадаем
+	# только через Caddy, из docker-сети.
+	#
+	# БЕЛЫЙ СПИСОК, а не /supabase/* целиком. Kong отдаёт на том же порту pgMeta
+	# (/pg/*), у которого НЕТ авторизации: проксирование всего префикса выставляло
+	# наружу схему БД без токена (проверено: /supabase/pg/tables -> 200 со списком
+	# таблиц). Поэтому пускаем ровно то, чем пользуется SPA, — auth и PostgREST
+	# (realtime/storage/functions она не использует, проверено по коду).
+	handle_path /supabase/auth/v1/* {
+		rewrite * /auth/v1{uri}
+		reverse_proxy host.docker.internal:54321
+	}
+	handle_path /supabase/rest/v1/* {
+		rewrite * /rest/v1{uri}
+		reverse_proxy host.docker.internal:54321
+	}
+	# всё прочее под /supabase/* (в т.ч. /pg/*, /graphql, /storage) — наружу нельзя
+	handle /supabase/* {
+		respond "not found" 404
+	}
+
+	# ── CRM-SPA: всё остальное, включая корень и /login ────────────────────────
+	handle {
+		reverse_proxy crm-spa:3000
+	}
+}
+
+# ── ДЕМО-СТЕНД (синтетические данные) ────────────────────────────────────────
+# Полная копия интерфейса на выдуманных игроках — для показов, без риска
+# засветить реальную базу. Отдельные база (ClickHouse demo, юзер demo_user без
+# доступа к retention), Supabase (порты 544xx) и контейнеры.
+# Сигналы в казино отсюда НЕ уходят: у демо-борда пустой CALLBACK_URL.
+demo.21do.xyz {
+	log {
+		output stdout
+	}
+
+	handle /api/v1/* {
+		reverse_proxy demo-board:8050
+	}
+
+	# Supabase демо — тот же белый список, что и в проде (pgMeta наружу нельзя)
+	handle_path /supabase/auth/v1/* {
+		rewrite * /auth/v1{uri}
+		reverse_proxy host.docker.internal:54421
+	}
+	handle_path /supabase/rest/v1/* {
+		rewrite * /rest/v1{uri}
+		reverse_proxy host.docker.internal:54421
+	}
+	handle /supabase/* {
+		respond "not found" 404
+	}
+
+	# Внешняя API-дока Sellrise (партнёрам) — статическая страница, только demo.
+	handle_path /integration* {
+		root * /srv/sellrise-site
+		try_files {path} /index.html
+		file_server
+	}
+
+	handle {
+		reverse_proxy demo-spa:3000
+	}
+}
+
+# Аварийный вход в старый HTML-борд, если в SPA что-то отвалится.
+# Самоподписанный сертификат (IP в SAN) — браузер ругнётся, это нормально.
+# Basic-auth по BOARD_USER/BOARD_PASS делает само приложение.
+https://72.62.146.171 {
+	tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
+	reverse_proxy board:8050
+}

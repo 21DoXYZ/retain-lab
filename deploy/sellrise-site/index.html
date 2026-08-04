@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark">
+<title>Sellrise — интеграционная документация</title>
+<style>
+ :root{
+   --bg:#08090c; --panel:#0d0f14; --surface:#12151b; --surface2:#161a21;
+   --ink:#e9ebf1; --muted:#98a1b2; --faint:#626b7c;
+   --line:rgba(255,255,255,.075); --line2:rgba(255,255,255,.13);
+   --accent:#5aa2ff; --cyan:#37e0cf; --accent-soft:rgba(90,162,255,.14);
+   --radius:14px;
+ }
+ *{box-sizing:border-box}
+ html{scroll-behavior:smooth; scroll-padding-top:26px}
+ body{margin:0;color:var(--ink);background:var(--bg);
+   font:15px/1.68 "Inter",-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;}
+ /* фон: near-black + свечение + тонкая сетка */
+ body::before{content:"";position:fixed;inset:0;z-index:-2;background:var(--bg)}
+ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+   background:
+     radial-gradient(1000px 560px at 50% -12%, rgba(90,162,255,.16), transparent 60%),
+     radial-gradient(760px 420px at 100% -5%, rgba(55,224,207,.08), transparent 55%),
+     linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px) 0 0/44px 44px,
+     linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px) 0 0/44px 44px;
+   -webkit-mask:radial-gradient(1200px 700px at 50% 0, #000 30%, transparent 78%);
+           mask:radial-gradient(1200px 700px at 50% 0, #000 30%, transparent 78%);}
+ ::selection{background:rgba(90,162,255,.32);color:#fff}
+ ::-webkit-scrollbar{width:10px;height:10px}
+ ::-webkit-scrollbar-thumb{background:#1e2229;border-radius:8px;border:2px solid var(--bg)}
+ ::-webkit-scrollbar-thumb:hover{background:#2a2f38}
+
+ /* hero */
+ .hero{border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+ .hero-inner{max-width:1180px;margin:0 auto;padding:46px 32px 34px}
+ .brand{font-size:30px;font-weight:800;letter-spacing:-.02em;
+   background:linear-gradient(94deg,#fff 6%,var(--accent) 52%,var(--cyan));
+   -webkit-background-clip:text;background-clip:text;color:transparent;width:max-content}
+ .brand::after{content:"";display:inline-block;width:7px;height:7px;margin-left:2px;border-radius:50%;
+   background:var(--cyan);box-shadow:0 0 12px var(--cyan);vertical-align:middle}
+ .tagline{margin-top:10px;color:var(--muted);font-size:14.5px;max-width:660px}
+
+ .wrap{display:grid;grid-template-columns:262px 1fr;max-width:1180px;margin:0 auto;gap:0}
+ /* sticky TOC */
+ nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;
+   padding:30px 14px 40px 32px;border-right:1px solid var(--line)}
+ .toc-title{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--faint);margin:0 0 14px;padding-left:12px}
+ nav.toc ul{list-style:none;margin:0;padding:0}
+ nav.toc li{margin:1px 0}
+ nav.toc a{color:var(--muted);text-decoration:none;font-size:13.5px;display:block;padding:8px 12px;border-radius:9px;
+   position:relative;transition:color .15s,background .15s}
+ nav.toc a:hover{color:var(--ink);background:rgba(255,255,255,.04)}
+ nav.toc a.active{color:#fff;background:linear-gradient(90deg,var(--accent-soft),transparent)}
+ nav.toc a.active::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2.5px;border-radius:3px;
+   background:linear-gradient(var(--accent),var(--cyan));box-shadow:0 0 10px rgba(90,162,255,.6)}
+
+ main{min-width:0;padding:34px 40px 96px}
+ section{padding-bottom:34px;margin-bottom:34px;border-bottom:1px solid var(--line)}
+ section:last-child{border-bottom:none}
+ h1{font-size:25px;font-weight:750;letter-spacing:-.01em;margin:.1em 0 .6em}
+ h2{font-size:19px;font-weight:680;margin:1.7em 0 .6em;padding-left:14px;position:relative}
+ h2::before{content:"";position:absolute;left:0;top:.28em;height:.85em;width:3px;border-radius:3px;
+   background:linear-gradient(var(--accent),var(--cyan))}
+ h3{font-size:15.5px;font-weight:650;color:#dfe3ec;margin:1.3em 0 .45em}
+ p{margin:.65em 0;color:#cfd4de}
+ strong{color:#fff;font-weight:650}
+ a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(90,162,255,.28)}
+ a:hover{color:#8dbcff;border-bottom-color:#8dbcff}
+
+ code{background:var(--surface2);color:#a9e9e0;padding:.13em .42em;border-radius:6px;
+   font:12.5px/1.5 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+   border:1px solid var(--line)}
+ pre{background:linear-gradient(180deg,#0f1218,#0c0e13);border:1px solid var(--line2);border-radius:var(--radius);
+   padding:16px 18px;overflow:auto;position:relative;box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
+ pre::before{content:"";position:absolute;top:13px;left:15px;width:9px;height:9px;border-radius:50%;
+   background:#2b3038;box-shadow:15px 0 0 #2b3038,30px 0 0 #2b3038}
+ pre code{background:none;padding:0;border:none;color:#cdd6e3;white-space:pre;display:block;margin-top:16px}
+
+ blockquote{margin:1em 0;padding:12px 16px;border:1px solid var(--line);border-left:3px solid var(--accent);
+   background:linear-gradient(90deg,rgba(90,162,255,.07),rgba(255,255,255,.01));color:var(--muted);
+   border-radius:0 12px 12px 0}
+ blockquote strong{color:#dfe6f2}
+
+ .tablewrap,table{margin:1.1em 0}
+ table{border-collapse:separate;border-spacing:0;width:100%;font-size:13.5px;display:block;overflow-x:auto;
+   border:1px solid var(--line2);border-radius:var(--radius);background:var(--panel)}
+ th,td{padding:10px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+ thead th{background:var(--surface);color:#cfd6e3;font-weight:600;white-space:nowrap;
+   border-bottom:1px solid var(--line2)}
+ tbody tr:last-child td{border-bottom:none}
+ tbody tr:hover td{background:rgba(255,255,255,.022)}
+ td code,th code{background:rgba(90,162,255,.10);color:#bcd6ff;border-color:rgba(90,162,255,.2)}
+
+ ul,ol{margin:.6em 0;padding-left:1.35em;color:#cfd4de}
+ li{margin:.3em 0}
+ li::marker{color:var(--accent)}
+
+ footer{max-width:1180px;margin:0 auto;padding:26px 40px 50px;color:var(--faint);font-size:12.5px;
+   border-top:1px solid var(--line)}
+
+ @media(max-width:860px){
+   .wrap{grid-template-columns:1fr}
+   nav.toc{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line);padding:20px 24px}
+   main{padding:26px 22px 70px}.hero-inner{padding:38px 22px 28px}footer{padding:22px}
+ }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <div class="brand">Sellrise</div>
+    <div class="tagline">Интеграционная документация — Retention Intelligence для операторов casino &amp; sportsbook. Приём событий, требования к данным и доставка предсказаний.</div>
+  </div>
+</header>
+<div class="wrap">
+<nav class="toc"><div class="toc-title">Разделы</div><ul><li><a href="#readme">Обзор</a></li>
+<li><a href="#b2b-integration-architecture">Архитектура интеграции</a></li>
+<li><a href="#authentication-and-access">Аутентификация и доступы</a></li>
+<li><a href="#data-requirements">Требования к данным</a></li>
+<li><a href="#realtime-event-ingestion">Приём событий (real-time)</a></li>
+<li><a href="#batch-data-ingestion">Batch-загрузка / бэкфилл</a></li>
+<li><a href="#predictions-delivery">Доставка предсказаний</a></li></ul></nav>
+<main><section id="readme">
+<h1>Sellrise Docs — интеграционная документация</h1>
+<blockquote>Интеграционная документация Sellrise Retention CRM для операторов casino &amp; sportsbook: приём событий (HTTP / потоковый канал), бэкфилл истории, требования к данным и доставка предсказаний (дашборд, callback-сигналы, витрины).</blockquote>
+<p>Предиктивный слой (состав моделей, метрики качества, use cases) описывается отдельно и передаётся оператору по запросу на этапе договорённостей.</p>
+<h2>Интеграция</h2>
+<ul>
+<li><a href="#b2b-integration-architecture">B2B Integration Architecture</a> — общая схема: от событий до сигналов</li>
+<li><a href="#authentication-and-access">Authentication &amp; Access</a> — токены, доступы потокового канала, роли дашборда</li>
+<li><a href="#data-requirements">Data Requirements</a> — какие данные нужны, критичность, расширенные данные для функций CRM</li>
+<li><a href="#realtime-event-ingestion">Real-time Event Ingestion</a> — контракт события v2, HTTP и потоковый канал</li>
+<li><a href="#batch-data-ingestion">Batch Data Ingestion</a> — бэкфилл истории и батч-каналы</li>
+<li><a href="#predictions-delivery">Predictions Delivery</a> — где забирать предсказания: дашборд, callback, витрины</li>
+</ul>
+<h2>Статус</h2>
+<table><thead><tr><th>Блок</th><th>Статус</th></tr></thead><tbody>
+<tr><td>Приём событий HTTP / потоковый канал</td><td>✅ работает</td></tr>
+<tr><td>Batch-бэкфилл истории</td><td>✅ работает</td></tr>
+<tr><td>Дашборд и выгрузки</td><td>✅ работает</td></tr>
+<tr><td>Callback-сигналы оператору</td><td>🟡 спецификация готова, включается после согласования формата и обмена токенами</td></tr>
+</tbody></table>
+</section>
+<section id="b2b-integration-architecture">
+<h1>B2B Integration Architecture</h1>
+<h2>Схема интеграции</h2>
+<pre><code>
+ваш бэкенд ──HTTP POST /ingest/events──┐
+ваш бэкенд ──потоковый канал───────────┼─►      Sellrise
+бэкфилл истории (Parquet/CSV дампы) ────┘   приём → обработка → ML-скоринг
+                                                        │
+                                       ┌────────────────┼────────────────┐
+                                       ▼                ▼                ▼
+                              дашборд Sellrise   callback-сигналы   выгрузки XLSX
+                              (CRM-операционка)  POST на ваш API    (колл-центр)
+</code></pre>
+<p>Внутренняя обработка — «чёрный ящик»: оператор шлёт события/историю по интерфейсам ниже и получает готовые предсказания. Состав моделей и предиктивного слоя — в отдельной внутренней документации, передаётся по запросу.</p>
+<h2>Точки интеграции</h2>
+<h3>1. Аутентификация 🔐</h3>
+<p>Токены и доступы выдаются при подключении, по каналу отдельно от документации. Детали — <a href="#authentication-and-access">Authentication &amp; Access</a>.</p>
+<h3>2. Загрузка данных 📤</h3>
+<table><thead><tr><th>Канал</th><th>Что</th><th>Когда использовать</th></tr></thead><tbody>
+<tr><td><code>POST /ingest/events</code> (HTTP)</td><td>события игроков поштучно или батчами до 1000</td><td>старт интеграции, средние объёмы</td></tr>
+<tr><td>Потоковый канал (Kafka-совместимый)</td><td>те же события потоком</td><td>большие объёмы, минимальная задержка</td></tr>
+<tr><td>Дампы Parquet/CSV</td><td>исторический бэкфилл, разовые дозаливки</td><td>история до включения потока</td></tr>
+</tbody></table>
+<p>Один контракт события для обоих каналов — <a href="#realtime-event-ingestion">Real-time Event Ingestion</a>. 8 типов событий: <code>user</code>, <code>bet</code>, <code>win</code>, <code>session_start</code>, <code>session_end</code>, <code>deposit</code>, <code>withdrawal</code>, <code>bonus</code>.</p>
+<h3>3. Получение предсказаний 📊</h3>
+<table><thead><tr><th>Канал</th><th>Формат</th><th>Режим</th></tr></thead><tbody>
+<tr><td>Дашборд Sellrise</td><td>карточка игрока, пул, пульт, live</td><td>интерактивно, RBAC-роли</td></tr>
+<tr><td>Callback-сигналы</td><td><code>POST</code> батчей JSON на ваш эндпоинт</td><td>push, ежедневно после скоринга</td></tr>
+<tr><td>Выгрузки</td><td>XLSX-списки сегментов со скорами</td><td>ежедневно / по запросу</td></tr>
+</tbody></table>
+<p>Детали и формат сигнала — <a href="#predictions-delivery">Predictions Delivery</a>.</p>
+<h3>4. Мониторинг 📈</h3>
+<ul>
+<li>Свежесть данных и предсказаний видна в дашборде (метка cutoff).</li>
+<li>Здоровье скоринга — сервисный <code>GET /health</code> (время и тайминги последнего прогона).</li>
+<li>Метрики каждой модели фиксируются в реестре при каждом переобучении.</li>
+</ul>
+<h2>Варианты интеграции</h2>
+<p><strong>Вариант A — HTTP push (рекомендуется для старта).</strong> Ваш бэкенд шлёт события на наш эндпоинт. Минимум инфраструктуры с вашей стороны: HTTP-клиент + ретраи + outbox.</p>
+<p><strong>Вариант B — потоковый канал (Kafka-совместимый API).</strong> Продюс напрямую в потоковый приёмник (SASL_SSL). Для больших объёмов и когда у вас уже есть событийная шина.</p>
+<p><strong>Вариант C — batch pull/дампы.</strong> Если событийного потока нет: регулярные Parquet-дампы в object storage или прямой pull из read-реплики вашей БД. Детали — <a href="#batch-data-ingestion">Batch Data Ingestion</a>.</p>
+<h2>Итоговый поток</h2>
+<pre><code>
+Ваша платформа → Аутентификация → Поток событий (+бэкфилл) → ML-скоринг →
+→ Предсказания → Дашборд / Сигналы / Выгрузки → Действия retention-команды →
+→ Реакция игрока возвращается событиями → цикл замыкается
+</code></pre>
+<p><strong>Частота пересчёта:</strong> предсказания обновляются ежедневно (ночной скоринг); переобучение моделей — еженедельно.</p>
+<p><strong>Ключевое отличие от скоринг-вендоров:</strong> предсказания приходят не «сырыми скорами в API», а внутри готовой операционки — с назначениями, звонками, статусами и обратной связью по каждому контакту. Слой действий уже построен.</p>
+</section>
+<section id="authentication-and-access">
+<h1>Authentication &amp; Access</h1>
+<h2>Обзор</h2>
+<p>Доступы разделены по принципу наименьших привилегий: у каждого канала — свой механизм и свой секрет. Компрометация одного токена не открывает остальные каналы.</p>
+<blockquote>🔐 <strong>Все секреты передаются отдельным безопасным каналом, никогда — в документации, тикетах или переписке.</strong></blockquote>
+<h2>Карта доступов</h2>
+<table><thead><tr><th>Канал</th><th>Механизм</th><th>Секрет</th><th>Кто выдаёт</th></tr></thead><tbody>
+<tr><td>HTTP-приём событий</td><td><code>Authorization: Bearer &lt;INGEST_TOKEN&gt;</code></td><td>ingest-токен</td><td>мы</td></tr>
+<tr><td>Потоковый приём событий</td><td>SASL_SSL / SCRAM-SHA-256</td><td>SASL-логин + пароль</td><td>мы</td></tr>
+<tr><td>Callback-сигналы (мы → вы)</td><td><code>Authorization: Bearer &lt;CALLBACK_TOKEN&gt;</code></td><td>генерируете <strong>вы</strong> для защиты своего эндпоинта</td><td>вы</td></tr>
+<tr><td>Дашборд Sellrise</td><td>логин/пароль + роль (RBAC)</td><td>учётные записи</td><td>мы, по списку сотрудников</td></tr>
+</tbody></table>
+<h2>HTTP-приём событий</h2>
+<p>Каждый запрос к <code>POST /ingest/events</code> — с заголовком:</p>
+<pre><code>
+Authorization: Bearer &lt;INGEST_TOKEN&gt;
+</code></pre>
+<ul>
+<li>Токен привязан к оператору; ротация — по запросу, старый токен отзывается.</li>
+<li><code>401</code> — токен отсутствует/неверен: проверьте заголовок, не ретраите запрос как есть.</li>
+<li>Исходящие IP вашего бэкенда добавляются в allowlist (сообщите их до старта).</li>
+</ul>
+<h2>Потоковый канал (Kafka-совместимый)</h2>
+<pre><code>
+security.protocol:  SASL_SSL           (TLS публичный, ca-файл не нужен)
+sasl.mechanism:     SCRAM-SHA-256
+sasl.username:      &lt;SASL_USER&gt;
+sasl.password:      &lt;SASL_PASS&gt;
+</code></pre>
+<p>Учётка имеет права только на продюс в выданный топик — ни чтения чужих топиков, ни администрирования.</p>
+<h2>Callback-токен (обратный канал)</h2>
+<p>Для доставки сигналов мы вызываем <strong>ваш</strong> эндпоинт. Токен для него генерируете вы и передаёте нам — так вы контролируете и ротацию, и отзыв:</p>
+<pre><code>
+POST https://&lt;ваш-домен&gt;/api/sellrise/signals
+Authorization: Bearer &lt;SELLRISE_CALLBACK_TOKEN&gt;
+</code></pre>
+<h2>Роли дашборда (RBAC)</h2>
+<p>Доступ к экранам и данным дашборда определяется ролью учётной записи. Матрица создана под структуру retention-отдела:</p>
+<table><thead><tr><th>Роль</th><th>Доступ</th></tr></thead><tbody>
+<tr><td><code>operator</code></td><td>своя очередь, свои звонки и карточки (без чужих данных)</td></tr>
+<tr><td><code>vip_manager</code></td><td>свои VIP-игроки и их скоринг</td></tr>
+<tr><td><code>head_department</code></td><td>данные своего отдела (dept-scope)</td></tr>
+<tr><td><code>head_retention</code></td><td>весь ретеншен + управление скриптами</td></tr>
+<tr><td><code>analyst</code></td><td>вся аналитика read-only (без аудио звонков)</td></tr>
+<tr><td><code>director</code></td><td>управленческая сводка</td></tr>
+<tr><td><code>super_admin</code></td><td>всё, администрирование</td></tr>
+</tbody></table>
+<p>Принципы: скоуп доступа энфорсит <strong>сервер</strong>, а не интерфейс; PII (телефоны) не показываются там, где они не нужны для работы; действия аудируются.</p>
+<h2>Лучшие практики</h2>
+<ul>
+<li><strong>Разные секреты для разных подсистем.</strong> ETL-контур знает только ingest-токен;</li>
+</ul>
+<p>  ваш CRM-приёмник — только callback-токен.</p>
+<ul>
+<li><strong>Ротация без простоя:</strong> запросите новый токен, переключите трафик, мы отзовём старый.</li>
+<li><strong>Не логируйте токены</strong> в теле логов и URL — только в заголовках запросов.</li>
+</ul>
+<h2>FAQ</h2>
+<p><strong>В: Один токен на все операции — можно?</strong> О: Технически каналов несколько и секреты у них разные by design; «одного токена на всё» не существует.</p>
+<p><strong>В: Что при компрометации?</strong> О: Сообщите нам — ingest/SASL отзываем немедленно и выдаём новые; callback-токен вы ротируете сами, мы лишь обновляем значение у себя.</p>
+<p><strong>В: Тестовое подключение?</strong> О: Выдаём тестовые доступы, вы шлёте 5–10 фейковых событий, мы подтверждаем приём — после этого включается боевой поток. См. <a href="#realtime-event-ingestion">Real-time Event Ingestion</a>.</p>
+</section>
+<section id="data-requirements">
+<h1>Data Requirements</h1>
+<h2>Обзор</h2>
+<p>Что нужно от оператора, чтобы модели обучились и предсказывали качественно. Принципы одинаковы для потока событий и батч-загрузки.</p>
+<h2>Главные принципы</h2>
+<blockquote><strong>Транзакции лучше агрегатов.</strong> Модели питаются гранулярным поведением (ритм депозитов, паттерны ставок внутри дня). Дневные агрегаты теряют сигнал — используйте их только если сырые транзакции физически недоступны.</blockquote>
+<ul>
+<li><strong>Минимум 6 месяцев свежей непрерывной истории.</strong> Не «данные двухлетней давности»:</li>
+</ul>
+<p>  модель должна учиться на текущем поведении и текущем трафик-миксе.</p>
+<ul>
+<li><strong>Тест- и сервис-аккаунты размечены</strong> (<code>account_type: normal/test/service</code>) — в</li>
+</ul>
+<p>  обучение и скоринг идут только реальные игроки.</p>
+<ul>
+<li><strong>Статусы денежных операций обязательны</strong> (<code>completed / rejected / failed / pending</code>):</li>
+</ul>
+<p>  успешные депозиты — сигнал №1 во всех моделях, отклонённые — самостоятельный признак.</p>
+<ul>
+<li><strong>Единый идентификатор игрока</strong> (<code>casino_player_id</code>) во всех датасетах.</li>
+<li><strong>Время в UTC.</strong> Суточные и «ночные» признаки система сама считает в таймзоне</li>
+</ul>
+<p>  оператора (фиксируется на старте интеграции).</p>
+<h2>Критичность датасетов</h2>
+<table><thead><tr><th>Датасет</th><th>Критичность</th><th>Используется</th></tr></thead><tbody>
+<tr><td>Депозиты/выводы со статусами (<code>money_transactions</code>)</td><td>🔴 критично</td><td>все модели; из депозитов восстанавливается VIP-история</td></tr>
+<tr><td>Профили игроков (<code>users</code>)</td><td>🔴 критично</td><td>фильтр реальных игроков, FTD, атрибуция, страна</td></tr>
+<tr><td>Ставки/выигрыши (<code>game_transactions</code>)</td><td>🟡 рекомендуется</td><td>игровые признаки: ритм, momentum, разнообразие игр</td></tr>
+<tr><td>Игровые сессии (<code>game_sessions</code>)</td><td>⚪ опционально</td><td>дашборд и витрины; моделям напрямую не нужны</td></tr>
+<tr><td>VIP-история</td><td>— <strong>не требуется</strong></td><td>выводится детерминированно из депозитов (наше отличие от вендоров)</td></tr>
+</tbody></table>
+<h2>Обязательные поля</h2>
+<h3><code>users</code> — профиль игрока (1 строка = игрок, upsert)</h3>
+<table><thead><tr><th>Поле</th><th>Зачем</th></tr></thead><tbody>
+<tr><td><code>casino_player_id</code></td><td>ключ во всех датасетах</td></tr>
+<tr><td><code>account_type</code></td><td><code>normal</code> / <code>test</code> / <code>service</code> — фильтр реальных игроков</td></tr>
+<tr><td><code>reg_date</code></td><td>лаг регистрация→FTD, стаж</td></tr>
+<tr><td><code>ftd_date</code>, <code>ftd_amount</code></td><td>старт окон LTV/repeat/early-VIP; сумма первого депозита</td></tr>
+<tr><td><code>country</code></td><td>категориальный признак</td></tr>
+<tr><td><code>affiliate_code</code>, <code>affiliate_type</code></td><td>атрибуция трафика (признак во всех моделях)</td></tr>
+</tbody></table>
+<h3><code>money_transactions</code> — денежные операции</h3>
+<table><thead><tr><th>Поле</th><th>Зачем</th></tr></thead><tbody>
+<tr><td><code>casino_player_id</code></td><td>ключ</td></tr>
+<tr><td><code>created_at</code> (UTC)</td><td>окна, гэпы, ритм депозитов</td></tr>
+<tr><td><code>type</code></td><td><code>deposit</code> / <code>withdrawal</code> / <code>bonus</code> / <code>manual_*</code> / <code>freespin</code></td></tr>
+<tr><td><code>status</code></td><td><code>completed/rejected/failed/pending</code> — успех фильтруется по статусу</td></tr>
+<tr><td><code>amount</code></td><td>суммы, лестница депозитов, VIP-уровень</td></tr>
+<tr><td><code>payment_method</code></td><td>категориальный признак</td></tr>
+<tr><td><code>description</code></td><td>тип бонуса — признак для рекомендаций офферов</td></tr>
+</tbody></table>
+<h3><code>game_transactions</code> — ставки и выигрыши</h3>
+<table><thead><tr><th>Поле</th><th>Зачем</th></tr></thead><tbody>
+<tr><td><code>casino_player_id</code></td><td>ключ</td></tr>
+<tr><td><code>created_at</code> (UTC)</td><td>recency, ритм, ночная доля</td></tr>
+<tr><td><code>transaction_type</code></td><td><code>bet</code> / <code>win</code> / <code>freespins_bet</code> / <code>freespins_win</code> — разметка фриспинов критична</td></tr>
+<tr><td><code>bet_amount</code>, <code>win_amount</code></td><td>оборот, средняя ставка, чистый результат</td></tr>
+<tr><td><code>game_uuid</code></td><td>разнообразие игр</td></tr>
+<tr><td><code>aggregator</code> / <code>provider</code></td><td>категориальный признак «основной провайдер»</td></tr>
+</tbody></table>
+<h2>Расширенные данные — функции CRM (второй эшелон)</h2>
+<p>Моделям эти данные <strong>не требуются</strong> — каждый пункт включает конкретную функцию продукта. Принцип деградации мягкий: пункта нет → соответствующая функция честно показывает «нет данных», всё остальное работает.</p>
+<table><thead><tr><th>Данные</th><th>Какую функцию включает</th></tr></thead><tbody>
+<tr><td><code>balance_after</code> в игровых событиях</td><td>график и максимум баланса в карточке игрока (аргументы для персонального контакта)</td></tr>
+<tr><td>События сессий (<code>session_start</code> / <code>session_end</code>)</td><td>«играют сейчас», live-алерты, моментум игрока</td></tr>
+<tr><td>Справочник игр (<code>game_uuid</code> → название)</td><td>человекочитаемая аналитика по играм</td></tr>
+<tr><td>Телефон / email + флаги верификации</td><td>звонки и доставка сообщений из CRM (PII-режим согласуется отдельно)</td></tr>
+<tr><td>Согласия на контакт (opt-in) + события изменения</td><td>строгий контроль отправок в автоматических цепочках</td></tr>
+<tr><td>Стоп-лист (<code>do_not_contact</code>)</td><td>запрет контакта на уровне системы</td></tr>
+<tr><td>Поток статусов бонусов (выдан → отыгран / сгорел / отменён)</td><td>жизненный цикл бонуса в карточке, бонус-экономика (P&amp;L бонусов)</td></tr>
+<tr><td>Справочник бонусов (каталог кампаний)</td><td>названия/типы бонусов в отчётах и рекомендациях</td></tr>
+<tr><td>Подтверждение выдачи бонуса (granted / rejected)</td><td>замкнутый цикл «оффер → выдача → отклик игрока»</td></tr>
+<tr><td>IP / User-Agent (сырые, ненормализованные)</td><td>антифрод-сигналы, детект мультиаккаунтов</td></tr>
+<tr><td>Расширенные атрибуты профиля (девайс, канал, статус KYC и т.п.)</td><td>дополнительные фильтры конструктора сегментов</td></tr>
+<tr><td>Callback-эндпоинт + токен на вашей стороне</td><td>приём push-сигналов после скоринга (<a href="#predictions-delivery">Predictions Delivery</a>)</td></tr>
+</tbody></table>
+<p>Состав второго эшелона согласуется на интеграции — подключать можно поэтапно, каждый пункт независим от остальных.</p>
+<h2>Определение VIP</h2>
+<p>VIP-критерии оператора фиксируются на старте (метрика, пороги, валюта). Типовая конфигурация — лестница уровней по накопительным успешным депозитам, например: Silver ≥ 1 000 · Gold ≥ 25 000 · Platinum ≥ 100 000 · Diamond ≥ 300 000 · Royal ≥ 750 000 (значения — иллюстрация; пороги задаются правилами оператора). Изменение порогов = переобучение VIP-моделей.</p>
+<h2>Качество данных</h2>
+<ul>
+<li><strong>Полнота:</strong> обязательные поля без пропусков; опциональные могут быть null.</li>
+<li><strong>Консистентность:</strong> суммы в одной валюте/одних единицах (не смешивать основную</li>
+</ul>
+<p>  валюту и minor units); один формат времени везде.</p>
+<ul>
+<li><strong>Дедупликация:</strong> у каждого события/транзакции — стабильный уникальный id; повторная</li>
+</ul>
+<p>  отправка того же id безопасна (мы дедуплицируем).</p>
+<ul>
+<li><strong>Правки задним числом:</strong> перезаливка данных за прошлую дату допустима — перед</li>
+</ul>
+<p>  обучением берётся последнее состояние каждой записи.</p>
+<h2>Частые вопросы</h2>
+<p><strong>В: У нас нет части полей (например, <code>session_id</code> или <code>description</code>).</strong> О: Присылайте что есть — обязательный минимум помечен выше. Отсутствие рекомендуемых полей снижает точность, но не блокирует запуск.</p>
+<p><strong>В: Можно сразу агрегаты по дням?</strong> О: Можно, но модели потеряют внутридневной сигнал (ритм, ночную долю, «раскачку» ставок). Согласуйте с нами формат агрегата заранее — и только если транзакции недоступны.</p>
+<p><strong>В: Как с таймзонами?</strong> О: Шлите UTC. Главное — консистентность: не смешивать таймзоны в одном датасете.</p>
+</section>
+<section id="realtime-event-ingestion">
+<h1>Real-time Event Ingestion</h1>
+<h2>Обзор</h2>
+<p>Приём событий игроков в реальном времени. Два канала на выбор — <strong>HTTP</strong> (проще) и <strong>потоковый канал</strong> (для больших объёмов). Оба ведут в один приёмник, формат события одинаковый. События питают и live-мониторинг, и ML-модели — поэтому важны профиль игрока, статусы денежных операций и разметка фриспинов.</p>
+<pre><code>
+ваш бэкенд ──HTTP POST── ┐
+                          ├─►  Sellrise (приём → обработка → модели + дашборд)
+ваш бэкенд ──поток───────┘
+</code></pre>
+<p>Полная спецификация полей по типам событий (документ для бэкенд-команды оператора) передаётся на этапе интеграции. Здесь — выжимка.</p>
+<h2>Контракт события (v2)</h2>
+<p>Одно сообщение = одно событие, JSON. Общие поля:</p>
+<table><thead><tr><th>Поле</th><th>Тип</th><th>Обяз.</th><th>Описание</th></tr></thead><tbody>
+<tr><td><code>event_id</code></td><td>uuid</td><td>✅</td><td>уникальный id — по нему дедупликация; при ретраях шлите тот же</td></tr>
+<tr><td><code>event_type</code></td><td>string</td><td>✅</td><td><code>user</code> · <code>bet</code> · <code>win</code> · <code>session_start</code> · <code>session_end</code> · <code>deposit</code> · <code>withdrawal</code> · <code>bonus</code></td></tr>
+<tr><td><code>casino_player_id</code></td><td>int</td><td>✅</td><td>ваш внутренний id игрока</td></tr>
+<tr><td><code>ts</code></td><td>string</td><td>✅</td><td>UTC, <code>YYYY-MM-DD HH:MM:SS.mmm</code></td></tr>
+<tr><td><code>currency</code></td><td>string</td><td>⬜</td><td>например <code>EUR</code> / <code>USD</code></td></tr>
+</tbody></table>
+<p>Игровые события несут <code>session_id</code>, <code>game_uuid</code>, <code>provider</code>, <code>bet_amount</code>/<code>win_amount</code>, <code>is_freespin</code>, <code>balance_after</code>; денежные — <code>amount</code>, <strong><code>status</code></strong>, <code>payment_method</code>, <code>is_manual</code>, <code>balance_after</code>; событие <code>user</code> — полный профиль (тип аккаунта, даты регистрации/FTD, атрибуция, балансы) и шлётся при регистрации и изменениях (upsert).</p>
+<p>Пример:</p>
+<pre><code>
+{"event_id":"…uuid…","event_type":"deposit","casino_player_id":40,
+ "ts":"2026-06-20 16:31:02.001","amount":250.00,"status":"completed",
+ "payment_method":"bank_transfer","is_manual":false,"currency":"EUR","balance_after":350.00}
+</code></pre>
+<blockquote>Незнакомые поля можно опускать, но <code>status</code> у денежных операций, <code>is_freespin</code> у игровых и событие <code>user</code> критичны для качества прогнозов.</blockquote>
+<h2>Канал A — HTTP (рекомендуется для старта)</h2>
+<pre><code>
+URL:    https://&lt;домен-инсталляции&gt;/ingest/events
+Метод:  POST
+Заголовки: Authorization: Bearer &lt;INGEST_TOKEN&gt; · Content-Type: application/json
+Тело:   одно событие (объект) ИЛИ батч (массив, до 1000)
+</code></pre>
+<p><strong>Ответы:</strong></p>
+<table><thead><tr><th>Код</th><th>Значение</th><th>Что делать</th></tr></thead><tbody>
+<tr><td><code>200 {"status":"ok","accepted":N}</code></td><td>принято и записано в буфер</td><td>ок</td></tr>
+<tr><td><code>400</code></td><td>нет обязательных полей / битый JSON</td><td>исправить payload, не ретраить как есть</td></tr>
+<tr><td><code>401</code></td><td>неверный/отсутствующий токен</td><td>проверить <code>Authorization</code></td></tr>
+<tr><td><code>413</code></td><td>батч &gt; 1000 событий</td><td>разбить</td></tr>
+<tr><td><code>503</code></td><td>буфер временно недоступен</td><td><strong>повторить с теми же <code>event_id</code></strong></td></tr>
+</tbody></table>
+<p><code>200</code> возвращается только после надёжной записи в буфер. Любой не-<code>200</code> (и таймаут/сетевая ошибка) ⇒ ретрай того же запроса.</p>
+<h2>Канал B — потоковый канал (Kafka-совместимый)</h2>
+<pre><code>
+bootstrap.servers:  &lt;выдаётся при подключении&gt;
+security.protocol:  SASL_SSL            (TLS публичный, ca-файл не нужен)
+sasl.mechanism:     SCRAM-SHA-256
+topic:              &lt;выдаётся при подключении&gt;
+key:                casino_player_id    (события игрока в одной партиции — порядок сохранён)
+value:              JSON события (контракт v2)
+</code></pre>
+<p>Рекомендуемые настройки продюсера: <code>enable.idempotence=true</code>, <code>acks=all</code>. Референс-реализация продюсера предоставляется по запросу.</p>
+<h2>Требования к доставке (оба канала)</h2>
+<ol>
+<li><strong><code>event_id</code> на каждое событие</strong> — дедупликация включена, дубли безопасны.</li>
+<li><strong>At-least-once + ретраи:</strong> лучше дубль, чем потеря.</li>
+<li><strong>Outbox/локальный буфер</strong> на вашей стороне: если приём недоступен — копить и</li>
+</ol>
+<p>   досылать. Идеал — outbox-запись в той же транзакции, что и бизнес-операция.</p>
+<ol>
+<li><strong><code>ts</code> — UTC с миллисекундами.</strong></li>
+<li><strong>Поток:</strong> ключ партиционирования — <code>casino_player_id</code>.</li>
+</ol>
+<h2>Тестовое подключение</h2>
+<ol>
+<li>Выдаём тестовые доступы (HTTP-токен и/или SASL-логин).</li>
+<li>Вы шлёте 5–10 фейковых событий по контракту.</li>
+<li>Мы подтверждаем приём.</li>
+<li>Включается боевой поток; фиксируется момент T для <a href="#batch-data-ingestion">бэкфилла истории</a>.</li>
+</ol>
+<h2>Чек-лист согласования перед стартом</h2>
+<ul>
+<li>Какие из 8 типов событий можете слать? Каких нет?</li>
+<li>Ваш id игрока == <code>casino_player_id</code>? Если нет — правило маппинга.</li>
+<li><code>status</code> и <code>payment_method</code> у денежных операций — передаёте?</li>
+<li><code>is_freespin</code> и <code>provider</code> у игровых — размечаете?</li>
+<li>Суммы: основная валюта или minor units? Сколько знаков?</li>
+<li>Ожидаемый объём: событий/сек в среднем и на пике.</li>
+<li>Исходящие IP (для allowlist), техконтакт, сроки.</li>
+</ul>
+</section>
+<section id="batch-data-ingestion">
+<h1>Batch Data Ingestion</h1>
+<h2>Обзор</h2>
+<p>Батч-каналы решают две задачи:</p>
+<ol>
+<li><strong>Бэкфилл истории</strong> — разовая загрузка данных за период до включения живого потока</li>
+</ol>
+<p>   (моделям нужно минимум 6 месяцев истории).</p>
+<ol>
+<li><strong>Регулярная батч-доставка</strong> — если событийного потока нет вовсе, данные могут</li>
+</ol>
+<p>   приезжать периодическими дампами или прямым pull из вашей БД.</p>
+<blockquote>Если есть возможность слать события — шлите события (<a href="#realtime-event-ingestion">Real-time Event Ingestion</a>). Батч — для истории и для случаев, когда потока нет.</blockquote>
+<h2>Форматы файлов</h2>
+<table><thead><tr><th>Параметр</th><th>Значение</th></tr></thead><tbody>
+<tr><td>Формат</td><td><strong>Parquet</strong> (предпочтительно) или CSV</td></tr>
+<tr><td>Состав</td><td><code>money_transactions</code>, <code>game_transactions</code>, <code>game_sessions</code> за период + <strong>полный свежий снапшот <code>users</code></strong></td></tr>
+<tr><td>Схемы полей</td><td><a href="#data-requirements">Data Requirements</a></td></tr>
+<tr><td>Время</td><td>UTC</td></tr>
+</tbody></table>
+<h2>Бэкфилл истории (при подключении)</h2>
+<p>Живой поток покрывает события <strong>с момента включения (T)</strong>. Историю до T присылайте дампом — она грузится в аналитические таблицы, на которых обучаются модели.</p>
+<p><strong>Порядок против «дырки» в данных:</strong></p>
+<ol>
+<li>Включаем живой поток, фиксируем T.</li>
+<li>Вы выгружаете дамп за период [конец предыдущей выгрузки → T].</li>
+<li>Перекрытие в несколько часов не страшно — дубли убираются автоматически.</li>
+<li>Мы заливаем, валидируем и пересчитываем модели.</li>
+</ol>
+<p><strong>Транзакционные датасеты</strong> — инкрементально (только период), <strong>профили <code>users</code></strong> — всегда полным снапшотом.</p>
+<h2>Регулярные батч-каналы (если потока нет)</h2>
+<table><thead><tr><th>Способ</th><th>Кто инициирует</th><th>Свежесть</th><th>Когда выбирать</th></tr></thead><tbody>
+<tr><td>Дампы Parquet в object storage (S3/R2)</td><td>вы кладёте</td><td>часы</td><td>классика, минимальная связность систем</td></tr>
+<tr><td>Прямой pull из read-реплики вашей БД</td><td>мы тянем</td><td>минуты–часы</td><td>если готовы выдать RO-доступ</td></tr>
+<tr><td>Ручные CSV-выгрузки</td><td>вы выгружаете</td><td>дни</td><td>только на старте/пилоте</td></tr>
+</tbody></table>
+<p>Для object storage согласуются: бакет/префикс, структура путей по датам, расписание, формат уведомления о готовности партиции. Для pull: адрес реплики, RO-учётка, allowlist наших IP, watermark-колонки (<code>updated_at</code>/<code>created_at</code>).</p>
+<h2>Требования к загрузке</h2>
+<ul>
+<li><strong>Идемпотентность:</strong> перезаливка данных за любую дату допустима — перед обучением</li>
+</ul>
+<p>  берётся последнее состояние каждой записи. Ошиблись в дампе — просто пришлите   исправленный файл за ту же дату.</p>
+<ul>
+<li><strong>Rolling window (рекомендация):</strong> ежедневно выгружать данные за последние несколько</li>
+</ul>
+<p>  дней с перекрытием — автоматически подхватываются «опоздавшие» транзакции.</p>
+<ul>
+<li><strong>Валидация на границе:</strong> каждая партия проходит проверки (схема, типы, дубли,</li>
+</ul>
+<p>  разрывы дат); расхождения возвращаем отчётом до включения данных в обучение.</p>
+<ul>
+<li><strong>Маппинг идентификаторов</strong> (если ваш id ≠ <code>casino_player_id</code>) выполняется в одном</li>
+</ul>
+<p>  месте слоя загрузки — по правилу, согласованному на старте.</p>
+<h2>Onboarding: тест → прод</h2>
+<ol>
+<li><strong>Тестовая загрузка:</strong> небольшой срез данных → проверяем схему, типы, полноту.</li>
+</ol>
+<p>   Полнота данных на этом шаге не критична — проверяется техника.</p>
+<ol>
+<li><strong>Совместная сверка:</strong> подтверждаем, что данные читаются корректно и сходятся с</li>
+</ol>
+<p>   вашими контрольными цифрами (количества, суммы по дням).</p>
+<ol>
+<li><strong>Боевая загрузка:</strong> полная история + регулярный инкремент. Модели обучаются</li>
+</ol>
+<p>   только на выверенных данных.</p>
+</section>
+<section id="predictions-delivery">
+<h1>Predictions Delivery</h1>
+<h2>Обзор</h2>
+<p>Предсказания пересчитываются <strong>ежедневно</strong> (ночной batch-скоринг всех моделей) и доставляются тремя каналами: дашборд (операционка), callback-сигналы (push в вашу систему), выгрузки (XLSX для колл-центра). Витрины скоров доступны и напрямую для BI.</p>
+<table><thead><tr><th>Канал</th><th>Кому</th><th>Статус</th></tr></thead><tbody>
+<tr><td>Дашборд Sellrise</td><td>retention-команде, VIP-менеджерам, руководителям</td><td>✅ работает</td></tr>
+<tr><td>Callback-сигналы</td><td>вашему бэкенду/CRM (авто-триггеры бонусов)</td><td>🟡 включается после согласования формата и обмена токенами</td></tr>
+<tr><td>Выгрузки XLSX</td><td>колл-центру</td><td>✅ работает</td></tr>
+<tr><td>Витрины скоров (BI)</td><td>аналитикам</td><td>✅ работает</td></tr>
+</tbody></table>
+<h2>Витрины предсказаний</h2>
+<p>Каждая модель ежедневно перезаписывает свою витрину скоров. Ключ везде — <code>casino_player_id</code>. Полный справочник витрин и колонок (состав предиктивного слоя) передаётся отдельным документом на этапе интеграции.</p>
+<h2>Канал 1 — дашборд Sellrise</h2>
+<p>Скоры выведены туда, где принимается решение:</p>
+<ul>
+<li><strong>Карточка игрока</strong> — вся история + прогнозы (LTV-полоса, риск, next-best-action).</li>
+<li><strong>Пул / Пульт / Играют сейчас</strong> — очереди работы с назначением оператору в один клик.</li>
+<li><strong>Моя очередь</strong> — задачи оператора; исход звонка двигает статус, реакция игрока</li>
+</ul>
+<p>  (депозит/игра ≤7 дней) фиксируется автоматически.</p>
+<ul>
+<li><strong>/ltv, /actions</strong> — ранжирование базы по ценности и списки действий.</li>
+</ul>
+<p>Доступ — по ролям (<a href="#authentication-and-access">Authentication &amp; Access</a>). VIP-скоры в карточке и сигналах — ближайший релиз (витрины уже наполняются).</p>
+<h2>Канал 2 — callback-сигналы (мы → вы)</h2>
+<p>После ночного скоринга мы POST'им батчи сигналов на ваш эндпоинт:</p>
+<pre><code>
+POST https://&lt;ваш-домен&gt;/api/sellrise/signals
+GET  https://&lt;ваш-домен&gt;/api/sellrise/health    (проверка перед отправкой)
+Authorization: Bearer &lt;SELLRISE_CALLBACK_TOKEN&gt;
+</code></pre>
+<p>Конверт:</p>
+<pre><code>
+{
+  "model_version": "2026-06-20",
+  "scored_at": "2026-06-20 14:37:00",
+  "signals": [
+    {
+      "casino_player_id": 40,
+      "pred_ltv_d90": 12345.60,
+      "p_churn_30d": 0.87,
+      "p_next_deposit": 0.42,
+      "ltv_tier": "D",
+      "recommended_action": "SAVE",
+      "recommended_bonus": "cashback",
+      "priority": 9876
+    }
+  ]
+}
+</code></pre>
+<table><thead><tr><th>Поле</th><th>Тип</th><th>Смысл</th></tr></thead><tbody>
+<tr><td><code>pred_ltv_d90</code></td><td>number</td><td>прогноз депозитов на 90 дней</td></tr>
+<tr><td><code>p_churn_30d</code></td><td>0..1 / null</td><td>вероятность оттока за 30 дней</td></tr>
+<tr><td><code>p_next_deposit</code></td><td>0..1 / null</td><td>вероятность следующего депозита</td></tr>
+<tr><td><code>ltv_tier</code></td><td><code>A</code>/<code>B</code>/<code>C</code>/<code>D</code></td><td>ценностный тир (D — «кит»)</td></tr>
+<tr><td><code>recommended_action</code></td><td>enum</td><td><code>CONVERT</code> · <code>NUDGE</code> · <code>SAVE</code> · <code>WINBACK</code> · <code>NURTURE</code> · <code>MONITOR</code></td></tr>
+<tr><td><code>recommended_bonus</code></td><td>enum</td><td><code>first_deposit_bonus</code> · <code>second_deposit_reload</code> · <code>reload_cashback</code> · <code>vip_offer</code> · <code>freespins</code> · <code>other</code></td></tr>
+<tr><td><code>priority</code></td><td>int</td><td>больше = важнее</td></tr>
+</tbody></table>
+<p>Все значения — стабильные машиночитаемые ASCII-коды, можно матчить программно.</p>
+<p><strong>Доставка:</strong> at-least-once, батчами; идемпотентность по <code>casino_player_id</code> в рамках одного <code>scored_at</code> — берите последнюю запись по времени.</p>
+<h2>Канал 3 — выгрузки колл-центру</h2>
+<p>Ежедневные сегментные списки со скорами, приоритетом и рекомендацией: at-risk · dormant · churned · never-deposited. XLSX, выгружаются из дашборда; состав колонок настраивается под скрипты колл-центра.</p>
+<h2>Мониторинг и статус моделей</h2>
+<ul>
+<li><strong>Свежесть:</strong> дашборд показывает cutoff данных; <code>scored_at</code>/<code>model_version</code> приходят</li>
+</ul>
+<p>  в каждом батче сигналов.</p>
+<ul>
+<li><strong>Здоровье скоринга:</strong> сервисный <code>GET /health</code> возвращает время и тайминги</li>
+</ul>
+<p>  последнего прогона; повторный запуск скоринга защищён от параллельного выполнения.</p>
+<ul>
+<li><strong>Качество моделей:</strong> метрики фиксируются в реестре при каждом переобучении</li>
+</ul>
+<p>  (еженедельный цикл); деградация видна по сравнению версий.</p>
+<h2>Ошибки и повторы (callback)</h2>
+<table><thead><tr><th>Ситуация</th><th>Поведение</th></tr></thead><tbody>
+<tr><td>ваш эндпоинт недоступен</td><td>ретраи с экспоненциальной паузой, доставка at-least-once</td></tr>
+<tr><td>частичная обработка батча</td><td>безопасно: записи идемпотентны в рамках <code>scored_at</code></td></tr>
+<tr><td>смена формата</td><td>версионируется полем <code>model_version</code>; изменения анонсируются заранее</td></tr>
+</tbody></table>
+</section></main>
+</div>
+<footer>Sellrise · интеграционная документация · конфиденциально, для партнёров по интеграции</footer>
+<script>
+ (function(){
+   var links=[].slice.call(document.querySelectorAll('nav.toc a'));
+   var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+   var obs=new IntersectionObserver(function(es){
+     es.forEach(function(e){
+       if(e.isIntersecting){
+         links.forEach(function(l){l.classList.remove('active');});
+         var a=map[e.target.id]; if(a)a.classList.add('active');
+       }
+     });
+   },{rootMargin:'-12% 0px -78% 0px',threshold:0});
+   document.querySelectorAll('main section').forEach(function(s){obs.observe(s);});
+ })();
+</script>
+</body>
+</html>

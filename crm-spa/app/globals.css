@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   DESIGN TOKENS — CRM-SPA
+   Values are 1:1 with the live Flask dashboard (player_board.py :root) and
+   SELLRISE_TOKENS.md. Do NOT introduce new colours or fonts here.
+   Tailwind v4: each color token below yields matching bg / text / border
+   utilities; each font token yields a font utility. Consume via utilities or
+   via the raw CSS variable, e.g. var(--color-ink).
+   ============================================================================ */
+@theme {
+  /* Brand / accent (CTA, links, active tabs, focus ring) */
+  --color-primary: #2563eb;   /* blue-600 */
+  --color-primary-d: #1d4ed8; /* blue-700 — hover */
+  --color-sun5: #3b82f6;      /* blue-500 — light accent */
+
+  /* Surfaces */
+  --color-cream: #eff6ff;     /* blue-50  — accent background */
+  --color-beige: #dbeafe;     /* blue-100 — accent border */
+  --color-surface: #f8fafc;   /* slate-50 — table headers / app fills */
+  --color-canvas: #ffffff;    /* card / content surface */
+  --color-appbg: #f3f4f6;     /* outermost app background */
+
+  /* Text — ink scale (primary → quiet) */
+  --color-ink: #1e293b;       /* slate-800 — primary text */
+  --color-slate: #334155;     /* slate-700 — secondary text */
+  --color-steel: #64748b;     /* slate-500 — muted text */
+  --color-stone: #94a3b8;     /* slate-400 — quiet text */
+
+  /* Hairlines / borders */
+  --color-hair: #f1f5f9;      /* slate-100 — thin border */
+  --color-hair2: #e5e7eb;     /* gray-200  — border */
+  --color-hair3: #d1d5db;     /* gray-300  — input border */
+
+  /* Semantic — positive / negative
+     NOTE: plan §4 lists .pos #15803d, but the live board renders #1f9d57.
+     We match the live board for pixel parity (see A2 report). */
+  --color-pos: #1f9d57;
+  --color-neg: #dc2626;
+
+  /* Sidebar (dark navigation) */
+  --color-sb: #121626;
+  --color-sb-line: #1e2336;
+  --color-sb-line2: #2a3045;
+  --color-sb-hover: #252b41;
+  --color-sb-card: #1a1f33;
+  --color-sb-text: #9aa3b2;
+  --color-sb-text2: #e6e9f0;
+  --color-sb-grp: #586074;
+
+  /* Typography — system stacks only (no web fonts, like the board) */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Radii — cards 12px · controls 8px · pills 999px */
+  --radius-card: 12px;
+  --radius-ctl: 8px;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    background: var(--color-appbg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

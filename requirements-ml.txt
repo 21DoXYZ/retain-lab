@@ -1,0 +1,9 @@
+# Зависимости для ОБУЧЕНИЯ моделей (*_model.py, ltv_quantiles.py).
+# Веб-морде (player_board.py) они НЕ нужны — для неё хватает requirements.txt.
+# Ставить отдельно:  pip install -r requirements-ml.txt
+clickhouse-connect>=0.7
+catboost>=1.2
+scikit-learn>=1.3
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10

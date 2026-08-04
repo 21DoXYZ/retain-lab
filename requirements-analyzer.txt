@@ -1,0 +1,17 @@
+# Call Analyzer — пайплайн-сервис (call_analyzer/). Отдельно от борда/ML.
+# Базовый набор — обязательный. Тяжёлые NLP/аудио-зависимости опциональны:
+# код gracefully работает и без них (SNR skip, PII regex-only) — dev spec §7, §11.
+
+fastapi>=0.110            # ingest API (call_analyzer/ingest_api.py)
+uvicorn[standard]>=0.29   # ASGI-сервер API
+pydantic>=2.6             # валидация тела запросов ingest
+celery>=5.3               # очередь/воркеры + beat (dev spec §2)
+redis>=5.0                # брокер celery (REDIS_URL)
+requests>=2.31            # OpenRouter (llm.py) + Gladia REST (asr.py)
+psycopg[binary]>=3.1      # Postgres схема analyzer (db.py) — как в tegsoft/store.py
+clickhouse-connect>=0.7   # аналитический приёмник call_audits_flat (clickhouse.py)
+
+# ── ОПЦИОНАЛЬНО (не в turnkey-минимуме; раскомментировать при необходимости) ──────
+# librosa>=0.10           # Audio QC: SNR/VAD (pipeline._snr). Без него SNR пропускается.
+# presidio-analyzer       # PII NER PERSON/LOCATION поверх regex (pii.py). Без него — regex-only.
+# presidio-anonymizer     # парой к presidio-analyzer

@@ -1,0 +1,185 @@
+/**
+ * ru — домен «Конструктор отчётов» (W5-T4). Экран /reports: панель сборки
+ * (метрики × разрезы × фильтры × период), сводная таблица с изменяемым порядком
+ * вложенности, сохранение/шаринг по ролям, экспорт CSV/XLSX.
+ *
+ * Метки метрик/разрезов приходят С БЭКЕНДА (GET /reports/fields, уже локализованы
+ * русским) — здесь только UI-обвязка. Текст несовместимостей (422) тоже отдаёт
+ * бэкенд и мы показываем его как есть.
+ */
+export const reports = {
+  // ── страница / шапка ────────────────────────────────────────────────────
+  "reports.title": "Конструктор отчётов",
+  "reports.lead": "Соберите сводный отчёт: метрики × разрезы × фильтры × период — с исторически корректными сегментами.",
+  "reports.tab.build": "Конструктор",
+  "reports.tab.saved": "Сохранённые",
+  "reports.error.title": "Не удалось загрузить конструктор",
+  "reports.error.desc": "Реестр полей недоступен. Обновите страницу или сообщите администратору.",
+
+  // ── секции панели сборки ─────────────────────────────────────────────────
+  "reports.section.metrics": "Метрики",
+  "reports.section.metrics.hint": "Что считаем (нажмите, чтобы добавить)",
+  "reports.section.dims": "Разрезы",
+  "reports.section.dims.hint": "Порядок = вложенность, как в сводной таблице Excel",
+  "reports.section.filters": "Фильтры",
+  "reports.section.period": "Период",
+
+  // ── метрики ──────────────────────────────────────────────────────────────
+  "reports.metrics.empty": "Выберите хотя бы одну метрику",
+  "reports.metrics.source.money": "Деньги",
+  "reports.metrics.source.game": "Игра",
+  "reports.metrics.source.users": "Игроки",
+  "reports.metrics.source.derived": "Производные (отношения)",
+
+  // ── разрезы ──────────────────────────────────────────────────────────────
+  "reports.dims.add": "+ разрез…",
+  "reports.dims.empty": "Без разрезов — одна итоговая строка по всему периоду.",
+  "reports.dims.max": "Максимум 3 разреза",
+  "reports.dims.up": "Выше",
+  "reports.dims.down": "Ниже",
+  "reports.dims.remove": "Убрать",
+  "reports.dims.level": "Уровень {n}",
+  "reports.dims.group.time": "Время",
+  "reports.dims.group.profile": "Профиль",
+  "reports.dims.group.transaction": "Транзакция",
+  "reports.dims.group.state_at": "Исторический статус",
+
+  // ── фильтры ──────────────────────────────────────────────────────────────
+  "reports.filters.add": "+ фильтр…",
+  "reports.filters.empty": "Фильтры не заданы — считается весь период.",
+  "reports.filters.op.in": "включая",
+  "reports.filters.op.not_in": "исключая",
+  "reports.filters.values.hint": "Значения через запятую",
+  "reports.filters.values.placeholder": "напр. TR, DE",
+  "reports.filters.remove": "Убрать фильтр",
+  "reports.filters.pick": "выберите значения",
+
+  // ── период ───────────────────────────────────────────────────────────────
+  "reports.period.from": "С",
+  "reports.period.to": "По",
+  "reports.period.preset.30d": "30 дней",
+  "reports.period.preset.quarter": "Квартал",
+  "reports.period.preset.all": "Всё",
+
+  // ── действия ─────────────────────────────────────────────────────────────
+  "reports.build": "Построить",
+  "reports.building": "Считаем…",
+  "reports.rebuild": "Обновить",
+  "reports.save": "Сохранить",
+  "reports.export.csv": "CSV",
+  "reports.export.xlsx": "XLSX",
+  "reports.export.failed": "Не удалось скачать файл",
+  "reports.export.forbidden": "Нет прав на экспорт этого отчёта",
+
+  // ── результат / состояния ────────────────────────────────────────────────
+  "reports.result.idle.title": "Отчёт ещё не построен",
+  "reports.result.idle.desc": "Выберите метрики (и при желании разрезы) и нажмите «Построить».",
+  "reports.result.empty.title": "За период данных нет",
+  "reports.result.empty.desc": "Под выбранные фильтры и период строк не нашлось. Расширьте период или ослабьте фильтры.",
+  "reports.result.meta": "{rows} строк · {ms} мс",
+
+  // ── сводная таблица ──────────────────────────────────────────────────────
+  "reports.pivot.total": "Итого",
+  "reports.pivot.allData": "Все данные",
+  "reports.pivot.dimsCol": "Разрез",
+
+  // ── форматирование значений разрезов ─────────────────────────────────────
+  "reports.value.weekOf": "нед. с {date}",
+  "reports.value.hour": "{h}:00",
+  "reports.value.none": "(не указано)",
+  "reports.value.vip": "VIP {n}",
+
+  // ── предупреждение об исторической глубине ────────────────────────────────
+  "reports.warn.history": "До {date} исторические статусы (VIP/цикл/тир на дату) реконструированы из raw-данных; модельные поля (p_churn, LTV) за тот период недоступны.",
+
+  // ── сохранение ───────────────────────────────────────────────────────────
+  "reports.save.title": "Сохранить отчёт",
+  "reports.save.name": "Название",
+  "reports.save.name.placeholder": "напр. Депозиты по месяцам × VIP",
+  "reports.save.visibility": "Доступ",
+  "reports.save.visibility.personal": "Личный",
+  "reports.save.visibility.shared": "Общий (все с доступом к модулю)",
+  "reports.save.visibility.roles": "По ролям",
+  "reports.save.roles": "Роли",
+  "reports.save.roles.hint": "Кому виден отчёт",
+  "reports.save.roles.empty": "Не выбрано ни одной роли — отчёт увидите только вы.",
+  "reports.save.official": "Официальный отчёт компании",
+  "reports.save.official.hint": "Помечается ⭐ и показывается вверху списка.",
+  "reports.save.submit": "Сохранить",
+  "reports.save.update": "Обновить",
+  "reports.save.asNew": "Сохранить как новый",
+  "reports.save.nameRequired": "Введите название отчёта",
+  "reports.save.noMetrics": "Сначала постройте отчёт (нужна хотя бы одна метрика).",
+  "reports.save.duplicate": "Отчёт с таким именем уже есть — измените название.",
+  "reports.save.failed": "Не удалось сохранить отчёт",
+
+  // ── список сохранённых ───────────────────────────────────────────────────
+  "reports.saved.title": "Сохранённые отчёты",
+  "reports.saved.empty.title": "Пока нет сохранённых отчётов",
+  "reports.saved.empty.desc": "Постройте отчёт и нажмите «Сохранить» — он появится здесь.",
+  "reports.saved.error.title": "Не удалось загрузить отчёты",
+  "reports.saved.error.desc": "Список сохранённых отчётов недоступен. Повторите попытку.",
+  "reports.saved.col.name": "Название",
+  "reports.saved.col.visibility": "Доступ",
+  "reports.saved.col.owner": "Автор",
+  "reports.saved.col.updated": "Изменён",
+  "reports.saved.col.actions": "Действия",
+  "reports.saved.official": "Официальный",
+  "reports.saved.mine": "Вы",
+  "reports.saved.open": "Открыть",
+  "reports.saved.duplicate": "Дублировать",
+  "reports.saved.delete": "Удалить",
+  "reports.saved.delete.title": "Удалить отчёт?",
+  "reports.saved.delete.confirm": "Отчёт «{name}» будет удалён без возможности восстановления.",
+  "reports.saved.delete.failed": "Не удалось удалить отчёт",
+  "reports.saved.duplicate.failed": "Не удалось скопировать отчёт",
+  "reports.saved.vis.personal": "Личный",
+  "reports.saved.vis.shared": "Общий",
+  "reports.saved.vis.roles": "По ролям",
+  "reports.build.needMetric": "Выберите хотя бы одну метрику, чтобы построить отчёт.",
+  "reports.currency.label": "Валюта",
+  "reports.currency.usdNote": "Суммы в USD по фиксированному курсу 1 $ ≈ {rate} ₺ (в данных нет по-транзакционного курса).",
+  "reports.build.needPeriod": "Укажите период (от и до).",
+  "reports.field.deposits_sum": "Депозиты, ₺",
+  "reports.field.deposits_count": "Кол-во депозитов",
+  "reports.field.depositors": "Депозиторы (уник.)",
+  "reports.field.withdrawals_sum": "Выводы, ₺",
+  "reports.field.withdrawals_count": "Кол-во выводов",
+  "reports.field.out_try_count": "Попытки вывода",
+  "reports.field.withdrawers": "Выводящие (уник.)",
+  "reports.field.withdraw_attempters": "Пытались вывести (уник.)",
+  "reports.field.out_conversion": "Вывод: заявка→успех, %",
+  "reports.field.uniq_out_ratio": "Вывод: уник. успех/заявка, %",
+  "reports.field.avg_deposit": "Средний депозит, ₺",
+  "reports.field.wd_dep_ratio": "Выводы/депозиты, %",
+  "reports.field.bonus_waged": "Бонусы отыграно, ₺",
+  "reports.field.uniq_try_rd": "Уник. попытка повт. депозита",
+  "reports.field.uniq_rd": "Уник. повторный депозит",
+  "reports.field.try_rd_to_rd": "Повт. депозит: попытка→успех, %",
+  "reports.field.bonus_cost": "Бонус-косты, ₺",
+  "reports.field.net_cash": "Чистый кэш, ₺",
+  "reports.field.ggr": "GGR, ₺",
+  "reports.field.turnover": "Оборот, ₺",
+  "reports.field.bet_count": "Кол-во ставок",
+  "reports.field.margin": "Маржа (GGR/оборот), %",
+  "reports.field.active_players": "Активные игроки",
+  "reports.field.ftd_count": "FTD (первые депозиты)",
+  "reports.field.registrations": "Регистрации",
+  "reports.field.reg_to_fd": "Конверсия reg→FD, %",
+  "reports.field.bonus_cost_ratio": "Bonus cost, %",
+  "reports.field.day": "День",
+  "reports.field.week": "Неделя",
+  "reports.field.month": "Месяц",
+  "reports.field.weekday": "День недели",
+  "reports.field.hour": "Час",
+  "reports.field.country": "Страна",
+  "reports.field.currency": "Валюта",
+  "reports.field.affiliate_code": "Аффилиат (код)",
+  "reports.field.affiliate_type": "Тип аффилиата",
+  "reports.field.registration_source": "Источник регистрации",
+  "reports.field.account_type": "Тип аккаунта",
+  "reports.field.payment_method": "Метод оплаты",
+  "reports.field.vip_level_at": "VIP-уровень на дату",
+  "reports.field.lifecycle_at": "Жизненный цикл на дату",
+  "reports.field.early_tier_at": "Ранний тир на дату",
+} satisfies Record<string, string>;

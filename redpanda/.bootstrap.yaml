@@ -1,0 +1,7 @@
+# Кластерные свойства Redpanda, применяются один раз при первом старте СВЕЖЕГО кластера.
+# Включаем аутентификацию (SASL/SCRAM) и авторизацию (ACL).
+# Сам superuser-аккаунт создаётся через RP_BOOTSTRAP_USER (см. docker-compose).
+enable_sasl: true
+kafka_enable_authorization: true
+superusers:
+  - admin

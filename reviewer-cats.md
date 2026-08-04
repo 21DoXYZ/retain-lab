@@ -1,0 +1,311 @@
+- dialog [ref=f4e985]:
+  - generic [ref=f4e987]:
+    - generic [ref=f4e988]:
+      - heading [level=2] [ref=f4e989]:
+        - generic [ref=f4e990]:
+          - text: Mahsup operatörü
+          - emphasis [ref=f4e991]: "4148"
+      - button "Kapat" [ref=f4e992] [cursor=pointer]: ×
+    - generic [ref=f4e994]:
+      - generic [ref=f4e995]:
+        - generic [ref=f4e996]: ⚠️ normal hesap, admin olarak işaretlenmemiş
+        - generic [ref=f4e997]: manuel çekim operatörü · dönem 2026-01-18 → 2026-04-29
+      - generic [ref=f4e998]:
+        - generic [ref=f4e999]:
+          - generic [ref=f4e1000]: Onaylanan işlem
+          - generic [ref=f4e1001]: 1 107
+        - generic [ref=f4e1002]:
+          - generic [ref=f4e1003]: Tutar
+          - generic [ref=f4e1004]: 9.9 Mn ₺
+        - generic [ref=f4e1005]:
+          - generic [ref=f4e1006]: En büyük
+          - generic [ref=f4e1007]: 6.2 Mn ₺
+        - generic [ref=f4e1008]:
+          - generic [ref=f4e1009]: Farklı oyuncu
+          - generic [ref=f4e1010]: "950"
+        - generic [ref=f4e1011]:
+          - generic [ref=f4e1012]: 🚩 yatırımsız
+          - generic [ref=f4e1013]: 669 · 8.7 Mn ₺
+      - generic [ref=f4e1014]: Ne için mahsup etti (notes'a göre)
+      - generic [ref=f4e1017]:
+        - heading [level=3]
+        - img [ref=f4e1020]:
+          - generic [ref=f4e1022]:
+            - generic [ref=f4e1023]: yatırımsız bonus
+            - generic [ref=f4e1024]: haksız kazanç
+            - generic [ref=f4e1025]: süresi dolmuş bonus
+            - generic [ref=f4e1026]: kural/promo ihlali
+            - generic [ref=f4e1027]: fazla kazanç (limit üstü)
+            - generic [ref=f4e1028]: diğer
+            - generic [ref=f4e1035]: 0.0M
+            - generic [ref=f4e1036]: 0.0M
+            - generic [ref=f4e1037]: 0.2M
+            - generic [ref=f4e1038]: 0.7M
+            - generic [ref=f4e1039]: 1.8M
+            - generic [ref=f4e1040]: 7.1M
+      - generic [ref=f4e1041]: Aylara göre mahsuplar
+      - generic [ref=f4e1044]:
+        - heading [level=3]
+        - img [ref=f4e1047]:
+          - generic [ref=f4e1049]:
+            - generic [ref=f4e1050]: 0M
+            - generic [ref=f4e1051]: 2M
+            - generic [ref=f4e1052]: 4M
+            - generic [ref=f4e1053]: 6M
+            - generic [ref=f4e1054]: 8M
+            - generic [ref=f4e1055]: 2026-01
+            - generic [ref=f4e1056]: 2026-02
+            - generic [ref=f4e1057]: 2026-03
+            - generic [ref=f4e1058]: 2026-04
+      - generic [ref=f4e1063]: Onayladığı en yüksek çekimler
+      - table [ref=f4e1068]:
+        - rowgroup [ref=f4e1069]:
+          - row "Oyuncu Çekti Toplam yatırdı Tarih İşaret" [ref=f4e1070]:
+            - columnheader "Oyuncu" [ref=f4e1071]
+            - columnheader "Çekti" [ref=f4e1072]
+            - columnheader "Toplam yatırdı" [ref=f4e1073]
+            - columnheader "Tarih" [ref=f4e1074]
+            - columnheader "İşaret" [ref=f4e1075]
+        - rowgroup [ref=f4e1076]:
+          - row "18390 6.2 Mn ₺ 5 000 ₺ 2026-02-28 🚩 yatırım yok" [ref=f4e1077] [cursor=pointer]:
+            - cell "18390" [ref=f4e1078]
+            - cell "6.2 Mn ₺" [ref=f4e1079]
+            - cell "5 000 ₺" [ref=f4e1080]
+            - cell "2026-02-28" [ref=f4e1081]
+            - cell "🚩 yatırım yok" [ref=f4e1082]
+          - row "15671 0.4 Mn ₺ 0 ₺ 2026-02-20 🚩 yatırım yok" [ref=f4e1084] [cursor=pointer]:
+            - cell "15671" [ref=f4e1085]
+            - cell "0.4 Mn ₺" [ref=f4e1086]
+            - cell "0 ₺" [ref=f4e1087]
+            - cell "2026-02-20" [ref=f4e1088]
+            - cell "🚩 yatırım yok" [ref=f4e1089]
+          - row "16708 0.3 Mn ₺ 0 ₺ 2026-02-23 🚩 yatırım yok" [ref=f4e1091] [cursor=pointer]:
+            - cell "16708" [ref=f4e1092]
+            - cell "0.3 Mn ₺" [ref=f4e1093]
+            - cell "0 ₺" [ref=f4e1094]
+            - cell "2026-02-23" [ref=f4e1095]
+            - cell "🚩 yatırım yok" [ref=f4e1096]
+          - row "20357 0.1 Mn ₺ 0 ₺ 2026-03-02 🚩 yatırım yok" [ref=f4e1098] [cursor=pointer]:
+            - cell "20357" [ref=f4e1099]
+            - cell "0.1 Mn ₺" [ref=f4e1100]
+            - cell "0 ₺" [ref=f4e1101]
+            - cell "2026-03-02" [ref=f4e1102]
+            - cell "🚩 yatırım yok" [ref=f4e1103]
+          - row "10090 0.1 Mn ₺ 80 000 ₺ 2026-02-08" [ref=f4e1105] [cursor=pointer]:
+            - cell "10090" [ref=f4e1106]
+            - cell "0.1 Mn ₺" [ref=f4e1107]
+            - cell "80 000 ₺" [ref=f4e1108]
+            - cell "2026-02-08" [ref=f4e1109]
+            - cell [ref=f4e1110]
+          - row "13450 0.1 Mn ₺ 11 275 ₺ 2026-03-18" [ref=f4e1111] [cursor=pointer]:
+            - cell "13450" [ref=f4e1112]
+            - cell "0.1 Mn ₺" [ref=f4e1113]
+            - cell "11 275 ₺" [ref=f4e1114]
+            - cell "2026-03-18" [ref=f4e1115]
+            - cell [ref=f4e1116]
+          - row "10516 0.1 Mn ₺ 500 ₺ 2026-02-23 🚩 yatırım yok" [ref=f4e1117] [cursor=pointer]:
+            - cell "10516" [ref=f4e1118]
+            - cell "0.1 Mn ₺" [ref=f4e1119]
+            - cell "500 ₺" [ref=f4e1120]
+            - cell "2026-02-23" [ref=f4e1121]
+            - cell "🚩 yatırım yok" [ref=f4e1122]
+          - row "9152 0.0 Mn ₺ 35 620 ₺ 2026-04-23" [ref=f4e1124] [cursor=pointer]:
+            - cell "9152" [ref=f4e1125]
+            - cell "0.0 Mn ₺" [ref=f4e1126]
+            - cell "35 620 ₺" [ref=f4e1127]
+            - cell "2026-04-23" [ref=f4e1128]
+            - cell [ref=f4e1129]
+          - row "2981 ⛔ engellendi 0.0 Mn ₺ 21 000 ₺ 2026-01-22" [ref=f4e1130] [cursor=pointer]:
+            - cell "2981 ⛔ engellendi" [ref=f4e1131]:
+              - text: "2981"
+              - generic [ref=f4e1132]: ⛔ engellendi
+            - cell "0.0 Mn ₺" [ref=f4e1133]
+            - cell "21 000 ₺" [ref=f4e1134]
+            - cell "2026-01-22" [ref=f4e1135]
+            - cell [ref=f4e1136]
+          - row "30857 0.0 Mn ₺ 36 500 ₺ 2026-03-30" [ref=f4e1137] [cursor=pointer]:
+            - cell "30857" [ref=f4e1138]
+            - cell "0.0 Mn ₺" [ref=f4e1139]
+            - cell "36 500 ₺" [ref=f4e1140]
+            - cell "2026-03-30" [ref=f4e1141]
+            - cell [ref=f4e1142]
+          - row "30857 0.0 Mn ₺ 36 500 ₺ 2026-03-30" [ref=f4e1143] [cursor=pointer]:
+            - cell "30857" [ref=f4e1144]
+            - cell "0.0 Mn ₺" [ref=f4e1145]
+            - cell "36 500 ₺" [ref=f4e1146]
+            - cell "2026-03-30" [ref=f4e1147]
+            - cell [ref=f4e1148]
+          - row "3808 0.0 Mn ₺ 0 ₺ 2026-01-23 🚩 yatırım yok" [ref=f4e1149] [cursor=pointer]:
+            - cell "3808" [ref=f4e1150]
+            - cell "0.0 Mn ₺" [ref=f4e1151]
+            - cell "0 ₺" [ref=f4e1152]
+            - cell "2026-01-23" [ref=f4e1153]
+            - cell "🚩 yatırım yok" [ref=f4e1154]
+          - row "236 0.0 Mn ₺ 980 000 ₺ 2026-03-01" [ref=f4e1156] [cursor=pointer]:
+            - cell "236" [ref=f4e1157]
+            - cell "0.0 Mn ₺" [ref=f4e1158]
+            - cell "980 000 ₺" [ref=f4e1159]
+            - cell "2026-03-01" [ref=f4e1160]
+            - cell [ref=f4e1161]
+          - row "1026 0.0 Mn ₺ 1 000 ₺ 2026-01-19 🚩 yatırım yok" [ref=f4e1162] [cursor=pointer]:
+            - cell "1026" [ref=f4e1163]
+            - cell "0.0 Mn ₺" [ref=f4e1164]
+            - cell "1 000 ₺" [ref=f4e1165]
+            - cell "2026-01-19" [ref=f4e1166]
+            - cell "🚩 yatırım yok" [ref=f4e1167]
+          - row "35331 0.0 Mn ₺ 0 ₺ 2026-04-26 🚩 yatırım yok" [ref=f4e1169] [cursor=pointer]:
+            - cell "35331" [ref=f4e1170]
+            - cell "0.0 Mn ₺" [ref=f4e1171]
+            - cell "0 ₺" [ref=f4e1172]
+            - cell "2026-04-26" [ref=f4e1173]
+            - cell "🚩 yatırım yok" [ref=f4e1174]
+          - row "12226 0.0 Mn ₺ 1 000 ₺ 2026-02-12 🚩 yatırım yok" [ref=f4e1176] [cursor=pointer]:
+            - cell "12226" [ref=f4e1177]
+            - cell "0.0 Mn ₺" [ref=f4e1178]
+            - cell "1 000 ₺" [ref=f4e1179]
+            - cell "2026-02-12" [ref=f4e1180]
+            - cell "🚩 yatırım yok" [ref=f4e1181]
+          - row "9437 0.0 Mn ₺ 0 ₺ 2026-02-03 🚩 yatırım yok" [ref=f4e1183] [cursor=pointer]:
+            - cell "9437" [ref=f4e1184]
+            - cell "0.0 Mn ₺" [ref=f4e1185]
+            - cell "0 ₺" [ref=f4e1186]
+            - cell "2026-02-03" [ref=f4e1187]
+            - cell "🚩 yatırım yok" [ref=f4e1188]
+          - row "13283 0.0 Mn ₺ 68 500 ₺ 2026-02-28" [ref=f4e1190] [cursor=pointer]:
+            - cell "13283" [ref=f4e1191]
+            - cell "0.0 Mn ₺" [ref=f4e1192]
+            - cell "68 500 ₺" [ref=f4e1193]
+            - cell "2026-02-28" [ref=f4e1194]
+            - cell [ref=f4e1195]
+          - row "2935 0.0 Mn ₺ 0 ₺ 2026-04-01 🚩 yatırım yok" [ref=f4e1196] [cursor=pointer]:
+            - cell "2935" [ref=f4e1197]
+            - cell "0.0 Mn ₺" [ref=f4e1198]
+            - cell "0 ₺" [ref=f4e1199]
+            - cell "2026-04-01" [ref=f4e1200]
+            - cell "🚩 yatırım yok" [ref=f4e1201]
+          - row "6224 0.0 Mn ₺ 0 ₺ 2026-03-29 🚩 yatırım yok" [ref=f4e1203] [cursor=pointer]:
+            - cell "6224" [ref=f4e1204]
+            - cell "0.0 Mn ₺" [ref=f4e1205]
+            - cell "0 ₺" [ref=f4e1206]
+            - cell "2026-03-29" [ref=f4e1207]
+            - cell "🚩 yatırım yok" [ref=f4e1208]
+          - row "2757 0.0 Mn ₺ 0 ₺ 2026-01-23 🚩 yatırım yok" [ref=f4e1210] [cursor=pointer]:
+            - cell "2757" [ref=f4e1211]
+            - cell "0.0 Mn ₺" [ref=f4e1212]
+            - cell "0 ₺" [ref=f4e1213]
+            - cell "2026-01-23" [ref=f4e1214]
+            - cell "🚩 yatırım yok" [ref=f4e1215]
+          - row "9916 0.0 Mn ₺ 39 990 ₺ 2026-03-19" [ref=f4e1217] [cursor=pointer]:
+            - cell "9916" [ref=f4e1218]
+            - cell "0.0 Mn ₺" [ref=f4e1219]
+            - cell "39 990 ₺" [ref=f4e1220]
+            - cell "2026-03-19" [ref=f4e1221]
+            - cell [ref=f4e1222]
+          - row "6965 0.0 Mn ₺ 500 ₺ 2026-02-23 🚩 yatırım yok" [ref=f4e1223] [cursor=pointer]:
+            - cell "6965" [ref=f4e1224]
+            - cell "0.0 Mn ₺" [ref=f4e1225]
+            - cell "500 ₺" [ref=f4e1226]
+            - cell "2026-02-23" [ref=f4e1227]
+            - cell "🚩 yatırım yok" [ref=f4e1228]
+          - row "29581 0.0 Mn ₺ 0 ₺ 2026-03-28 🚩 yatırım yok" [ref=f4e1230] [cursor=pointer]:
+            - cell "29581" [ref=f4e1231]
+            - cell "0.0 Mn ₺" [ref=f4e1232]
+            - cell "0 ₺" [ref=f4e1233]
+            - cell "2026-03-28" [ref=f4e1234]
+            - cell "🚩 yatırım yok" [ref=f4e1235]
+          - row "4564 0.0 Mn ₺ 0 ₺ 2026-01-19 🚩 yatırım yok" [ref=f4e1237] [cursor=pointer]:
+            - cell "4564" [ref=f4e1238]
+            - cell "0.0 Mn ₺" [ref=f4e1239]
+            - cell "0 ₺" [ref=f4e1240]
+            - cell "2026-01-19" [ref=f4e1241]
+            - cell "🚩 yatırım yok" [ref=f4e1242]
+          - row "17095 0.0 Mn ₺ 0 ₺ 2026-02-28 🚩 yatırım yok" [ref=f4e1244] [cursor=pointer]:
+            - cell "17095" [ref=f4e1245]
+            - cell "0.0 Mn ₺" [ref=f4e1246]
+            - cell "0 ₺" [ref=f4e1247]
+            - cell "2026-02-28" [ref=f4e1248]
+            - cell "🚩 yatırım yok" [ref=f4e1249]
+          - row "16669 0.0 Mn ₺ 8 000 ₺ 2026-02-23" [ref=f4e1251] [cursor=pointer]:
+            - cell "16669" [ref=f4e1252]
+            - cell "0.0 Mn ₺" [ref=f4e1253]
+            - cell "8 000 ₺" [ref=f4e1254]
+            - cell "2026-02-23" [ref=f4e1255]
+            - cell [ref=f4e1256]
+          - row "9152 0.0 Mn ₺ 35 620 ₺ 2026-04-23" [ref=f4e1257] [cursor=pointer]:
+            - cell "9152" [ref=f4e1258]
+            - cell "0.0 Mn ₺" [ref=f4e1259]
+            - cell "35 620 ₺" [ref=f4e1260]
+            - cell "2026-04-23" [ref=f4e1261]
+            - cell [ref=f4e1262]
+          - row "3799 0.0 Mn ₺ 0 ₺ 2026-01-21 🚩 yatırım yok" [ref=f4e1263] [cursor=pointer]:
+            - cell "3799" [ref=f4e1264]
+            - cell "0.0 Mn ₺" [ref=f4e1265]
+            - cell "0 ₺" [ref=f4e1266]
+            - cell "2026-01-21" [ref=f4e1267]
+            - cell "🚩 yatırım yok" [ref=f4e1268]
+          - row "32296 0.0 Mn ₺ 70 000 ₺ 2026-04-11" [ref=f4e1270] [cursor=pointer]:
+            - cell "32296" [ref=f4e1271]
+            - cell "0.0 Mn ₺" [ref=f4e1272]
+            - cell "70 000 ₺" [ref=f4e1273]
+            - cell "2026-04-11" [ref=f4e1274]
+            - cell [ref=f4e1275]
+          - row "12154 0.0 Mn ₺ 0 ₺ 2026-02-12 🚩 yatırım yok" [ref=f4e1276] [cursor=pointer]:
+            - cell "12154" [ref=f4e1277]
+            - cell "0.0 Mn ₺" [ref=f4e1278]
+            - cell "0 ₺" [ref=f4e1279]
+            - cell "2026-02-12" [ref=f4e1280]
+            - cell "🚩 yatırım yok" [ref=f4e1281]
+          - row "975 0.0 Mn ₺ 995 353 ₺ 2026-04-12" [ref=f4e1283] [cursor=pointer]:
+            - cell "975" [ref=f4e1284]
+            - cell "0.0 Mn ₺" [ref=f4e1285]
+            - cell "995 353 ₺" [ref=f4e1286]
+            - cell "2026-04-12" [ref=f4e1287]
+            - cell [ref=f4e1288]
+          - row "19503 0.0 Mn ₺ 0 ₺ 2026-02-28 🚩 yatırım yok" [ref=f4e1289] [cursor=pointer]:
+            - cell "19503" [ref=f4e1290]
+            - cell "0.0 Mn ₺" [ref=f4e1291]
+            - cell "0 ₺" [ref=f4e1292]
+            - cell "2026-02-28" [ref=f4e1293]
+            - cell "🚩 yatırım yok" [ref=f4e1294]
+          - row "7797 0.0 Mn ₺ 1 000 ₺ 2026-01-31 🚩 yatırım yok" [ref=f4e1296] [cursor=pointer]:
+            - cell "7797" [ref=f4e1297]
+            - cell "0.0 Mn ₺" [ref=f4e1298]
+            - cell "1 000 ₺" [ref=f4e1299]
+            - cell "2026-01-31" [ref=f4e1300]
+            - cell "🚩 yatırım yok" [ref=f4e1301]
+          - row "12410 0.0 Mn ₺ 2 905 ₺ 2026-03-28" [ref=f4e1303] [cursor=pointer]:
+            - cell "12410" [ref=f4e1304]
+            - cell "0.0 Mn ₺" [ref=f4e1305]
+            - cell "2 905 ₺" [ref=f4e1306]
+            - cell "2026-03-28" [ref=f4e1307]
+            - cell [ref=f4e1308]
+          - row "27467 0.0 Mn ₺ 2 000 ₺ 2026-03-22" [ref=f4e1309] [cursor=pointer]:
+            - cell "27467" [ref=f4e1310]
+            - cell "0.0 Mn ₺" [ref=f4e1311]
+            - cell "2 000 ₺" [ref=f4e1312]
+            - cell "2026-03-22" [ref=f4e1313]
+            - cell [ref=f4e1314]
+          - row "18016 0.0 Mn ₺ 0 ₺ 2026-03-18 🚩 yatırım yok" [ref=f4e1315] [cursor=pointer]:
+            - cell "18016" [ref=f4e1316]
+            - cell "0.0 Mn ₺" [ref=f4e1317]
+            - cell "0 ₺" [ref=f4e1318]
+            - cell "2026-03-18" [ref=f4e1319]
+            - cell "🚩 yatırım yok" [ref=f4e1320]
+          - row "7791 0.0 Mn ₺ 0 ₺ 2026-02-09 🚩 yatırım yok" [ref=f4e1322] [cursor=pointer]:
+            - cell "7791" [ref=f4e1323]
+            - cell "0.0 Mn ₺" [ref=f4e1324]
+            - cell "0 ₺" [ref=f4e1325]
+            - cell "2026-02-09" [ref=f4e1326]
+            - cell "🚩 yatırım yok" [ref=f4e1327]
+          - row "12288 0.0 Mn ₺ 2 000 ₺ 2026-04-03" [ref=f4e1329] [cursor=pointer]:
+            - cell "12288" [ref=f4e1330]
+            - cell "0.0 Mn ₺" [ref=f4e1331]
+            - cell "2 000 ₺" [ref=f4e1332]
+            - cell "2026-04-03" [ref=f4e1333]
+            - cell [ref=f4e1334]
+          - row "33478 0.0 Mn ₺ 116 420 ₺ 2026-04-14" [ref=f4e1335] [cursor=pointer]:
+            - cell "33478" [ref=f4e1336]
+            - cell "0.0 Mn ₺" [ref=f4e1337]
+            - cell "116 420 ₺" [ref=f4e1338]
+            - cell "2026-04-14" [ref=f4e1339]
+            - cell [ref=f4e1340]

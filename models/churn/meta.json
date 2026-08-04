@@ -1,0 +1,44 @@
+{
+  "name": "churn",
+  "trained_at": "2026-07-15T10:28:58Z",
+  "artifacts": [
+    "model.cbm"
+  ],
+  "features": [
+    "recency_at_T",
+    "tenure_at_T",
+    "bets_to_T",
+    "turnover_to_T",
+    "active_days_to_T",
+    "avg_bet",
+    "freespin_ratio",
+    "night_share",
+    "bets_last7",
+    "bets_prev7",
+    "bets_last30",
+    "momentum_7v7",
+    "expected_gap",
+    "overdue_ratio",
+    "is_depositor",
+    "dep_count",
+    "dep_sum",
+    "deposit_recency_at_T",
+    "provider",
+    "country",
+    "affiliate_type",
+    "payment_method"
+  ],
+  "cat_features": [
+    "provider",
+    "country",
+    "affiliate_type",
+    "payment_method"
+  ],
+  "metrics": {
+    "roc_auc": 0.725,
+    "pr_auc": 0.943,
+    "brier": 0.107
+  },
+  "horizon_days": 30,
+  "table": "player_churn_ml"
+}

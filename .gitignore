@@ -1,0 +1,73 @@
+# ═══════════════════════════════════════════════════════════
+# ДАННЫЕ — НИКОГДА не коммитить (PII: email/phone/payment_details)
+# ═══════════════════════════════════════════════════════════
+*.csv
+*.xlsx
+*.parquet
+*.sqlite
+*.db
+retention_export_manifest_*.json
+
+# Досланные справочники ставок (provider/affiliate rates — config-данные казино) — не в git
+retention_reference_rates_*/
+*.tar.gz
+
+# Скриншоты (могут содержать данные игроков / чужие борды)
+*.png
+*.jpg
+*.jpeg
+Снимок*
+.playwright-mcp/
+
+# Сгенерированные дашборды/ноутбуки со встроенными данными
+retention_analysis.html
+retention_analysis.ipynb
+dashboard.html
+*_data.js
+.ipynb_checkpoints/
+
+# Дамп ML-таблиц (предсказания по casino_player_id) — переносим вручную, не в git
+ml_dump/
+*.native
+
+# Обученные модели (models/<name>/*.cbm + meta.json) — КОММИТЯТСЯ в git:
+# это сериализованные ансамбли деревьев (фичи/пороги/листья), без сырых PII-строк.
+# Удобно: на VPS модели приезжают обычным git pull (см. MODELS.md).
+
+# Окружение / локальная инфраструктура / тулинг
+.venv/
+.claude/
+.ch/
+ch/
+metabase/
+Sellrise-Front-End/
+node_modules/
+__pycache__/
+catboost_info/
+*.pyc
+.DS_Store
+.env
+*.log
+
+# скрипты с креденшелами Metabase (не веб-морда)
+build_*.py
+setup_relationships.py
+README_ANALYTICS.md
+
+# секреты (токены интеграции) — не коммитим
+secrets/
+
+# секреты инфраструктуры — генерируются из .env, не коммитим
+ch_users.d/
+ch_config.d/kafka.xml
+certs/
+
+# CRM-SPA / Supabase / env (волна SPA)
+crm-spa/node_modules/
+crm-spa/.next/
+crm-spa/out/
+crm-spa/.env.local
+supabase/.branches/
+supabase/.temp/
+tegsoft_docs_full.txt
+scratch_api_coh.json

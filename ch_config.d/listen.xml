@@ -1,0 +1,6 @@
+<clickhouse>
+    <!-- Наш mount config.d перекрывает штатный docker_related_config.xml образа,
+         который включал прослушивание всех интерфейсов. Возвращаем его (IPv4),
+         иначе ClickHouse слушает только localhost и недоступен из docker-сети (board). -->
+    <listen_host>0.0.0.0</listen_host>
+</clickhouse>
