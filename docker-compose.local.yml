@@ -1,0 +1,14 @@
+# Локальная разработка (Mac, colima): docker compose -f docker-compose.yml -f docker-compose.local.yml ...
+# Отличия от VPS: Redpanda без TLS (нет LE-сертификатов), порты board/ingest
+# опубликованы на localhost напрямую (без Caddy), SPA крутится на хосте (npm run dev).
+services:
+  redpanda:
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+      - ./redpanda-local:/etc/redpanda
+  board:
+    ports:
+      - "127.0.0.1:8050:8050"
+  ingest:
+    ports:
+      - "127.0.0.1:8081:8081"

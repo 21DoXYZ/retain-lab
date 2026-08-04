@@ -1,0 +1,18 @@
+# VPS-дев (retain-lab): Redpanda без TLS (конфиг ./redpanda-local), все порты
+# наружу — только loopback, доступ через SSH-туннель. ВАЖНО: docker публикует
+# порты в ОБХОД ufw, поэтому 0.0.0.0:19092 из базового файла здесь принудительно
+# перебинжен на 127.0.0.1 (!override).
+#   запуск:  docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d <svc...>
+services:
+  redpanda:
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+      - ./redpanda-local:/etc/redpanda
+    ports: !override
+      - "127.0.0.1:19092:19092"
+  board:
+    ports:
+      - "127.0.0.1:8050:8050"
+  ingest:
+    ports:
+      - "127.0.0.1:8081:8081"
