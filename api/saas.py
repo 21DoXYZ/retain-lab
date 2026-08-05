@@ -405,14 +405,20 @@ def saas_questionnaire_submit():
             written += 1
 
     # Привязка авто-офферов к offer-шагам каркаса (роль -> шаг).
-    bind_roles = {'K1_activation': 'bonus', 'K2_trial_conversion': 'trial',
-                  'K4_save': 'pause', 'K5_upgrade': 'discount'}
+    bind_roles = {'K1_activation': 'activation', 'K2_trial_conversion': 'conversion',
+                  'K4_save': 'save', 'K5_upgrade': 'upgrade'}
     by_role = {}
     for o in final:
-        oid = o['offer_id']
-        for role in ('bonus', 'discount', 'trial', 'pause', 'credit'):
-            if role in oid.lower() and role not in by_role:
-                by_role[role] = oid
+        r = str(o.get('role') or '')
+        if r and r not in by_role:
+            by_role[r] = o['offer_id']
+    # фолбэк по подстроке id - для офферов без role
+    for o in final:
+        oid = o['offer_id'].lower()
+        for role, marker in (('activation', 'bonus'), ('conversion', 'trial'),
+                             ('save', 'pause'), ('upgrade', 'discount')):
+            if role not in by_role and marker in oid:
+                by_role[role] = o['offer_id']
     bound = 0
     for cid, role in bind_roles.items():
         camp = by_id.get(cid)

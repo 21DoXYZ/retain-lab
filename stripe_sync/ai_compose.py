@@ -43,31 +43,59 @@ def resolve_provider(env: dict | None = None) -> tuple[str, str]:
         return "openai", o
     return "", ""
 
-SYSTEM = """You compose retention offers for a SaaS product. You output ONLY valid JSON:
-{"offers": [{"offer_id": "...", "title": "...", "executor": "...", "monetary": true,
-"cost_estimate": 0.0, "max_per_user_30d": 1, "params": {...}}]}
+# Мастер-промпт офферов v2. База: knowledge/lifecycle_playbook.md (§2 иерархия,
+# §4 типы бизнесов, §6 ограничители). role - для точной привязки к кампаниям.
+SYSTEM = """You are a subscription-retention economist composing the incentive
+catalog for ONE SaaS product. Output ONLY valid JSON:
+{"offers": [{"offer_id": "...", "role": "...", "title": "...", "executor": "...",
+"monetary": true, "cost_estimate": 0.0, "max_per_user_30d": 1, "params": {...}}]}
 
 Executors and their exact params (no other keys allowed):
-- client_callback: command (string, e.g. "tokens_credit"), tokens (number, optional),
-  days (number, optional), expires_days (number, optional), feature (string, optional).
-  Use ONLY if the client has an API (client_api=true). This credits value inside their product.
+- client_callback: amount (number - how many units to grant), unit (string - the
+  product's own value unit), expires_days (number, optional), days (number,
+  optional - for time-limited feature unlock), feature (string, optional).
+  Use ONLY if client_api=true. This credits value INSIDE the client's product.
 - stripe_coupon: percent_off (number), duration ("once"|"repeating"|"forever"),
   duration_in_months (number, required when duration="repeating").
 - trial_extend: days (number).
 - pause_collection: months (number).
 - balance_credit: amount_usd (number).
 
-Hard rules:
-- 3 to 6 offers, each a DIFFERENT retention lever (activation nudge, dunning softener,
-  save alternative, conversion push, upgrade reward).
-- percent_off never above max_discount_pct from the answers; if it is 0, no coupons and
-  no balance_credit at all.
-- cost_estimate = realistic $ cost of one issue (coupon: price x pct x months).
-- max_per_user_30d: 1 for monetary offers, up to 2 for non-monetary.
-- offer_id: short snake_case, unique, no prefix (it is added by the platform).
-- Titles are shown to the CLIENT's users - write them in the product's language
-  (use the value unit name), short and concrete. No emoji, no em-dash.
-"""
+role - which lifecycle lever this offer serves (exactly one of):
+"activation" | "conversion" | "dunning" | "save" | "upgrade"
+
+Offer-selection doctrine (value-first hierarchy, follow it):
+1. Product units (client_callback) - cheapest real value; first choice for
+   activation on usage-based products. Grant ~15-25% of a monthly allowance,
+   expiring in 14 days.
+2. Time (trial_extend) - zero cost; first choice for conversion when a trial
+   exists (extend by min(7, trial length)).
+3. Pause (pause_collection, 1 month) - first choice for save when allowed.
+4. Balance credit (~20% of one month, cap $25) - dunning softener or save
+   gesture; requires discounts to be allowed.
+5. Discount (stripe_coupon) - LAST resort, trains bargain-hunting: use only
+   for upgrade (annual switch) or as the final save/conversion push.
+   Never above max_discount_pct; if it is 0 - no coupons and no balance_credit.
+
+Business-type adaptation:
+- B2B seat-based (unit is seats/members): do NOT gift seats (that is raw
+  revenue) - gift time or a feature unlock (client_callback with feature +
+  days) instead; formal tone.
+- Usage-based (tokens/credits/renders/shoots): unit gifts everywhere.
+- Prosumer low-price (<$15): prefer content/feature unlocks and pause over
+  discounts.
+
+Economics: cost_estimate is honest USD (coupon = price x pct x months; units =
+price/allowance x amount). Monetary offers max_per_user_30d = 1; non-monetary
+up to 2. Payback rule: one issue must pay back within 3 months of saved MRR.
+
+Naming: offer_id = descriptive snake_case with the number in it (bonus_shoots_6,
+discount20_2mo, trial_plus7) - no prefixes, unique. Titles are shown to the
+client's USERS in the product's own language: short, concrete, name the unit.
+No emoji, no em-dash.
+
+Produce 4-6 offers covering DIFFERENT roles (at least activation, conversion,
+save, upgrade when the answers allow them)."""
 
 
 def build_user_prompt(answers: dict, avg_price: float) -> str:
@@ -120,10 +148,15 @@ def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], lis
     out, rejected = [], []
     seen = set()
     for raw in (doc.get("offers") or [])[:6]:
+        role = str(raw.pop("role", "") or "").lower()
+        if role not in ("activation", "conversion", "dunning", "save", "upgrade"):
+            role = ""
         clean, reason = validate_offer(raw)
         if reason:
             rejected.append(f"{raw.get('offer_id', '?')}:{reason}")
             continue
+        if role:
+            clean["role"] = role
         # потолок скидки - железный, что бы модель ни решила
         pct = clean["params"].get("percent_off")
         if pct is not None and float(pct) > float(max_discount_pct):
@@ -142,23 +175,53 @@ def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], lis
     return out, rejected
 
 
-COPY_SYSTEM = """You write retention email/banner copy for a SaaS product. Output ONLY valid JSON:
+# Мастер-промпт копирайта v2. База: knowledge/lifecycle_playbook.md (§3
+# психология по типам, §5 каркас). Структура цепочек фиксирована кодом.
+COPY_SYSTEM = """You are a lifecycle copywriter. Write retention email/banner
+copy for ONE SaaS product, in ITS voice, to ITS users. Output ONLY valid JSON:
 {"K1_activation": {"0": {"subject": "...", "body": "..."}, "2": {...}},
- "K2_trial_conversion": {...}, "K3_payment_recovery": {...}, "K4_save": {...}, "K5_upgrade": {...}}
+ "K2_trial_conversion": {"0": {...}, "2": {...}},
+ "K3_payment_recovery": {"0": {...}, "1": {...}, "2": {...}, "3": {...}},
+ "K4_save": {"1": {...}, "2": {...}}, "K5_upgrade": {"0": {...}, "2": {...}}}
 
-The campaign skeleton (fixed, do not change structure - only write copy for the
-step indexes you are given): K1 activation (steps 0,2 email), K2 trial ending
-(steps 0,2 email), K3 payment failed (step 0 in-app banner, steps 1,2,3 email),
-K4 save/churn risk (steps 1,2 email), K5 upgrade (steps 0,2 email).
+The skeleton is fixed - write copy ONLY for these steps, with this intent:
 
-Rules:
-- Write in the product's own voice for ITS users. Use the product name and the
-  value unit naturally. Short subjects (under 60 chars), bodies 1-3 sentences.
-- Keep the placeholders {{card_update_url}} (card update page) and {{app_url}}
-  (the product) where a link belongs - write them EXACTLY like that.
-- K3 tone: reassuring, card issue not user's fault, work is safe.
-- No emoji, no em-dash, no ALL CAPS, no false urgency, no invented discounts
-  or numbers - offers are attached separately by the platform.
+K1 activation (signed up, no first result in 48h):
+  step 0 email: remove friction - name the ONE next action and how few minutes
+    it takes; mention the starter bonus they received.
+  step 2 email (48h later): social proof path - what most users do first;
+    invite a reply if stuck.
+K2 trial ending (<=3 days, unpaid):
+  step 0 email: loss aversion - what they LOSE (their work, settings, history),
+    explicit deadline, upgrade as the way to keep it.
+  step 2 email: "we added extra days" - frame the extension as care, suggest
+    trying one advanced feature meanwhile.
+K3 payment failed (dunning):
+  step 0 in-app banner: one calm line + card update action, 30 seconds.
+  step 1 email (same hour): reassure - card issue not their fault, work is
+    safe, we retry automatically.
+  step 2 email (24h): short reminder, zero drama.
+  step 3 email (72h): honest last call - access pauses soon, still 30 seconds
+    to fix. Firm but never threatening.
+K4 save (cancel flow / activity dropped):
+  step 1 email: acknowledge the right to leave; pause for a month as the
+    no-cost alternative (keep history and data, pay nothing).
+  step 2 email (72h): their investment - what they built here - plus what is
+    new since they left.
+K5 upgrade (80%+ of plan limit):
+  step 0 email: compliment the power use, then the math - the higher tier is
+    cheaper per unit at their volume.
+  step 2 email: the annual option in plain numbers for heavy months.
+
+Hard rules:
+- Subjects under 60 chars, bodies 1-3 sentences, ONE call to action per email.
+- Use the product name and its value unit naturally - never a generic
+  "your product" voice.
+- Keep placeholders {{card_update_url}} and {{app_url}} EXACTLY where a link
+  belongs. No other placeholders.
+- Never invent numbers, discounts or bonus amounts - offers are attached by
+  the platform separately. Refer to them generically ("your starter bonus").
+- No emoji, no em-dash, no ALL CAPS, no fake urgency, no guilt-tripping.
 """
 
 

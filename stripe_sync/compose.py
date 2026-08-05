@@ -170,7 +170,7 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
         bonus = max(1, round(float(answers["monthly_units"]) * 0.2))
         unit_cost = (price / float(answers["monthly_units"])) if price else 0.0
         out.append({
-            "offer_id": f"{AUTO_PREFIX}bonus_{_slug(unit)}",
+            "offer_id": f"{AUTO_PREFIX}bonus_{_slug(unit)}", "role": "activation",
             "title": f"+{bonus} bonus {unit} (14d TTL)",
             "executor": "client_callback", "monetary": True,
             "cost_estimate": round(bonus * unit_cost, 2),
@@ -182,7 +182,7 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
     if ceiling > 0:
         pct = int(min(20, ceiling))
         out.append({
-            "offer_id": f"{AUTO_PREFIX}discount{pct}",
+            "offer_id": f"{AUTO_PREFIX}discount{pct}", "role": "upgrade",
             "title": f"{pct}% off for 2 months",
             "executor": "stripe_coupon", "monetary": True,
             "cost_estimate": round(price * pct / 100 * 2, 2),
@@ -194,7 +194,7 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
     if answers.get("has_trial"):
         days = int(min(7, float(answers.get("trial_days") or 14)))
         out.append({
-            "offer_id": f"{AUTO_PREFIX}trial_plus{days}",
+            "offer_id": f"{AUTO_PREFIX}trial_plus{days}", "role": "conversion",
             "title": f"Trial extension +{days} days",
             "executor": "trial_extend", "monetary": False,
             "cost_estimate": 0.0, "max_per_user_30d": 1,
@@ -203,7 +203,7 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
 
     if answers.get("can_pause"):
         out.append({
-            "offer_id": f"{AUTO_PREFIX}pause_1m",
+            "offer_id": f"{AUTO_PREFIX}pause_1m", "role": "save",
             "title": "Pause subscription for 1 month",
             "executor": "pause_collection", "monetary": False,
             "cost_estimate": 0.0, "max_per_user_30d": 1,
@@ -214,7 +214,7 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
         credit = round(min(25.0, price * 0.2))
         if credit >= 1:
             out.append({
-                "offer_id": f"{AUTO_PREFIX}credit_{int(credit)}",
+                "offer_id": f"{AUTO_PREFIX}credit_{int(credit)}", "role": "dunning",
                 "title": f"${int(credit)} account credit",
                 "executor": "balance_credit", "monetary": True,
                 "cost_estimate": float(credit), "max_per_user_30d": 1,
