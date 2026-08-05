@@ -372,7 +372,23 @@ def saas_questionnaire_submit():
 
     # AI-набор (если есть) вытесняет детерминированный: он богаче, но прошёл
     # те же схемы; без AI - живёт база. Ручные C_ офферы не трогаются.
-    final = ai_offers if ai_offers else base
+    final = list(ai_offers) if ai_offers else list(base)
+
+    # ДОБОР: у каждой цепочки с offer-шагом должен быть оффер. Роли, которые
+    # модель не покрыла (частый случай - winback), закрываем детерминированным
+    # оффером из compose - иначе шаг молча логировал бы no_offer_bound.
+    needed = {'activation', 'conversion', 'save', 'upgrade', 'winback'}
+    covered = {str(o.get('role') or '') for o in final}
+    added = []
+    for o in base:
+        r = str(o.get('role') or '')
+        if r in needed and r not in covered:
+            final.append(o)
+            covered.add(r)
+            added.append(o['offer_id'])
+    if added:
+        print(f'[onboarding] {tenant}: добор ролей детерминированными: {added}', flush=True)
+
     ovr.replace_auto_offers(tenant, final)
     ca.update_tenant(tenant, {'onboarding_answers': answers,
                               'offers_reviewed': True,

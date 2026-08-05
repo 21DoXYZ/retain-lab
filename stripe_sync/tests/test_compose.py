@@ -128,3 +128,10 @@ def test_plan_rows_maps_stripe_price_and_client_limit():
     assert all(r[2] == 500 for r in rows)          # лимит из опросника
     # без ответа клиента лимит 0 - burn_rate останется 0 (честно)
     assert plan_rows([("p", 10, "month")], 0, "hub", "t")[0][2] == 0
+
+
+def test_compose_covers_all_campaign_roles():
+    """Детерминированный набор закрывает все роли, нужные цепочкам с офферами."""
+    offers = compose_offers(FULL, avg_price=49.0)
+    roles = {o.get("role") for o in offers}
+    assert {"activation", "conversion", "save", "upgrade", "winback"} <= roles
