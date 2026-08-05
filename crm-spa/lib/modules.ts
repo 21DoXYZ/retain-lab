@@ -37,6 +37,12 @@ const STATIC_DISABLED: readonly string[] = [
   // короткое меню (дашборд + revenue-экраны + автоматизация + ключи). Всё
   // скрытое живо и доступно по прямому URL; вернуть пункт = убрать строку.
   "channels",
+  "players",
+  "bonus",
+  "bonuses",
+  "campaigns",
+  "analytics",
+  "funnel",
   "ltv",
   "dist",
   "flags",

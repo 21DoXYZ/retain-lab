@@ -34,7 +34,7 @@ const STAGE_ORDER = ["ACTIVATE", "CONVERT", "UPGRADE", "SAVE", "DUNNING", "WINBA
 
 const START_CARDS = [
   { href: "/leak-audit", emoji: "💸", title: "saas.home.start.leak.title", desc: "saas.home.start.leak.desc" },
-  { href: "/players", emoji: "👥", title: "saas.home.start.users.title", desc: "saas.home.start.users.desc" },
+  { href: "/users", emoji: "👥", title: "saas.home.start.users.title", desc: "saas.home.start.users.desc" },
   { href: "/uplift", emoji: "📈", title: "saas.home.start.uplift.title", desc: "saas.home.start.uplift.desc" },
 ] as const;
 

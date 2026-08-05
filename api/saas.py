@@ -207,3 +207,80 @@ def home():
         'setup': {'stripe_connected': live_customers > 0,
                   'snippet_connected': snippet_events > 0},
     })
+
+
+@bp.get('/saas/users')
+@require_auth(roles=LEAK_ROLES)
+def saas_users():
+    """Список юзеров SaaS-контура: identity + стадия + действие + скоры.
+    ?stage=DUNNING - фильтр; сортировка: ценность на кону, затем MRR."""
+    tenant = request.args.get('tenant') or DEFAULT_TENANT
+    stage = (request.args.get('stage') or '').upper()
+
+    where = "tenant_id = {t:String}"
+    params = {'t': tenant}
+    if stage:
+        where += " AND stage = {s:String}"
+        params['s'] = stage
+
+    rows = q(
+        f"""
+        SELECT identity_id, email_norm, client_user_id, stripe_customer_id,
+               sub_status, plan_id, toFloat64(mrr), stage, recommended_action,
+               value_at_stake, coalesce(p_convert, 0), coalesce(p_churn, 0),
+               coalesce(ltv_estimate, 0),
+               if(toUnixTimestamp(last_seen) = 0, '', toString(last_seen))
+        FROM user_actions WHERE {where}
+        ORDER BY value_at_stake DESC, mrr DESC
+        LIMIT 500
+        """, params)[1]
+
+    users = [{
+        'identity_id': r[0], 'email': r[1], 'client_user_id': r[2],
+        'stripe_customer_id': r[3], 'sub_status': r[4], 'plan_id': r[5],
+        'mrr': round(_flt(r[6]), 2), 'stage': r[7], 'action': r[8],
+        'value_at_stake': round(_flt(r[9]), 2),
+        'p_convert': round(_flt(r[10]), 2), 'p_churn': round(_flt(r[11]), 2),
+        'ltv': round(_flt(r[12]), 2), 'last_seen': r[13],
+    } for r in rows]
+
+    stages = {r[0]: int(r[1]) for r in q(
+        "SELECT stage, count() FROM user_actions WHERE tenant_id = {t:String} GROUP BY stage",
+        {'t': tenant})[1]}
+
+    return api_json({'tenant': tenant, 'stages': stages, 'users': users})
+
+
+@bp.get('/saas/offers')
+@require_auth(roles=LEAK_ROLES)
+def saas_offers():
+    """Каталог офферов тенанта (stripe_sync/offers_catalog.json - есть в образе
+    борда: COPY . .) + статистика выдач из offers_issued."""
+    import json as _json
+    import os as _os
+
+    tenant = request.args.get('tenant') or DEFAULT_TENANT
+    path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+                         'stripe_sync', 'offers_catalog.json')
+    catalog = _json.load(open(path)).get(tenant, {})
+
+    stats = {r[0]: {'issued': int(r[1]), 'dry_run': int(r[2]),
+                    'holdout': int(r[3]), 'rejected': int(r[4])}
+             for r in q(
+        """
+        SELECT offer_id, countIf(status = 'issued'), countIf(status = 'dry_run'),
+               countIf(status = 'holdout'), countIf(status = 'rejected')
+        FROM offers_issued WHERE tenant_id = {t:String} GROUP BY offer_id
+        """, {'t': tenant})[1]}
+
+    offers = [{
+        'offer_id': o['offer_id'], 'title': o['title'], 'executor': o['executor'],
+        'monetary': bool(o.get('monetary')),
+        'cost_estimate': _flt(o.get('cost_estimate')),
+        'max_per_user_30d': int(o.get('max_per_user_30d') or 0),
+        'stats': stats.get(o['offer_id'],
+                           {'issued': 0, 'dry_run': 0, 'holdout': 0, 'rejected': 0}),
+    } for o in catalog.get('offers', [])]
+
+    return api_json({'tenant': tenant, 'control_pct': catalog.get('control_pct', 10),
+                     'offers': offers})

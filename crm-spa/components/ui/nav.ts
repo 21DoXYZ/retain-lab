@@ -149,6 +149,8 @@ export const NAV_GROUPS: NavGroup[] = [
     section: "nav.section.expand",
     title: "nav.group.bonuseco",
     items: [
+      // SaaS-пресет: каталог офферов + выдачи (казино bonus-экраны скрыты флагами)
+      { key: "offers", href: "/offers", emoji: "🎁", label: "nav.saasOffers", roles: [...ANALYSTS, "finance"] },
       { key: "bonus", href: "/bonus", emoji: "🎁", label: "nav.bonus", roles: [...MARKETING, "analyst", "head_department"] },
       { key: "bonuses", href: "/bonuses", emoji: "🎯", label: "nav.bonuses", roles: [...MARKETING, "analyst"] },
       { key: "campaigns", href: "/campaigns", emoji: "📣", label: "nav.campaigns", roles: MARKETING },
@@ -169,6 +171,8 @@ export const NAV_GROUPS: NavGroup[] = [
     section: "nav.section.core",
     title: "nav.group.core",
     items: [
+      // SaaS-пресет: юзеры на user_actions (казино /players скрыт флагом)
+      { key: "users", href: "/users", emoji: "👥", label: "nav.players", roles: [...ANALYSTS, "finance"] },
       { key: "players", href: "/players", emoji: "👥", label: "nav.players", roles: ["super_admin", "head_retention", "director", "head_department", "analyst", "finance", "marketing_manager", "affiliate_manager", "risk_officer", "support", "vip_manager", "viewer"] },
       { key: "desk", href: "/desk", emoji: "🎛", label: "nav.desk", roles: DESK },
       { key: "queue", href: "/queue", emoji: "📞", label: "nav.queue", roles: OPS },
