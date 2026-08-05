@@ -120,7 +120,7 @@ def uplift():
                argMax(avg_check, computed_at)       AS avg_check,
                argMax(incremental_usd, computed_at) AS incremental_usd,
                argMax(goal_event, computed_at)      AS goal_event,
-               max(computed_at)                     AS computed_at
+               max(computed_at)                     AS computed_at_max
         FROM uplift_reports
         WHERE tenant_id = {t:String}
         GROUP BY campaign_id
