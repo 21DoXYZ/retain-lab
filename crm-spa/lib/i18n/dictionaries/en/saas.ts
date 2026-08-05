@@ -98,13 +98,70 @@ export const saas: Partial<Messages> = {
 
   "saas.channels.title": "Channels",
   "saas.channels.lead":
-    "Providers are platform-level (our keys): the client does not connect channels - they supply contacts and consents via the contact_update event. This screen shows key status and base coverage.",
-  "saas.channels.col.channel": "Channel",
-  "saas.channels.col.provider": "Provider",
-  "saas.channels.col.status": "Status",
-  "saas.channels.col.detail": "Sender",
+    "Every touch goes out under your brand: email from your subdomain, SMS and Viber under your sender name, Telegram through your own bot. Infrastructure and delivery are on us.",
   "saas.channels.col.contacts": "Contacts",
   "saas.channels.col.consented": "Consented",
-  "saas.channels.on": "configured",
-  "saas.channels.off": "no key",
+
+  "saas.channels.name.email": "Email",
+  "saas.channels.name.sms": "SMS",
+  "saas.channels.name.viber": "Viber",
+  "saas.channels.name.telegram": "Telegram",
+  "saas.channels.name.whatsapp": "WhatsApp",
+
+  "saas.channels.state.active": "connected",
+  "saas.channels.state.pending_dns": "waiting for DNS",
+  "saas.channels.state.pending_approval": "registering",
+  "saas.channels.state.awaiting_provider": "platform pending",
+  "saas.channels.state.sender_needed": "set the sender",
+  "saas.channels.state.not_connected": "not connected",
+  "saas.channels.state.coming_soon": "coming soon",
+
+  "saas.channels.copy": "Copy",
+  "saas.channels.copied": "Copied",
+
+  "saas.channels.email.domainLabel": "Sending subdomain",
+  "saas.channels.email.domainHint":
+    "A dedicated subdomain of your domain, e.g. mail.yourbrand.com - emails are signed with it, your main domain stays untouched.",
+  "saas.channels.email.connect": "Connect",
+  "saas.channels.email.awaitingNote":
+    "Domain recorded. The platform is finishing email provider setup - DNS records will appear here.",
+  "saas.channels.email.dnsLead":
+    "Add these records to your domain's DNS, then press Check DNS. Propagation takes minutes to a couple of hours.",
+  "saas.channels.email.dns.type": "Type",
+  "saas.channels.email.dns.name": "Name",
+  "saas.channels.email.dns.value": "Value",
+  "saas.channels.email.check": "Check DNS",
+  "saas.channels.email.verifiedNote":
+    "Domain verified. Set the From name and address - every email will be sent from it.",
+  "saas.channels.email.fromLabel": "From",
+  "saas.channels.email.senderName": "Sender name",
+  "saas.channels.email.saveSender": "Save sender",
+
+  "saas.channels.msg.label": "Sender name",
+  "saas.channels.msg.hint":
+    "The alpha name recipients see instead of a number (latin letters/digits, up to 11 chars). We register it with the operator.",
+  "saas.channels.msg.request": "Request",
+  "saas.channels.msg.pendingNote":
+    "The name is being registered with the operator - usually 1-3 business days. The channel activates automatically.",
+  "saas.channels.msg.awaitingNote": "Name approved. The platform is finishing provider setup.",
+
+  "saas.channels.tg.step1": "Open @BotFather in Telegram and create a bot with /newbot - use your product's name and avatar.",
+  "saas.channels.tg.step2": "Copy the token from BotFather's reply.",
+  "saas.channels.tg.step3": "Paste the token here - we validate the bot and start accepting subscriptions.",
+  "saas.channels.tg.connect": "Connect bot",
+  "saas.channels.tg.linkLead":
+    "Give users this link (with their ID substituted) - pressing Start subscribes them with consent:",
+  "saas.channels.tg.disconnect": "Disconnect",
+
+  "saas.channels.wa.note":
+    "WhatsApp Business requires Meta verification of your business (WABA). We run the onboarding - tell us when you need the channel.",
+
+  "saas.channels.err.invalid_domain": "Invalid domain - expected something like mail.yourbrand.com.",
+  "saas.channels.err.email_not_on_domain": "The address must be on your connected subdomain.",
+  "saas.channels.err.no_domain": "Connect a sending subdomain first.",
+  "saas.channels.err.telegram_invalid_token": "Telegram rejected the token - make sure it is copied in full.",
+  "saas.channels.err.invalid_sms_sender": "Name: latin letters/digits, 2-11 chars.",
+  "saas.channels.err.invalid_viber_sender": "Name: latin letters/digits, 2-11 chars.",
+  "saas.channels.err.resend_not_configured": "The email provider is not set up by the platform yet.",
+  "saas.channels.err.generic": "Something went wrong - try again.",
 };

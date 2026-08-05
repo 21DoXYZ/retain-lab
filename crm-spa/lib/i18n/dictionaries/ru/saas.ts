@@ -97,13 +97,70 @@ export const saas = {
 
   "saas.channels.title": "Каналы",
   "saas.channels.lead":
-    "Провайдеры - платформенные (ключи наши): клиент каналы не подключает, он поставляет контакты и согласия событием contact_update. Здесь - статус ключей и покрытие базы.",
-  "saas.channels.col.channel": "Канал",
-  "saas.channels.col.provider": "Провайдер",
-  "saas.channels.col.status": "Статус",
-  "saas.channels.col.detail": "Отправитель",
+    "Каждое касание уходит от имени вашего бренда: письма с вашего поддомена, SMS и Viber с вашего имени отправителя, Telegram через вашего бота. Инфраструктура и доставка - на нас.",
   "saas.channels.col.contacts": "Контакты",
   "saas.channels.col.consented": "С согласием",
-  "saas.channels.on": "настроен",
-  "saas.channels.off": "нет ключа",
+
+  "saas.channels.name.email": "Email",
+  "saas.channels.name.sms": "SMS",
+  "saas.channels.name.viber": "Viber",
+  "saas.channels.name.telegram": "Telegram",
+  "saas.channels.name.whatsapp": "WhatsApp",
+
+  "saas.channels.state.active": "подключён",
+  "saas.channels.state.pending_dns": "ждём DNS",
+  "saas.channels.state.pending_approval": "на регистрации",
+  "saas.channels.state.awaiting_provider": "ждёт платформу",
+  "saas.channels.state.sender_needed": "укажите отправителя",
+  "saas.channels.state.not_connected": "не подключён",
+  "saas.channels.state.coming_soon": "скоро",
+
+  "saas.channels.copy": "Копировать",
+  "saas.channels.copied": "Скопировано",
+
+  "saas.channels.email.domainLabel": "Поддомен отправки",
+  "saas.channels.email.domainHint":
+    "Отдельный поддомен вашего домена, например mail.вашбренд.com - письма подписываются им, основной домен не затрагивается.",
+  "saas.channels.email.connect": "Подключить",
+  "saas.channels.email.awaitingNote":
+    "Домен зафиксирован. Платформа завершает настройку почтового провайдера - DNS-записи появятся здесь.",
+  "saas.channels.email.dnsLead":
+    "Добавьте эти записи в DNS вашего домена и нажмите «Проверить DNS». Обновление занимает от минут до пары часов.",
+  "saas.channels.email.dns.type": "Тип",
+  "saas.channels.email.dns.name": "Имя",
+  "saas.channels.email.dns.value": "Значение",
+  "saas.channels.email.check": "Проверить DNS",
+  "saas.channels.email.verifiedNote":
+    "Домен подтверждён. Укажите имя и адрес «От кого» - с него уйдут все письма.",
+  "saas.channels.email.fromLabel": "От кого",
+  "saas.channels.email.senderName": "Имя отправителя",
+  "saas.channels.email.saveSender": "Сохранить отправителя",
+
+  "saas.channels.msg.label": "Имя отправителя",
+  "saas.channels.msg.hint":
+    "Альфа-имя - то, что получатель видит вместо номера (латиница/цифры, до 11 знаков). Регистрируем у оператора мы.",
+  "saas.channels.msg.request": "Запросить",
+  "saas.channels.msg.pendingNote":
+    "Имя на регистрации у оператора - обычно 1-3 рабочих дня. Канал включится автоматически.",
+  "saas.channels.msg.awaitingNote": "Имя подтверждено. Платформа завершает настройку провайдера.",
+
+  "saas.channels.tg.step1": "Откройте @BotFather в Telegram и командой /newbot создайте бота с именем и аватаром вашего продукта.",
+  "saas.channels.tg.step2": "Скопируйте токен из ответа BotFather.",
+  "saas.channels.tg.step3": "Вставьте токен сюда - мы проверим бота и включим приём подписок.",
+  "saas.channels.tg.connect": "Подключить бота",
+  "saas.channels.tg.linkLead":
+    "Дайте юзерам эту ссылку (подставив их ID) - нажатие Start подписывает их на уведомления с согласием:",
+  "saas.channels.tg.disconnect": "Отключить",
+
+  "saas.channels.wa.note":
+    "WhatsApp Business требует верификации вашего бизнеса в Meta (WABA). Онбординг ведём мы - напишите нам, когда канал нужен.",
+
+  "saas.channels.err.invalid_domain": "Некорректный домен - нужен вид mail.вашбренд.com.",
+  "saas.channels.err.email_not_on_domain": "Адрес должен быть на подключённом поддомене.",
+  "saas.channels.err.no_domain": "Сначала подключите поддомен отправки.",
+  "saas.channels.err.telegram_invalid_token": "Telegram не принял токен - проверьте, что скопирован целиком.",
+  "saas.channels.err.invalid_sms_sender": "Имя: латиница/цифры, 2-11 знаков.",
+  "saas.channels.err.invalid_viber_sender": "Имя: латиница/цифры, 2-11 знаков.",
+  "saas.channels.err.resend_not_configured": "Почтовый провайдер ещё не настроен платформой.",
+  "saas.channels.err.generic": "Не получилось - попробуйте ещё раз.",
 };

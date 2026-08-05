@@ -16,6 +16,18 @@ import os
 VALID_CHANNELS = {"sms", "viber", "whatsapp", "telegram"}
 
 
+def _parse(meta: str) -> tuple[str, str, int] | None:
+    try:
+        m = json.loads(meta)
+    except ValueError:
+        return None
+    channel = str(m.get("channel", "")).lower()
+    address = str(m.get("address", "")).strip()
+    if channel not in VALID_CHANNELS or not address:
+        return None
+    return channel, address, 1 if m.get("consent") else 0
+
+
 def sync_contacts(client, tenant: str) -> int:
     rows = client.query(
         """
@@ -29,16 +41,36 @@ def sync_contacts(client, tenant: str) -> int:
 
     out = []
     for cuid, meta, ts in rows:
-        try:
-            m = json.loads(meta)
-        except ValueError:
-            continue
-        channel = str(m.get("channel", "")).lower()
-        address = str(m.get("address", "")).strip()
-        if channel not in VALID_CHANNELS or not address:
-            continue
-        consent = 1 if m.get("consent") else 0
-        out.append([tenant, cuid, channel, address, consent, ts, ts])
+        p = _parse(meta)
+        if p:
+            out.append([tenant, cuid, p[0], p[1], p[2], ts, ts])
+
+    # Отписки без client_user_id (телеграмный /stop или блокировка бота знают
+    # только chat_id): восстанавливаем юзера по уже известному адресу канала.
+    orphan = client.query(
+        """
+        SELECT meta, toString(ts)
+        FROM retention.saas_events
+        WHERE tenant_id = %(t)s AND event_type = 'contact_update'
+          AND client_user_id = '' AND meta != ''
+        """,
+        parameters={"t": tenant},
+    ).result_rows
+    if orphan:
+        known = {(r[0], r[1]): r[2] for r in client.query(
+            """
+            SELECT channel, address, client_user_id
+            FROM retention.contacts_current WHERE tenant_id = %(t)s
+            """,
+            parameters={"t": tenant},
+        ).result_rows}
+        for meta, ts in orphan:
+            p = _parse(meta)
+            if not p:
+                continue
+            cuid = known.get((p[0], p[1]), "")
+            if cuid:
+                out.append([tenant, cuid, p[0], p[1], p[2], ts, ts])
 
     if out:
         client.insert(

@@ -1,9 +1,21 @@
 {
   "hubcontent": {
-    "email_from": "Hub Content <care@mail.hubcontent.com>",
+    "email_domain": "mail.hubcontent.com",
+    "email_domain_id": "resend-domain-uuid",
     "email_domain_status": "pending_dns",
-    "sms_sender": "HubContent",
-    "viber_sender": "HubContent",
-    "telegram_bot_token": ""
+    "email_dns_records": [
+      {"record": "DKIM", "type": "TXT", "name": "resend._domainkey.mail.hubcontent.com",
+       "value": "p=MIGf...", "status": "not_started"}
+    ],
+    "email_from": "Hub Content <care@mail.hubcontent.com>",
+
+    "requested_sms_sender": "HubContent",
+    "sms_sender": "",
+    "requested_viber_sender": "HubContent",
+    "viber_sender": "",
+
+    "telegram_bot_token": "",
+    "telegram_bot_username": "",
+    "telegram_webhook_secret": ""
   }
 }

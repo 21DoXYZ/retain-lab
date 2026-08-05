@@ -286,16 +286,29 @@ def saas_offers():
                      'offers': offers})
 
 
-@bp.get('/saas/channels')
-@require_auth(roles=LEAK_ROLES)
-def channels():
-    """Статус каналов: провайдеры платформы (настроен ли ключ) + покрытие
-    контактами/согласиями. Ключи живут в env сервера - клиент каналы не
-    подключает, он поставляет контакты (contact_update) и согласия."""
-    import os as _os
+# ── Каналы: клиентский флоу подключения (Phase 4) ────────────────────────────
+# Партнёрская модель: аккаунты провайдеров наши, клиент подключает только
+# идентичность бренда (поддомен, альфа-имя, свой бот). Состояние - в
+# secrets/tenants.json (том rw у board), пишет его stripe_sync.channels_admin.
 
-    tenant = request.args.get('tenant') or DEFAULT_TENANT
+import os as _os
+import secrets as _secrets
 
+from stripe_sync import channels_admin as ca
+
+CHANNEL_WRITE_ROLES = ('super_admin', 'director', 'head_retention')
+
+
+def _platform(name: str) -> bool:
+    return bool(_os.environ.get(name, '').strip())
+
+
+def _tenant_arg() -> str:
+    return (request.args.get('tenant') or (request.get_json(silent=True) or {}).get('tenant')
+            or DEFAULT_TENANT)
+
+
+def _channels_payload(tenant: str) -> dict:
     email_users = int(q(
         "SELECT countIf(email_norm != '') FROM user_actions WHERE tenant_id = {t:String}",
         {'t': tenant})[1][0][0])
@@ -306,37 +319,190 @@ def channels():
         FROM contacts_current WHERE tenant_id = {t:String} GROUP BY channel
         """, {'t': tenant})[1]}
 
-    def _set(name):
-        return bool(_os.environ.get(name, '').strip())
+    tch = ca.load_tenants().get(tenant, {}) or {}
+    resend_key = _platform('RESEND_API_KEY')
+    dt_key = _platform('DECISION_API_KEY')
+    bot_user = str(tch.get('telegram_bot_username', ''))
 
-    # Идентичность отправителя тенанта (from-домен, альфа-имена, бот):
-    # secrets/tenants.json - тот же файл, что читают сендеры.
-    import json as _json
-    try:
-        with open(_os.environ.get('TENANTS_FILE', '/secrets/tenants.json')) as _fh:
-            tch = _json.load(_fh).get(tenant, {}) or {}
-    except Exception:
-        tch = {}
-
-    providers = [
-        {'channel': 'email', 'provider': 'Resend',
-         'configured': _set('RESEND_API_KEY') and bool(tch.get('email_from') or _set('EMAIL_FROM')),
-         'detail': tch.get('email_from') or _os.environ.get('EMAIL_FROM', ''),
-         'contacts': email_users, 'consented': email_users},
+    channels = [
+        {'channel': 'email', 'provider': 'Resend', 'state': ca.email_state(tch, resend_key),
+         'detail': tch.get('email_from') or tch.get('email_domain', ''),
+         'contacts': email_users, 'consented': email_users,
+         'email': {'domain': tch.get('email_domain', ''),
+                   'from': tch.get('email_from', ''),
+                   'dns_records': tch.get('email_dns_records', [])}},
         {'channel': 'sms', 'provider': 'DecisionTelecom',
-         'configured': _set('DECISION_API_KEY') and bool(tch.get('sms_sender') or _set('DECISION_SMS_SENDER')),
-         'detail': tch.get('sms_sender') or _os.environ.get('DECISION_SMS_SENDER', ''),
+         'state': ca.messaging_state(tch, 'sms', dt_key),
+         'detail': tch.get('sms_sender') or tch.get('requested_sms_sender', ''),
          **cov.get('sms', {'contacts': 0, 'consented': 0})},
         {'channel': 'viber', 'provider': 'DecisionTelecom',
-         'configured': _set('DECISION_API_KEY') and bool(tch.get('viber_sender') or _set('DECISION_VIBER_SENDER')),
-         'detail': tch.get('viber_sender') or _os.environ.get('DECISION_VIBER_SENDER', ''),
+         'state': ca.messaging_state(tch, 'viber', dt_key),
+         'detail': tch.get('viber_sender') or tch.get('requested_viber_sender', ''),
          **cov.get('viber', {'contacts': 0, 'consented': 0})},
-        {'channel': 'whatsapp', 'provider': 'DecisionTelecom',
-         'configured': False, 'detail': 'WABA onboarding pending',
-         **cov.get('whatsapp', {'contacts': 0, 'consented': 0})},
-        {'channel': 'telegram', 'provider': 'Bot API',
-         'configured': bool(tch.get('telegram_bot_token')) or _set('TELEGRAM_BOT_TOKEN'),
-         'detail': 'tenant bot' if tch.get('telegram_bot_token') else '',
+        {'channel': 'telegram', 'provider': 'Telegram Bot API',
+         'state': ca.telegram_state(tch),
+         'detail': f'@{bot_user}' if bot_user else '',
+         'telegram': {'bot_username': bot_user,
+                      'connect_link': f'https://t.me/{bot_user}?start=' if bot_user else ''},
          **cov.get('telegram', {'contacts': 0, 'consented': 0})},
+        {'channel': 'whatsapp', 'provider': 'DecisionTelecom', 'state': 'coming_soon',
+         'detail': '', **cov.get('whatsapp', {'contacts': 0, 'consented': 0})},
     ]
-    return api_json({'tenant': tenant, 'providers': providers})
+    return {'tenant': tenant, 'channels': channels}
+
+
+@bp.get('/saas/channels')
+@require_auth(roles=LEAK_ROLES)
+def channels():
+    return api_json(_channels_payload(_tenant_arg()))
+
+
+def _bad(reason: str, code: int = 400):
+    return api_json(None, code, reason)
+
+
+@bp.post('/saas/channels/email/domain')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def channels_email_domain():
+    """Клиент вводит свой поддомен отправки (mail.клиент.com). С ключом Resend
+    сразу создаём домен и возвращаем DNS-записи; без ключа фиксируем запрос
+    (awaiting_provider) - создание догонит /verify, когда ключ появится."""
+    tenant = _tenant_arg()
+    domain = str((request.get_json(silent=True) or {}).get('domain', '')).strip().lower()
+    if not ca.DOMAIN_RE.match(domain):
+        return _bad('invalid_domain')
+
+    key = _os.environ.get('RESEND_API_KEY', '').strip()
+    if not key:
+        ca.update_tenant(tenant, {'email_domain': domain,
+                                  'email_domain_status': 'awaiting_provider',
+                                  'email_domain_id': None, 'email_dns_records': None})
+        print(f'[channels] {tenant}: email domain {domain} запрошен (ключа Resend ещё нет)',
+              flush=True)
+        return api_json(_channels_payload(tenant))
+
+    ok, status, data = ca.resend_create_domain(domain, key)
+    if not ok:
+        return _bad(f'resend_{status}', 502)
+    ca.update_tenant(tenant, {'email_domain': domain,
+                              'email_domain_id': str(data.get('id', '')),
+                              'email_domain_status': 'pending_dns',
+                              'email_dns_records': ca.dns_rows(data)})
+    print(f'[channels] {tenant}: email domain {domain} создан в Resend', flush=True)
+    return api_json(_channels_payload(tenant))
+
+
+@bp.post('/saas/channels/email/verify')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def channels_email_verify():
+    """Кнопка «Проверить DNS»: дергаем верификацию и перечитываем статус."""
+    tenant = _tenant_arg()
+    tch = ca.load_tenants().get(tenant, {}) or {}
+    domain = str(tch.get('email_domain', ''))
+    if not domain:
+        return _bad('no_domain')
+    key = _os.environ.get('RESEND_API_KEY', '').strip()
+    if not key:
+        return _bad('resend_not_configured', 409)
+
+    dom_id = str(tch.get('email_domain_id', ''))
+    if not dom_id:   # домен был запрошен до появления ключа - создаём сейчас
+        ok, status, data = ca.resend_create_domain(domain, key)
+        if not ok:
+            return _bad(f'resend_{status}', 502)
+        dom_id = str(data.get('id', ''))
+        ca.update_tenant(tenant, {'email_domain_id': dom_id,
+                                  'email_domain_status': 'pending_dns',
+                                  'email_dns_records': ca.dns_rows(data)})
+
+    ca.resend_verify_domain(dom_id, key)
+    ok, status, data = ca.resend_get_domain(dom_id, key)
+    if not ok:
+        return _bad(f'resend_{status}', 502)
+    st = str(data.get('status', 'pending'))
+    ca.update_tenant(tenant, {
+        'email_domain_status': 'verified' if st == 'verified' else 'pending_dns',
+        'email_dns_records': ca.dns_rows(data)})
+    print(f'[channels] {tenant}: verify {domain} -> {st}', flush=True)
+    return api_json(_channels_payload(tenant))
+
+
+@bp.post('/saas/channels/email/sender')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def channels_email_sender():
+    """Имя и адрес «От кого» - строго на подключённом домене тенанта."""
+    tenant = _tenant_arg()
+    body = request.get_json(silent=True) or {}
+    name = str(body.get('from_name', '')).strip().replace('<', '').replace('>', '')[:60]
+    addr = str(body.get('from_email', '')).strip().lower()
+    tch = ca.load_tenants().get(tenant, {}) or {}
+    domain = str(tch.get('email_domain', ''))
+    if not domain:
+        return _bad('no_domain')
+    if not ca.EMAIL_RE.match(addr) or not addr.endswith('@' + domain):
+        return _bad('email_not_on_domain')
+    email_from = f'{name} <{addr}>' if name else addr
+    ca.update_tenant(tenant, {'email_from': email_from})
+    return api_json(_channels_payload(tenant))
+
+
+@bp.post('/saas/channels/messaging')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def channels_messaging():
+    """Заявка на альфа-имя SMS/Viber. Регистрацию у DecisionTelecom ведёт
+    платформа (менеджер DT), активация = перенос requested_* -> *_sender."""
+    tenant = _tenant_arg()
+    body = request.get_json(silent=True) or {}
+    patch = {}
+    for kind in ('sms', 'viber'):
+        val = str(body.get(f'{kind}_sender', '')).strip()
+        if not val:
+            continue
+        if not ca.ALPHA_RE.match(val):
+            return _bad(f'invalid_{kind}_sender')
+        patch[f'requested_{kind}_sender'] = val
+    if not patch:
+        return _bad('nothing_to_update')
+    ca.update_tenant(tenant, patch)
+    print(f'[channels] {tenant}: заявка на альфа-имена {patch}', flush=True)
+    return api_json(_channels_payload(tenant))
+
+
+@bp.post('/saas/channels/telegram')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def channels_telegram():
+    """Подключение бота клиента: валидация токена (getMe) + вебхук на наш
+    ingest с секретом. Пустой bot_token = отключить."""
+    tenant = _tenant_arg()
+    token = str((request.get_json(silent=True) or {}).get('bot_token', '')).strip()
+
+    if not token:
+        old = (ca.load_tenants().get(tenant, {}) or {}).get('telegram_bot_token', '')
+        if old:
+            ca.telegram_delete_webhook(str(old))
+        ca.update_tenant(tenant, {'telegram_bot_token': None,
+                                  'telegram_bot_username': None,
+                                  'telegram_webhook_secret': None})
+        return api_json(_channels_payload(tenant))
+
+    if not ca.BOT_TOKEN_RE.match(token):
+        return _bad('telegram_invalid_token')
+    ok, username = ca.telegram_get_me(token)
+    if not ok:
+        return _bad(username)
+
+    host = _os.environ.get('SAAS_HOST', '').strip()
+    if not host:
+        return _bad('saas_host_not_set', 500)
+    secret = _secrets.token_hex(24)
+    ok, reason = ca.telegram_set_webhook(
+        token, f'https://{host}/ingest/saas/tg/{tenant}', secret)
+    if not ok:
+        return _bad(f'webhook_failed:{reason}', 502)
+
+    ca.update_tenant(tenant, {'telegram_bot_token': token,
+                              'telegram_bot_username': username,
+                              'telegram_webhook_secret': secret})
+    print(f'[channels] {tenant}: telegram @{username} подключён, вебхук установлен',
+          flush=True)
+    return api_json(_channels_payload(tenant))

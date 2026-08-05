@@ -20,6 +20,8 @@ services:
       # Локальный Supabase (CLI) подписывает JWT HS256 — legacy-путь api/core.py
       SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
       # Статусы каналов для /api/v1/saas/channels (ключи как у saas-ops)
+      # + SAAS_HOST: URL телеграм-вебхука при подключении бота тенанта
+      SAAS_HOST: ${SAAS_HOST:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       DECISION_API_KEY: ${DECISION_API_KEY:-}

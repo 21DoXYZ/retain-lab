@@ -233,6 +233,50 @@ def ingest_saas():
     return jsonify(status="ok", accepted=len(events)), 200
 
 
+# ── Telegram-вебхук ботов тенантов (Phase 4 каналы) ──────────────────────────
+# Секрет ставится при подключении бота (POST /saas/channels/telegram в борде,
+# setWebhook secret_token) и хранится в tenants.json. Fail-closed: нет секрета
+# у тенанта или не совпал заголовок -> 403.
+from tg_events import update_to_event  # noqa: E402
+
+TENANTS_FILE = os.environ.get("TENANTS_FILE", "/secrets/tenants.json")
+_tenants_cache = {"mtime": 0, "data": {}}
+
+
+def _tenant_conf(tenant_id):
+    try:
+        mt = os.path.getmtime(TENANTS_FILE)
+        if mt != _tenants_cache["mtime"]:
+            with open(TENANTS_FILE) as fh:
+                _tenants_cache["data"] = json.load(fh) or {}
+            _tenants_cache["mtime"] = mt
+    except Exception:
+        pass
+    return _tenants_cache["data"].get(tenant_id, {}) or {}
+
+
+@app.post("/ingest/saas/tg/<tenant_id>")
+def ingest_tg(tenant_id):
+    secret = str(_tenant_conf(tenant_id).get("telegram_webhook_secret", ""))
+    got = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not secret or not hmac.compare_digest(got, secret):
+        return jsonify(error="forbidden"), 403
+
+    upd = request.get_json(silent=True) or {}
+    ev = update_to_event(tenant_id, upd)
+    if ev is None:
+        return jsonify(status="ignored"), 200   # не-подписочные апдейты не интересны
+
+    errs = []
+    producer.produce(SAAS_TOPIC, key=str(ev.get("client_user_id") or tenant_id),
+                     value=json.dumps(ev),
+                     on_delivery=lambda err, _m: errs.append(str(err)) if err else None)
+    producer.flush(10)
+    if errs:   # Telegram ретраит любые не-2xx - доставка гарантируется
+        return jsonify(error="kafka delivery failed"), 503
+    return jsonify(status="ok"), 200
+
+
 @app.get("/ingest/health")
 def health():
     return jsonify(status="ok"), 200
