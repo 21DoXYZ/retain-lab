@@ -293,19 +293,22 @@ JOIN retention.identities_current i
 WHERE e.client_user_id = '' AND e.stripe_customer_id = '' AND e.email_hash != '';
 
 -- Фичи по событиям per identity (общий источник для стадий и скоринг-джоба).
+-- Момент ценности УНИВЕРСАЛЕН: generation_completed (Hub Content) ИЛИ
+-- value_moment (канонич. имя для любого продукта, см. INTEGRATION-SAAS.md).
+-- Иначе ACTIVATE/SAVE-математика мертва для тенантов с другим словарём.
 CREATE OR REPLACE VIEW retention.user_event_features AS
 SELECT
     tenant_id,
     identity_id,
     min(ts)                                                              AS first_seen,
     max(ts)                                                              AS last_seen,
-    countIf(event_type = 'generation_completed')                         AS generations_total,
-    countIf(event_type = 'generation_completed' AND ts >= now() - INTERVAL 7 DAY)  AS generations_7d,
-    countIf(event_type = 'generation_completed' AND ts >= now() - INTERVAL 14 DAY
+    countIf(event_type IN ('generation_completed', 'value_moment'))                                  AS generations_total,
+    countIf(event_type IN ('generation_completed', 'value_moment') AND ts >= now() - INTERVAL 7 DAY) AS generations_7d,
+    countIf(event_type IN ('generation_completed', 'value_moment') AND ts >= now() - INTERVAL 14 DAY
             AND ts < now() - INTERVAL 7 DAY)                             AS generations_prev_7d,
-    uniqIf(toDate(ts), event_type = 'generation_completed'
+    uniqIf(toDate(ts), event_type IN ('generation_completed', 'value_moment')
            AND ts >= now() - INTERVAL 28 DAY AND ts < now() - INTERVAL 7 DAY) AS gen_days_prior_3w,
-    uniqIf(toDate(ts), event_type = 'generation_completed'
+    uniqIf(toDate(ts), event_type IN ('generation_completed', 'value_moment')
            AND ts >= toStartOfMonth(now()))                              AS gen_days_this_month,
     countIf(event_type IN ('paywall_viewed', 'plan_page_viewed'))        AS paywall_views,
     countIf(event_type = 'checkout_started')                            AS checkout_starts,
