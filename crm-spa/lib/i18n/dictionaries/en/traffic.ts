@@ -3,7 +3,7 @@ export const traffic = {
   // ── "Source verdicts" screen (W2-T2) ──
   "traffic.verdicts.title": "Source verdicts",
   "traffic.verdicts.lead":
-    "Day-5 cohort quality forecast: which sources bring valuable players and which bring fraud. Per-source call — scale · watch · disable.",
+    "Day-5 cohort quality forecast: which sources bring valuable users and which bring fraud. Per-source call - scale · watch · disable.",
   "traffic.verdicts.pill.asOf": "data as of {date}",
   "traffic.verdicts.pill.median": "median LTV D90: {v}",
 
@@ -16,16 +16,16 @@ export const traffic = {
   // table columns (spec §3.1)
   "traffic.verdicts.col.source": "Source",
   "traffic.verdicts.col.affiliate": "Affiliate",
-  "traffic.verdicts.col.players": "Players (7d)",
-  "traffic.verdicts.col.playersTitle": "Registrations in the window (in brackets — last 7 days)",
-  "traffic.verdicts.col.ftd": "FTD",
-  "traffic.verdicts.col.ftdTitle": "Players with a first deposit",
-  "traffic.verdicts.col.deposits": "Deposits",
-  "traffic.verdicts.col.depositsTitle": "Cohort deposit sum (cash, casino spec)",
+  "traffic.verdicts.col.players": "Users (7d)",
+  "traffic.verdicts.col.playersTitle": "Registrations in the window (in brackets - last 7 days)",
+  "traffic.verdicts.col.ftd": "First payment",
+  "traffic.verdicts.col.ftdTitle": "Users with a first payment",
+  "traffic.verdicts.col.deposits": "Payments",
+  "traffic.verdicts.col.depositsTitle": "Cohort payment sum (cash)",
   "traffic.verdicts.col.predSum": "LTV D90 forecast, Σ",
-  "traffic.verdicts.col.predSumTitle": "Total 90-day deposit forecast over scored players",
-  "traffic.verdicts.col.predAvg": "per player",
-  "traffic.verdicts.col.predAvgTitle": "Average LTV D90 forecast per scored player",
+  "traffic.verdicts.col.predSumTitle": "Total 90-day payment forecast over scored users",
+  "traffic.verdicts.col.predAvg": "per user",
+  "traffic.verdicts.col.predAvgTitle": "Average LTV D90 forecast per scored user",
   "traffic.verdicts.col.confidence": "Confidence",
   "traffic.verdicts.col.verdict": "Verdict",
 
@@ -43,15 +43,15 @@ export const traffic = {
 
   // legend / how to read
   "traffic.verdicts.legend.label": "How to read:",
-  "traffic.verdicts.legend.scale": "forecast well above median and FTD rate not below baseline — pour more",
-  "traffic.verdicts.legend.watch": "within norm — keep watching",
-  "traffic.verdicts.legend.disable": "players beat the games (GGR < 0) or forecast half the median — disable",
-  "traffic.verdicts.legend.maturing": "cohort younger than 5 days or fewer than 10 players — too early to judge",
-  "traffic.verdicts.legend.draft": "Thresholds are drafts — to be agreed with Vasiliy.",
+  "traffic.verdicts.legend.scale": "forecast well above median and first-payment rate not below baseline - pour more",
+  "traffic.verdicts.legend.watch": "within norm - keep watching",
+  "traffic.verdicts.legend.disable": "net revenue below zero or forecast half the median - disable",
+  "traffic.verdicts.legend.maturing": "cohort younger than 5 days or fewer than 10 users - too early to judge",
+  "traffic.verdicts.legend.draft": "Thresholds are drafts - to be agreed with Vasiliy.",
 
   // states
   "traffic.verdicts.empty.title": "No new registrations in the window",
-  "traffic.verdicts.empty.desc": "No cohorts in the selected window — widen the range or wait for new registrations.",
+  "traffic.verdicts.empty.desc": "No cohorts in the selected window - widen the range or wait for new registrations.",
   "traffic.verdicts.error.title": "Failed to load verdicts",
   "traffic.verdicts.error.desc": "Check the connection to the analytics backend and retry.",
 } satisfies Record<string, string>;

@@ -55,8 +55,8 @@ export function AppShell({ active, role, children, headerRight, t }: AppShellPro
             R
           </span>
           <div className="leading-tight">
-            <div className="text-sm font-semibold text-white">Retention</div>
-            <div className="text-xs text-sb-grp mt-0.5">ClickHouse · live</div>
+            <div className="text-sm font-semibold text-white">Revenue Autopilot</div>
+            <div className="text-xs text-sb-grp mt-0.5">live</div>
           </div>
         </div>
 

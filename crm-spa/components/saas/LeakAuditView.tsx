@@ -1,0 +1,101 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { flaskFetch } from "@/lib/api";
+import { useT } from "@/lib/i18n";
+import { Banner, ErrorState, PageHeader, SCard, SCardGrid } from "@/components/ui";
+
+/**
+ * /leak-audit — отчёт «где утекает выручка» (REBUILD §Phase 5) поверх
+ * GET /api/v1/saas/leak-audit (api/saas.py, витрины saas_schema.sql).
+ * Числа в долларах: SaaS-контур считает MRR в валюте Stripe-планов (usd).
+ */
+
+interface LeakBlock {
+  count: number;
+  mrr?: number;
+  potential_mrr?: number;
+  expansion_potential?: number;
+}
+
+interface LeakAudit {
+  tenant: string;
+  headline_monthly_leak: number;
+  blocks: {
+    dunning: LeakBlock;
+    dead_trials: LeakBlock;
+    silent_cancels_30d: LeakBlock;
+    under_upgrades: LeakBlock;
+  };
+}
+
+function usd(n: number | undefined): string {
+  return "$" + (n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
+export function LeakAuditView() {
+  const t = useT();
+  const [data, setData] = useState<LeakAudit | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    flaskFetch<LeakAudit>("/api/v1/saas/leak-audit")
+      .then(setData)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(load, [load]);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <PageHeader title={t("saas.leak.title")} lead={t("saas.leak.lead")} />
+
+      {error ? (
+        <ErrorState onRetry={load} />
+      ) : (
+        <>
+          {data ? (
+            <Banner>
+              <span className="text-[15px] font-semibold">
+                {t("saas.leak.headline", { amount: usd(data.headline_monthly_leak) })}
+              </span>
+            </Banner>
+          ) : null}
+
+          <SCardGrid>
+            <SCard
+              loading={loading}
+              label={t("saas.leak.dunning")}
+              value={usd(data?.blocks.dunning.mrr)}
+              sub={t("saas.leak.dunningSub", { count: data?.blocks.dunning.count ?? 0 })}
+              valueTone="neg"
+            />
+            <SCard
+              loading={loading}
+              label={t("saas.leak.silent")}
+              value={usd(data?.blocks.silent_cancels_30d.mrr)}
+              sub={t("saas.leak.silentSub", { count: data?.blocks.silent_cancels_30d.count ?? 0 })}
+              valueTone="neg"
+            />
+            <SCard
+              loading={loading}
+              label={t("saas.leak.upgrades")}
+              value={usd(data?.blocks.under_upgrades.expansion_potential)}
+              sub={t("saas.leak.upgradesSub", { count: data?.blocks.under_upgrades.count ?? 0 })}
+            />
+            <SCard
+              loading={loading}
+              label={t("saas.leak.deadTrials")}
+              value={usd(data?.blocks.dead_trials.potential_mrr)}
+              sub={t("saas.leak.deadTrialsSub", { count: data?.blocks.dead_trials.count ?? 0 })}
+            />
+          </SCardGrid>
+        </>
+      )}
+    </div>
+  );
+}

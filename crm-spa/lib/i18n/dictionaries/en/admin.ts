@@ -9,7 +9,7 @@ export const admin: Partial<Messages> = {
   "admin.role.head_retention": "Head of retention",
   "admin.role.head_department": "Head of department",
   "admin.role.operator": "Operator",
-  "admin.role.vip_manager": "VIP manager",
+  "admin.role.vip_manager": "Power user manager",
   "admin.role.affiliate_manager": "Traffic manager",
   "admin.role.marketing_manager": "Marketing",
   "admin.role.analyst": "Analyst",
@@ -25,7 +25,7 @@ export const admin: Partial<Messages> = {
 
   "admin.users.title": "Users",
   "admin.users.lead":
-    "Create, block, reset password and reassign players. Every action is written to the audit log.",
+    "Create, block, reset password and reassign users. Every action is written to the audit log.",
   "admin.users.createOperator": "+ Create operator",
   "admin.users.createAffiliate": "+ Affiliate cabinet",
 
@@ -45,7 +45,7 @@ export const admin: Partial<Messages> = {
   "admin.users.modal.createAffiliateTitle": "Affiliate cabinet",
   "admin.users.modal.createUserTitle": "New user",
   "admin.users.modal.resetTitle": "Reset password",
-  "admin.users.modal.deleteTitle": "Delete with player reassignment",
+  "admin.users.modal.deleteTitle": "Delete with user reassignment",
 
   "admin.users.btn.cancel": "Cancel",
   "admin.users.btn.create": "Create",
@@ -69,17 +69,17 @@ export const admin: Partial<Messages> = {
   "admin.users.field.newPasswordPlaceholder": "new password",
 
   "admin.users.deleteBody":
-    "Deleting: {name} ({email}). Their assigned players will be reassigned to the chosen operator (notes and call history move with the player).",
-  "admin.users.field.reassignTo": "Reassign players to operator",
+    "Deleting: {name} ({email}). Their assigned users will be reassigned to the chosen operator (notes and call history move with the user).",
+  "admin.users.field.reassignTo": "Reassign users to operator",
   "admin.users.field.reassignHint":
-    "can be left empty — the queue will simply close",
-  "admin.users.reassignNone": "— don't reassign —",
+    "can be left empty - the queue will simply close",
+  "admin.users.reassignNone": " -  don't reassign - ",
 
   "admin.users.flash.created": "User created",
   "admin.users.flash.blocked": "Account blocked",
   "admin.users.flash.unblocked": "Account unblocked",
   "admin.users.flash.passwordChanged": "Password changed",
-  "admin.users.flash.deleted": "User deleted, players reassigned",
+  "admin.users.flash.deleted": "User deleted, assigned users reassigned",
   "admin.users.flash.errorStatus": "Error ({status})",
   "admin.users.flash.networkError": "Network unavailable",
 

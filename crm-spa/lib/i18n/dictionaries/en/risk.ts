@@ -1,7 +1,7 @@
-// «Flags feed» screen of the Risk & fraud module (W2-T3). Keys "risk.*". en — translations of ru.
+// «Flags feed» screen of the Risk & fraud module (W2-T3). Keys "risk.*". en - translations of ru.
 export const risk = {
   "risk.flags.title": "Flags feed",
-  "risk.flags.lead": "A single «needs review» queue — signals from audit, affiliates and bonuses in one list.",
+  "risk.flags.lead": "A single «needs review» queue - signals from audit, affiliates and offers in one list.",
 
   // Header pills
   "risk.flags.pill.total": "{n} to review",
@@ -9,18 +9,18 @@ export const risk = {
   "risk.flags.pill.checkedNow": "checked just now",
 
   // Per-kind tiles (click = filter the feed)
-  "risk.flags.tile.hint": "Click — filter the feed by this kind",
+  "risk.flags.tile.hint": "Click - filter the feed by this kind",
   "risk.flags.tile.active": "filter active",
-  "risk.flags.kind.no_deposit_withdrawal.label": "Withdrawal without deposit",
-  "risk.flags.kind.no_deposit_withdrawal.sub": "manual debits > 50k ₺ with deposit < 10% of withdrawal",
+  "risk.flags.kind.no_deposit_withdrawal.label": "Refund without payment",
+  "risk.flags.kind.no_deposit_withdrawal.sub": "manual debits > 50k ₺ with payments < 10% of the refund",
   "risk.flags.kind.suspicious_operator.label": "Operator in question",
   "risk.flags.kind.suspicious_operator.sub": "≥ 40% of debits without a clear note",
-  "risk.flags.kind.affiliate_players_win.label": "Players beat the games",
+  "risk.flags.kind.affiliate_players_win.label": "Users ahead on credits",
   "risk.flags.kind.affiliate_cash_drain.label": "Cash in the red",
-  "risk.flags.kind.affiliate_players_win.sub": "source's real GGR is negative",
-  "risk.flags.kind.affiliate_cash_drain.sub": "withdrawals exceed deposits",
-  "risk.flags.kind.bonus_abuse.label": "Bonus abuse",
-  "risk.flags.kind.bonus_abuse.sub": "«🎁 Bonus hunter» archetype in profit on freespins",
+  "risk.flags.kind.affiliate_players_win.sub": "source's real MRR is negative",
+  "risk.flags.kind.affiliate_cash_drain.sub": "refunds exceed payments",
+  "risk.flags.kind.bonus_abuse.label": "Offer abuse",
+  "risk.flags.kind.bonus_abuse.sub": "«🎁 Offer hunter» archetype in profit on bonus tokens",
 
   // Table columns
   "risk.flags.col.kind": "Kind",
@@ -30,16 +30,16 @@ export const risk = {
   "risk.flags.col.details": "Details",
 
   // Entities (links to cards)
-  "risk.flags.entity.player": "Player #{id}",
+  "risk.flags.entity.player": "User #{id}",
   "risk.flags.entity.operator": "Operator {id}",
   "risk.flags.entity.affiliate": "Source {id}",
 
   // Row details per kind
-  "risk.flags.details.no_deposit_withdrawal": "deposited {deposited} ₺ · {ops} ops",
+  "risk.flags.details.no_deposit_withdrawal": "paid {deposited} ₺ · {ops} ops",
   "risk.flags.details.suspicious_operator": "unclear {unclear}% · {ops} ops",
   "risk.flags.details.adminBadge": "admin/service",
-  "risk.flags.details.affiliate": "{players} players · FTD {ftd}",
-  "risk.flags.details.bonus_abuse": "freespins {freespin}%",
+  "risk.flags.details.affiliate": "{players} users · first payments {ftd}",
+  "risk.flags.details.bonus_abuse": "bonus tokens {freespin}%",
 
   // Severity
   "risk.flags.sev.3": "large (≥ 100k ₺)",
@@ -51,10 +51,10 @@ export const risk = {
 
   // Explainer banner
   "risk.flags.banner.severity": "Severity: 🔴 large (≥ 100k ₺) · 🟡 notable (≥ 20k ₺) · ⚪ minor.",
-  "risk.flags.banner.sources": "Sources: debit audit, affiliate verdicts, «Bonus hunter» archetype. Click a tile to filter the feed.",
+  "risk.flags.banner.sources": "Sources: debit audit, affiliate verdicts, «Offer hunter» archetype. Click a tile to filter the feed.",
 
   // Empty «all clear» (spec §4.1) + empty by filter
-  "risk.flags.empty.clear.title": "No flags — all clear",
+  "risk.flags.empty.clear.title": "No flags - all clear",
   "risk.flags.empty.clear.desc": "Nothing to review. Last check {mins} min ago.",
   "risk.flags.empty.clear.descNow": "Nothing to review. Last check just now.",
   "risk.flags.empty.kind.title": "No flags of this kind",

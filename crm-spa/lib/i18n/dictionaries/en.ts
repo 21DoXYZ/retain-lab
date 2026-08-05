@@ -24,6 +24,7 @@ import { traffic } from "./en/traffic";
 import { risk } from "./en/risk";
 import { automation } from "./en/automation";
 import { reports } from "./en/reports";
+import { saas } from "./en/saas";
 
 export const en: Partial<Messages> = {
   ...base,
@@ -44,4 +45,5 @@ export const en: Partial<Messages> = {
   ...risk,
   ...automation,
   ...reports,
+  ...saas,
 };

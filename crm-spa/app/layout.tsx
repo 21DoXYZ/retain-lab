@@ -11,7 +11,7 @@ import { resolveLocale } from "@/lib/i18n/server";
 // nobody-facing sees). <html lang> DOES matter for accessibility/SEO across
 // locales, so that one is resolved from the locale cookie below.
 export const metadata: Metadata = {
-  title: "Retention CRM",
+  title: "Revenue Autopilot",
   description: "CRM · колл-центр · аналитика",
 };
 

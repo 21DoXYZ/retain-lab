@@ -24,6 +24,7 @@ import { traffic } from "./tr/traffic";
 import { risk } from "./tr/risk";
 import { automation } from "./tr/automation";
 import { reports } from "./tr/reports";
+import { saas } from "./tr/saas";
 
 export const tr: Partial<Messages> = {
   ...base,
@@ -44,4 +45,5 @@ export const tr: Partial<Messages> = {
   ...risk,
   ...automation,
   ...reports,
+  ...saas,
 };

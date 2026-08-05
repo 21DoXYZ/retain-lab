@@ -63,7 +63,7 @@ function LoginForm() {
             R
           </span>
           <div className="leading-tight">
-            <div className="text-[17px] font-bold text-ink">Retention CRM</div>
+            <div className="text-[17px] font-bold text-ink">Revenue Autopilot</div>
             <div className="text-[12.5px] text-steel">{t("login.tagline")}</div>
           </div>
         </div>

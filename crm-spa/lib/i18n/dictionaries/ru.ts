@@ -28,6 +28,7 @@ import { traffic } from "./ru/traffic";
 import { risk } from "./ru/risk";
 import { automation } from "./ru/automation";
 import { reports } from "./ru/reports";
+import { saas } from "./ru/saas";
 
 export const ru = {
   ...base,
@@ -48,6 +49,7 @@ export const ru = {
   ...risk,
   ...automation,
   ...reports,
+  ...saas,
 } satisfies Record<string, string>;
 
 /** Every valid message key (derived from the base dictionary). */
