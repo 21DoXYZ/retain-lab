@@ -130,7 +130,7 @@ export const saas: Partial<Messages> = {
   "saas.camp.rules.title": "Stage rules (one per user, priority top-down)",
   "saas.camp.rule.DUNNING": "Payment failed: the last payment_failed is newer than the last paid invoice, or the subscription is past_due.",
   "saas.camp.rule.WINBACK": "Subscription canceled 30+ days ago.",
-  "saas.camp.rule.CONVERT": "Trial ends within 3 days, no payment yet.",
+  "saas.camp.rule.CONVERT": "Trial ends within 3 days or has already expired - no payment yet.",
   "saas.camp.rule.SAVE": "Paying, but: opened cancel flow in 14 days, or scheduled a cancellation, or used the product 3 weeks straight then went silent for 7 days.",
   "saas.camp.rule.UPGRADE": "Paying and burned 80%+ of the plan limit.",
   "saas.camp.rule.ACTIVATE": "Signed up 48+ hours ago but never reached value (0 generations).",
