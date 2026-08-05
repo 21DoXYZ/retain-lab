@@ -419,3 +419,50 @@ CREATE TABLE IF NOT EXISTS retention.offers_issued
 )
 ENGINE = MergeTree
 ORDER BY (tenant_id, identity_id, issued_at);
+
+-- ============================================================================
+-- Phase 4 — Кампании K1-K5 (SaaS-раннер v1, stripe_sync/campaign_tick.py).
+-- Определения — saas_campaigns.json (репо); здесь — состояние и лог касаний.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS retention.campaign_enrollments
+(
+    `tenant_id`    LowCardinality(String),
+    `campaign_id`  LowCardinality(String),
+    `identity_id`  String,
+    `control`      UInt8,                    -- 1 = holdout: шаги не исполняются
+    `entry_stage`  LowCardinality(String),
+    `step_idx`     Int32,                    -- следующий шаг к исполнению
+    `next_step_at` DateTime64(3),
+    `status`       LowCardinality(String),   -- active | done | exited
+    `enrolled_at`  DateTime64(3),
+    `updated_at`   DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, campaign_id, identity_id);
+
+CREATE OR REPLACE VIEW retention.campaign_enrollments_current AS
+SELECT tenant_id, campaign_id, identity_id,
+       argMax(control, updated_at)      AS control,
+       argMax(entry_stage, updated_at)  AS entry_stage,
+       argMax(step_idx, updated_at)     AS step_idx,
+       argMax(next_step_at, updated_at) AS next_step_at,
+       argMax(status, updated_at)       AS status,
+       min(enrolled_at)                 AS enrolled_at
+FROM retention.campaign_enrollments
+GROUP BY tenant_id, campaign_id, identity_id;
+
+-- Лог касаний (email/offer) — сырьё для uplift-отчёта Phase 6.
+CREATE TABLE IF NOT EXISTS retention.campaign_send_log
+(
+    `tenant_id`   LowCardinality(String),
+    `campaign_id` LowCardinality(String),
+    `identity_id` String,
+    `step_idx`    Int32,
+    `action`      LowCardinality(String),   -- email | offer
+    `detail`      String,                    -- subject / offer_id
+    `status`      LowCardinality(String),    -- dry_run | sent | issued | holdout | rejected
+    `reason`      String,
+    `ts`          DateTime64(3)
+)
+ENGINE = MergeTree
+ORDER BY (tenant_id, campaign_id, identity_id, ts);
