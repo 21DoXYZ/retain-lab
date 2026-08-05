@@ -17,11 +17,26 @@ import urllib.request
 
 from compose import AUTO_PREFIX, EXECUTOR_SCHEMAS, validate_offer
 
-API_URL = "https://api.anthropic.com/v1/messages"
-MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 _TIMEOUT = 60
 
 AI_PREFIX = "AI_"
+
+
+def resolve_provider(env: dict | None = None) -> tuple[str, str]:
+    """(provider, api_key). Anthropic приоритетнее, OpenAI - фолбэк.
+    ('', '') = AI выключен."""
+    e = env if env is not None else os.environ
+    a = str(e.get("ANTHROPIC_API_KEY", "") or "").strip()
+    if a:
+        return "anthropic", a
+    o = str(e.get("OPENAI_API_KEY", "") or "").strip()
+    if o:
+        return "openai", o
+    return "", ""
 
 SYSTEM = """You compose retention offers for a SaaS product. You output ONLY valid JSON:
 {"offers": [{"offer_id": "...", "title": "...", "executor": "...", "monetary": true,
@@ -58,19 +73,35 @@ def build_user_prompt(answers: dict, avg_price: float) -> str:
     )
 
 
-def _call(api_key: str, system: str, user: str) -> str:
+def _call_anthropic(api_key: str, system: str, user: str) -> str:
     payload = json.dumps({
-        "model": MODEL, "max_tokens": 1500,
+        "model": ANTHROPIC_MODEL, "max_tokens": 1500,
         "system": system,
         "messages": [{"role": "user", "content": user}],
     }).encode()
     req = urllib.request.Request(
-        API_URL, data=payload, method="POST",
+        ANTHROPIC_URL, data=payload, method="POST",
         headers={"Content-Type": "application/json",
                  "x-api-key": api_key, "anthropic-version": "2023-06-01"})
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
         data = json.loads(resp.read().decode())
     return "".join(b.get("text", "") for b in data.get("content", []))
+
+
+def _call_openai(api_key: str, system: str, user: str) -> str:
+    payload = json.dumps({
+        "model": OPENAI_MODEL, "max_tokens": 1500,
+        "response_format": {"type": "json_object"},
+        "messages": [{"role": "system", "content": system},
+                     {"role": "user", "content": user}],
+    }).encode()
+    req = urllib.request.Request(
+        OPENAI_URL, data=payload, method="POST",
+        headers={"Content-Type": "application/json",
+                 "Authorization": f"Bearer {api_key}"})
+    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+        data = json.loads(resp.read().decode())
+    return ((data.get("choices") or [{}])[0].get("message") or {}).get("content", "")
 
 
 def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], list[str]]:
@@ -109,11 +140,12 @@ def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], lis
 def ai_compose(answers: dict, avg_price: float) -> tuple[list[dict], str]:
     """(офферы, note). Пустой список + note при любом сбое - вызывающий
     остаётся на детерминированной сборке."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not api_key:
+    provider, api_key = resolve_provider()
+    if not provider:
         return [], "ai_not_configured"
+    call = _call_anthropic if provider == "anthropic" else _call_openai
     try:
-        text = _call(api_key, SYSTEM, build_user_prompt(answers, avg_price))
+        text = call(api_key, SYSTEM, build_user_prompt(answers, avg_price))
     except urllib.error.HTTPError as exc:
         return [], f"ai_http_{exc.code}"
     except Exception as exc:

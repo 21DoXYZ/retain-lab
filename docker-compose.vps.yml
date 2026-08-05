@@ -24,6 +24,11 @@ services:
       # + STRIPE_WEBHOOK_SECRET: только СТАТУС «вебхук настроен» на /keys
       SAAS_HOST: ${SAAS_HOST:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # AI-компоновщик офферов (/saas/questionnaire): любой из ключей
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       DECISION_API_KEY: ${DECISION_API_KEY:-}

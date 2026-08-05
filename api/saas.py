@@ -313,8 +313,13 @@ def saas_onboarding():
         },
         'channels': [{'channel': c['channel'], 'state': c['state']} for c in ch],
         'answers': (ca.load_tenants().get(tenant, {}) or {}).get('onboarding_answers') or {},
-        'ai_enabled': _platform('ANTHROPIC_API_KEY'),
+        'ai_enabled': _ai_enabled(),
     })
+
+
+def _ai_enabled() -> bool:
+    """AI-компоновщик доступен: любой из ключей (Anthropic приоритетнее)."""
+    return _platform('ANTHROPIC_API_KEY') or _platform('OPENAI_API_KEY')
 
 
 def _avg_plan_price(tenant: str) -> float:
@@ -335,7 +340,7 @@ def saas_questionnaire():
     tenant = _tenant_arg()
     answers = (ca.load_tenants().get(tenant, {}) or {}).get('onboarding_answers') or {}
     return api_json({'questions': QUESTIONS, 'answers': answers,
-                     'ai_enabled': _platform('ANTHROPIC_API_KEY'),
+                     'ai_enabled': _ai_enabled(),
                      'avg_plan_price': _avg_plan_price(tenant)})
 
 
@@ -359,7 +364,7 @@ def saas_questionnaire_submit():
 
     ai_note = 'ai_not_configured'
     ai_offers = []
-    if _platform('ANTHROPIC_API_KEY'):
+    if _ai_enabled():
         from stripe_sync.ai_compose import ai_compose
         ai_offers, ai_note = ai_compose(answers, avg_price)
 
