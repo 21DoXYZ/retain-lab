@@ -45,6 +45,24 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M4.93 19.07a10 10 0 0 1 0-14.14" />
     </>
   ),
+  segments: (
+    <>
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </>
+  ),
+  chains: (
+    <>
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </>
+  ),
+  keys: (
+    <>
+      <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+    </>
+  ),
   overview: (
     <>
       <rect x="3" y="3" width="7" height="9" rx="1" />
