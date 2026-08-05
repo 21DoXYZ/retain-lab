@@ -40,9 +40,9 @@ export function CallChart({ option, height = 260, className }: CallChartProps) {
 
 /** Board chart palette — do not introduce new colours (see money/segmentation). */
 export const CHART = {
-  primary: "#2563eb",
-  steel: "#64748b",
+  primary: "#465fff",
+  steel: "#667085",
   hair: "#e5e7eb",
-  ink: "#1e293b",
+  ink: "#101828",
   amber: "#d97706",
 } as const;

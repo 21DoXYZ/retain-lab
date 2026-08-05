@@ -17,8 +17,8 @@ import type { BonusKpiItem, BonusKpiKey, EconStatus } from "./types";
 const STATUS_TONE: Record<EconStatus, { bg: string; fg: string }> = {
   ok: { bg: "#dcfce7", fg: "#166534" },
   partial: { bg: "#fef9c3", fg: "#854d0e" },
-  needs_event: { bg: "#f1f5f9", fg: "#475569" },
-  missing: { bg: "#f1f5f9", fg: "#94a3b8" },
+  needs_event: { bg: "#f2f4f7", fg: "#344054" },
+  missing: { bg: "#f2f4f7", fg: "#98a2b3" },
   indirect: { bg: "#ffedd5", fg: "#9a3412" },
 };
 

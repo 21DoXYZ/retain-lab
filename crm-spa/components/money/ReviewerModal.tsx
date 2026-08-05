@@ -29,10 +29,10 @@ import { useAuditCategory } from "@/lib/auditCategory";
  */
 
 // палитра борда (общая с AuditScreen / GgrTabs)
-const OR = "#2563eb";
-const ST = "#64748b";
+const OR = "#465fff";
+const ST = "#667085";
 const HA = "#e5e7eb";
-const INK = "#1e293b";
+const INK = "#101828";
 
 const mn = formatMoneyMn;
 const f = formatInt;

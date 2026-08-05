@@ -292,7 +292,7 @@ export function UsersAdmin({ me, initialUsers }: Props) {
                     <TD className="text-left font-medium text-ink">{u.full_name}</TD>
                     <TD className="text-left font-mono text-steel">{u.email}</TD>
                     <TD className="text-left">
-                      <Badge bg="#eff6ff" fg="#1d4ed8">{t(ROLE_KEY[u.role])}</Badge>
+                      <Badge bg="#ecf3ff" fg="#3641f5">{t(ROLE_KEY[u.role])}</Badge>
                     </TD>
                     <TD className="text-left text-slate">{scope}</TD>
                     <TD className="text-left">

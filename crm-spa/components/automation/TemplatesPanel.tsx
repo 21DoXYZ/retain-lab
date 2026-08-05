@@ -86,7 +86,7 @@ export function TemplatesPanel({ canWrite }: TemplatesPanelProps) {
       header: t("automation.chains.tpl.col.channel"),
       align: "left",
       render: (tpl) => (
-        <Badge bg="#eef2f6" fg="#475569">
+        <Badge bg="#eef2f6" fg="#344054">
           {t(`automation.chains.channel.${tpl.channel_kind}` as MessageKey)}
         </Badge>
       ),

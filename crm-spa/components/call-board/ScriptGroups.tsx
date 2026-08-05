@@ -161,7 +161,7 @@ export function ScriptGroups({
         <Card>
           <div className="flex items-center gap-2">
             <span className="text-[13.5px] font-medium text-slate">{t("callsboard.script.groups.ungrouped")}</span>
-            <Badge bg="#f1f5f9" fg="#475569">{data.ungrouped.length}</Badge>
+            <Badge bg="#f2f4f7" fg="#344054">{data.ungrouped.length}</Badge>
           </div>
           <p className="mt-1 text-[12.5px] text-steel">{t("callsboard.script.groups.ungroupedHint")}</p>
           {scripts.length ? (
@@ -243,14 +243,14 @@ function GroupCard({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-[14px] font-medium text-ink">{group.name}</span>
-          <Badge bg="#f1f5f9" fg="#475569">{group.members}</Badge>
+          <Badge bg="#f2f4f7" fg="#344054">{group.members}</Badge>
           {group.script_name ? (
             <Badge bg="#f5f3ff" fg="#5b21b6">{group.script_name}</Badge>
           ) : (
             <Badge bg="#f0fdf4" fg="#166534">{t("callsboard.script.groups.inheritsDefault")}</Badge>
           )}
           {group.active_version != null ? (
-            <Badge bg="#eff6ff" fg="#1e293b">
+            <Badge bg="#ecf3ff" fg="#101828">
               {t("callsboard.script.groups.activeVersion", { version: group.active_version })}
             </Badge>
           ) : (

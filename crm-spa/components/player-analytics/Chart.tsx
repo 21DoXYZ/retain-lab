@@ -30,11 +30,11 @@ const ReactECharts = dynamic(() => import("echarts-for-react"), {
 
 /** Board rhythm palette (player_board.py RHYTHM_JS) — do not introduce new colours. */
 export const RC = {
-  primary: "#2563eb",
-  steel: "#64748b",
+  primary: "#465fff",
+  steel: "#667085",
   hair: "#e5e7eb",
-  ink: "#1e293b",
-  heat: ["#eff6ff", "#bfdbfe", "#60a5fa", "#2563eb", "#1e3a8a"],
+  ink: "#101828",
+  heat: ["#ecf3ff", "#c9d4ff", "#7592ff", "#465fff", "#1e3a8a"],
 };
 
 export function EChart({

@@ -30,11 +30,11 @@ export interface TranslatedBadgeTone {
 /** lifecycle stage → colours + label key (board LIFE). */
 export const LIFECYCLE: Record<string, TranslatedBadgeTone> = {
   active: { bg: "#dcfce7", fg: "#166534", labelKey: "ui.badge.lifecycle.active" },
-  cooling: { bg: "#dbeafe", fg: "#1e40af", labelKey: "ui.badge.lifecycle.cooling" },
+  cooling: { bg: "#dde9ff", fg: "#1e40af", labelKey: "ui.badge.lifecycle.cooling" },
   at_risk: { bg: "#fef9c3", fg: "#854d0e", labelKey: "ui.badge.lifecycle.atRisk" },
-  dormant: { bg: "#f1f5f9", fg: "#475569", labelKey: "ui.badge.lifecycle.dormant" },
+  dormant: { bg: "#f2f4f7", fg: "#344054", labelKey: "ui.badge.lifecycle.dormant" },
   churned: { bg: "#fee2e2", fg: "#991b1b", labelKey: "ui.badge.lifecycle.churned" },
-  never: { bg: "#f1f5f9", fg: "#94a3b8", labelKey: "ui.badge.lifecycle.never" },
+  never: { bg: "#f2f4f7", fg: "#98a2b3", labelKey: "ui.badge.lifecycle.never" },
 };
 
 export const LIFECYCLE_FALLBACK: BadgeTone = { bg: "#ededed", fg: "#8a8a8a", label: "—" };
@@ -46,7 +46,7 @@ export const ACCOUNT_TYPE: Record<string, TranslatedBadgeTone> = {
   blocked: { bg: "#fee2e2", fg: "#991b1b", labelKey: "ui.badge.accountType.blocked" },
 };
 
-export const ACCOUNT_TYPE_FALLBACK: BadgeTone = { bg: "#f1f5f9", fg: "#64748b", label: "" };
+export const ACCOUNT_TYPE_FALLBACK: BadgeTone = { bg: "#f2f4f7", fg: "#667085", label: "" };
 
 /**
  * next-best-action code → colours (board ACT_COLORS) + подпись-ключ.
@@ -60,20 +60,20 @@ export const ACCOUNT_TYPE_FALLBACK: BadgeTone = { bg: "#f1f5f9", fg: "#64748b", 
 export const ACTION: Record<string, { bg: string; fg: string; labelKey: MessageKey }> = {
   SAVE: { bg: "#fee2e2", fg: "#991b1b", labelKey: "ui.badge.action.SAVE" },
   WINBACK: { bg: "#fef9c3", fg: "#854d0e", labelKey: "ui.badge.action.WINBACK" },
-  NUDGE: { bg: "#dbeafe", fg: "#1e40af", labelKey: "ui.badge.action.NUDGE" },
+  NUDGE: { bg: "#dde9ff", fg: "#1e40af", labelKey: "ui.badge.action.NUDGE" },
   CONVERT: { bg: "#e0e7ff", fg: "#4338ca", labelKey: "ui.badge.action.CONVERT" },
   NURTURE: { bg: "#dcfce7", fg: "#166534", labelKey: "ui.badge.action.NURTURE" },
   MONITOR: { bg: "#e0e7ff", fg: "#4338ca", labelKey: "ui.badge.action.MONITOR" },
   // сырое значение API без кода — ключ лукапа, не копия интерфейса
-  наблюдать: { bg: "#f1f5f9", fg: "#475569", labelKey: "ui.badge.action.observe" },
+  наблюдать: { bg: "#f2f4f7", fg: "#344054", labelKey: "ui.badge.action.observe" },
 };
 
 export const ACTION_FALLBACK = { bg: "#ededed", fg: "#8a8a8a" };
 
 /** LTV early tier → colours + label key (board TIER_BG / TIER_LBL). */
 export const TIER: Record<string, TranslatedBadgeTone> = {
-  A: { bg: "#f1f5f9", fg: "#475569", labelKey: "ui.badge.tier.a" },
-  B: { bg: "#dbeafe", fg: "#1e40af", labelKey: "ui.badge.tier.b" },
+  A: { bg: "#f2f4f7", fg: "#344054", labelKey: "ui.badge.tier.a" },
+  B: { bg: "#dde9ff", fg: "#1e40af", labelKey: "ui.badge.tier.b" },
   C: { bg: "#fef9c3", fg: "#854d0e", labelKey: "ui.badge.tier.c" },
   D: { bg: "#dcfce7", fg: "#166534", labelKey: "ui.badge.tier.d" },
 };
@@ -92,10 +92,10 @@ export const VIP_LABEL: Record<number, string> = {
 
 /** VIP badge tint per level (Silver+ uses the beige/cream accent). */
 export const VIP_TONE: Record<number, BadgeTone> = {
-  0: { bg: "#f1f5f9", fg: "#64748b", label: VIP_LABEL[0] },
-  1: { bg: "#f1f5f9", fg: "#475569", label: VIP_LABEL[1] },
+  0: { bg: "#f2f4f7", fg: "#667085", label: VIP_LABEL[0] },
+  1: { bg: "#f2f4f7", fg: "#344054", label: VIP_LABEL[1] },
   2: { bg: "#fef9c3", fg: "#854d0e", label: VIP_LABEL[2] },
-  3: { bg: "#dbeafe", fg: "#1e40af", label: VIP_LABEL[3] },
+  3: { bg: "#dde9ff", fg: "#1e40af", label: VIP_LABEL[3] },
   4: { bg: "#e0e7ff", fg: "#4338ca", label: VIP_LABEL[4] },
   5: { bg: "#dcfce7", fg: "#166534", label: VIP_LABEL[5] },
 };

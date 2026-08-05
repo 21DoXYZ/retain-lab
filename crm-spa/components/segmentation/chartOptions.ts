@@ -6,12 +6,12 @@ import type { CohortItem, FunnelStage, RfmSegment, LtvDecile } from "./types";
  * (player_board.py COHORTS_JS `copt()`), so the SPA charts read identically to
  * the dashboard. Palette below is the board's exact set.
  */
-const OR = "#2563eb";
-const SU = "#60a5fa";
-const INK = "#1e293b";
-const ST = "#64748b";
+const OR = "#465fff";
+const SU = "#7592ff";
+const INK = "#101828";
+const ST = "#667085";
 const HA = "#e5e7eb";
-const PAL = [OR, SU, "#93c5fd", "#1d4ed8", "#bfdbfe", INK, "#cbd5e1"];
+const PAL = [OR, SU, "#a6b8ff", "#3641f5", "#c9d4ff", INK, "#d0d5dd"];
 
 const TIP = {
   backgroundColor: "#fff",
@@ -119,8 +119,8 @@ export function cohortOption(item: CohortItem): EChartsOption | null {
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: "rgba(37,99,235,.3)" },
-                { offset: 1, color: "rgba(37,99,235,0)" },
+                { offset: 0, color: "rgba(70,95,255,.3)" },
+                { offset: 1, color: "rgba(70,95,255,0)" },
               ],
             },
           },

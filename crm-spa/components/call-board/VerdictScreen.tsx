@@ -91,7 +91,7 @@ export function VerdictScreen() {
               {data.verdict_unlocked ? (
                 <Badge bg="#dcfce7" fg="#166534">{t("callsboard.verdict.state.unlocked")}</Badge>
               ) : (
-                <Badge bg="#e5e7eb" fg="#334155">{t("callsboard.verdict.state.locked")}</Badge>
+                <Badge bg="#e5e7eb" fg="#344054">{t("callsboard.verdict.state.locked")}</Badge>
               )}
             </div>
             <dl className="space-y-1.5">

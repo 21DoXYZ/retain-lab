@@ -53,10 +53,10 @@ import {
  */
 
 const STATUS_TONE: Record<ChainStatus, { bg: string; fg: string }> = {
-  draft: { bg: "#eef2f6", fg: "#475569" },
+  draft: { bg: "#eef2f6", fg: "#344054" },
   active: { bg: "#dcfce7", fg: "#166534" },
   paused: { bg: "#fef9c3", fg: "#854d0e" },
-  archived: { bg: "#f1f5f9", fg: "#94a3b8" },
+  archived: { bg: "#f2f4f7", fg: "#98a2b3" },
 };
 
 interface ChainEditorProps {

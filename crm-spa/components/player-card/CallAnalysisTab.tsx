@@ -56,7 +56,7 @@ export function CallAnalysisTab({ role, meId, calls, names, embedded = false }: 
                     {c.duration_sec != null ? ` · ${c.duration_sec} c` : ""}
                   </div>
                   <div className="mt-0.5">
-                    <Badge bg="#eff6ff" fg="#1d4ed8" className="text-[11px]">
+                    <Badge bg="#ecf3ff" fg="#3641f5" className="text-[11px]">
                       {t(OUTCOME_LABELS[c.outcome])}
                     </Badge>
                   </div>

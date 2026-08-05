@@ -101,7 +101,7 @@ export function AutoPlan({ candidates }: { candidates: AutoPlanCandidate[] }) {
       render: (c) => (
         <div className="flex items-center gap-2">
           <span className="text-slate">{slotText(c.casino_player_id)}</span>
-          <Badge bg="#eff6ff" fg="#1d4ed8">
+          <Badge bg="#ecf3ff" fg="#3641f5">
             {t("calendar.badge.system")}
           </Badge>
         </div>

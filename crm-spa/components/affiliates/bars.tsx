@@ -80,8 +80,8 @@ export function Funnel({
   const t = useT();
   const base = registrations || 1;
   const steps: { key: string; label: string; value: number; color: string }[] = [
-    { key: "reg", label: t("monitor.bars.funnel.registrations"), value: registrations, color: "#2563eb" },
-    { key: "ftd", label: t("monitor.bars.funnel.ftd"), value: ftd, color: "#60a5fa" },
+    { key: "reg", label: t("monitor.bars.funnel.registrations"), value: registrations, color: "#465fff" },
+    { key: "ftd", label: t("monitor.bars.funnel.ftd"), value: ftd, color: "#7592ff" },
     { key: "act", label: t("monitor.bars.funnel.active"), value: active, color: "#16a34a" },
   ];
   return (

@@ -66,7 +66,7 @@ function CurveChart({ curve }: { curve: LtvCurvePoint[] }) {
         type: "line" as const,
         smooth: true,
         showSymbol: false,
-        areaStyle: { color: "rgba(37,99,235,0.08)" },
+        areaStyle: { color: "rgba(70,95,255,0.08)" },
         data: curve.map((c) => c.avg),
       },
       {

@@ -34,13 +34,13 @@ export interface EChartProps {
 
 /** Brand palette pulled from the design tokens (globals.css). */
 export const CHART_COLORS = {
-  primary: "#2563eb",
-  sun5: "#3b82f6",
+  primary: "#465fff",
+  sun5: "#465fff",
   pos: "#1f9d57",
   gold: "#854d0e",
-  steel: "#64748b",
+  steel: "#667085",
   hair: "#e5e7eb",
-  ink: "#1e293b",
+  ink: "#101828",
 };
 
 export function EChart({ option, height = 320, className }: EChartProps) {

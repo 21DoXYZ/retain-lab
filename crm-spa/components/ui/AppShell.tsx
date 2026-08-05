@@ -12,7 +12,7 @@ import { getMessages } from "@/lib/i18n/messages";
 const FALLBACK_MESSAGES = getMessages(DEFAULT_LOCALE);
 
 /**
- * AppShell — dark sidebar + white content area, 1:1 with the live dashboard.
+ * AppShell — light sidebar + content area (TailAdmin v2 preset).
  * Presentational only: `active` marks the current nav key, `role` filters
  * items via the (stub) role matrix. Real routing/guards are B1's job — this
  * component holds no state and works as a Server Component.
@@ -41,21 +41,18 @@ export function AppShell({ active, role, children, headerRight, t }: AppShellPro
       {/* Sidebar — hidden below ~lg, like the board. Own scroll + full-height dark
           bg (fix: min-h-screen let long nav overflow the dark panel onto the body). */}
       <aside className="hidden lg:flex w-[260px] flex-none flex-col overflow-y-auto bg-sb text-sb-text border-r border-sb-line px-4 py-[22px]">
-        <div
-          className="flex items-center gap-3 rounded-2xl px-3 py-[11px] mb-[22px]"
-          style={{ background: "linear-gradient(180deg,#252b41,#1a1f33)" }}
-        >
+        <div className="flex items-center gap-3 rounded-2xl px-3 py-[11px] mb-[22px] bg-sb-card border border-sb-line">
           <span
             className="grid place-items-center w-10 h-10 rounded-xl text-white font-extrabold text-base flex-none"
             style={{
-              background: "linear-gradient(135deg,#60a5fa,#3b82f6)",
-              boxShadow: "0 8px 20px rgba(59,130,246,.25)",
+              background: "linear-gradient(135deg,#7592ff,#465fff)",
+              boxShadow: "0 8px 20px rgba(70,95,255,.25)",
             }}
           >
             R
           </span>
           <div className="leading-tight">
-            <div className="text-sm font-semibold text-white">Revenue Autopilot</div>
+            <div className="text-sm font-semibold text-ink">Revenue Autopilot</div>
             <div className="text-xs text-sb-grp mt-0.5">live</div>
           </div>
         </div>
@@ -85,10 +82,9 @@ export function AppShell({ active, role, children, headerRight, t }: AppShellPro
                       className={cn(
                         "flex items-center gap-3 text-sm font-medium px-3.5 py-[11px] rounded-[14px] transition-colors",
                         on
-                          ? "bg-primary text-white"
+                          ? "bg-cream text-primary"
                           : "text-sb-text hover:bg-sb-hover hover:text-sb-text2",
                       )}
-                      style={on ? { boxShadow: "0 8px 20px rgba(37,99,235,.28)" } : undefined}
                     >
                       <span className="w-5 h-5 grid place-items-center flex-none">
                         {hasIcon(it.key) ? <Icon name={it.key} /> : <span>{it.emoji}</span>}
@@ -104,7 +100,7 @@ export function AppShell({ active, role, children, headerRight, t }: AppShellPro
       </aside>
 
       {/* Content */}
-      <main className="flex-1 min-w-0 bg-canvas overflow-auto px-[32px] pt-[26px] pb-[54px]">
+      <main className="flex-1 min-w-0 bg-appbg overflow-auto px-[32px] pt-[26px] pb-[54px]">
         {headerRight ? (
           <div className="flex justify-end mb-2">{headerRight}</div>
         ) : null}

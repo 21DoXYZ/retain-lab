@@ -26,7 +26,7 @@ interface ScheduleBlockProps {
 }
 
 const SCHED_TONE: Record<SchedStatus, { bg: string; fg: string; labelKey: MessageKey }> = {
-  planned: { bg: "#eff6ff", fg: "#1d4ed8", labelKey: "card.schedule.status.planned" },
+  planned: { bg: "#ecf3ff", fg: "#3641f5", labelKey: "card.schedule.status.planned" },
   done: { bg: "#ecfdf5", fg: "#047857", labelKey: "card.schedule.status.done" },
   overdue: { bg: "#fef2f2", fg: "#b91c1c", labelKey: "card.schedule.status.overdue" },
   missed: { bg: "#fffbeb", fg: "#b45309", labelKey: "card.schedule.status.missed" },

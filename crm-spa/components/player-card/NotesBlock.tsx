@@ -247,7 +247,7 @@ export function NotesBlock({
                             const tone = TAG_TONE[tag as NoteTag];
                             const labelKey = TAG_LABELS[tag as NoteTag];
                             return (
-                              <Badge key={tag} bg={tone?.bg ?? "#eff6ff"} fg={tone?.fg ?? "#1d4ed8"}>
+                              <Badge key={tag} bg={tone?.bg ?? "#ecf3ff"} fg={tone?.fg ?? "#3641f5"}>
                                 {labelKey ? t(labelKey) : tag}
                               </Badge>
                             );

@@ -51,12 +51,12 @@ export function lifecycleSignal(lifecycle: string | null | undefined): {
     case "churned":
       return { key: "affiliate.signal.churned", bg: "#fef2f2", fg: "#b91c1c" };
     case "dormant":
-      return { key: "affiliate.signal.dormant", bg: "#f1f5f9", fg: "#64748b" };
+      return { key: "affiliate.signal.dormant", bg: "#f2f4f7", fg: "#667085" };
     case "active":
       return { key: "affiliate.signal.active", bg: "#ecfdf5", fg: "#1f9d57" };
     case "never":
-      return { key: "affiliate.signal.new", bg: "#eff6ff", fg: "#1d4ed8" };
+      return { key: "affiliate.signal.new", bg: "#ecf3ff", fg: "#3641f5" };
     default:
-      return { key: "affiliate.signal.unknown", bg: "#f1f5f9", fg: "#64748b" };
+      return { key: "affiliate.signal.unknown", bg: "#f2f4f7", fg: "#667085" };
   }
 }

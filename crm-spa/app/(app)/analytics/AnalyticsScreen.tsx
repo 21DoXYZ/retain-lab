@@ -15,11 +15,11 @@ import { useT } from "@/lib/i18n";
  */
 
 // board palette (ANALYTICS_JS)
-const OR = "#2563eb";
-const YE = "#93c5fd";
-const SU = "#60a5fa";
-const INK = "#1e293b";
-const ST = "#64748b";
+const OR = "#465fff";
+const YE = "#a6b8ff";
+const SU = "#7592ff";
+const INK = "#101828";
+const ST = "#667085";
 const HA = "#e5e7eb";
 const tip = { backgroundColor: "#fff", borderColor: HA, textStyle: { color: INK } };
 const ax = (e: Record<string, unknown> = {}) => ({
@@ -70,8 +70,8 @@ export function AnalyticsScreen() {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: "rgba(37,99,235,.22)" },
-              { offset: 1, color: "rgba(37,99,235,0)" },
+              { offset: 0, color: "rgba(70,95,255,.22)" },
+              { offset: 1, color: "rgba(70,95,255,0)" },
             ],
           },
         },

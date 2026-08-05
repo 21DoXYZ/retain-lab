@@ -424,7 +424,7 @@ function PoolRowView({
       <TD className="text-left text-slate">{row.directory.country ?? "—"}</TD>
       <TD className="text-left text-slate">
         {row.directory.affiliate_code ? (
-          <Badge bg="#eff6ff" fg="#1d4ed8">
+          <Badge bg="#ecf3ff" fg="#3641f5">
             {row.directory.affiliate_code}
           </Badge>
         ) : (

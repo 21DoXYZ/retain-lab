@@ -178,7 +178,7 @@ export function ScorePanel({
                 // фолбэк — сам код (НЕ весь объект, иначе React падает).
                 const k = objectionLabelKey(o.type);
                 return (
-                  <Badge key={i} bg="#eff6ff" fg="#1d4ed8" className="text-[11px]">
+                  <Badge key={i} bg="#ecf3ff" fg="#3641f5" className="text-[11px]">
                     {k ? t(k) : o.type}
                   </Badge>
                 );

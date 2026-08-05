@@ -81,7 +81,7 @@ export function NodeCard({
           <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-cream text-ink text-[12px] font-semibold flex-none">
             {index + 1}
           </span>
-          <Badge bg="#eef2f6" fg="#475569">
+          <Badge bg="#eef2f6" fg="#344054">
             {t(`automation.chains.node.kind.${node.kind}` as MessageKey)}
           </Badge>
           <span className="text-[12px] text-stone font-mono truncate">{node.id}</span>

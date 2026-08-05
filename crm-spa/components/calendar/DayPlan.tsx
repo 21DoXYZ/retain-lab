@@ -96,7 +96,7 @@ function PlanTable({ rows, state = "data", emptyTitle, emptyDescription }: PlanT
             </Badge>
           ) : null}
           {r.by_system ? (
-            <Badge bg="#eff6ff" fg="#1d4ed8">
+            <Badge bg="#ecf3ff" fg="#3641f5">
               {t("calendar.badge.system")}
             </Badge>
           ) : null}

@@ -153,7 +153,7 @@ export const TAG_LABELS: Record<NoteTag, MessageKey> = {
 /** Colour hints for tag chips (board palette; blue-scale accents). */
 export const TAG_TONE: Record<NoteTag, { bg: string; fg: string }> = {
   offer_declined: { bg: "#fef2f2", fg: "#b91c1c" },
-  other_offer: { bg: "#eff6ff", fg: "#1d4ed8" },
+  other_offer: { bg: "#ecf3ff", fg: "#3641f5" },
   callback: { bg: "#fffbeb", fg: "#b45309" },
   negative: { bg: "#fef2f2", fg: "#dc2626" },
   returned: { bg: "#ecfdf5", fg: "#047857" },

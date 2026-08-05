@@ -75,7 +75,7 @@ export function DeltaBadge({ delta }: { delta: Delta | null | undefined }) {
 /* ---------------------------------------------------------------------------
  * MoneySpark — board `spark()` SVG polyline (150×36 viewBox), for SCard footers.
  * ------------------------------------------------------------------------- */
-export function MoneySpark({ values, color = "#2563eb" }: { values: number[]; color?: string }) {
+export function MoneySpark({ values, color = "#465fff" }: { values: number[]; color?: string }) {
   const nums = values.map((v) => Number(v) || 0);
   if (nums.length < 2) return null;
   const lo = Math.min(...nums);

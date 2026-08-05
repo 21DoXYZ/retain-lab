@@ -212,7 +212,7 @@ export function ActionsScreen() {
           <Card className="mt-3" padded>
             <div className="text-[13px] text-steel leading-relaxed">
               📖 <b>{t("marketing.actions.footnote.bold")}</b> {t("marketing.actions.footnote.mid")}{" "}
-              <Badge bg="#f1f5f9" fg="#475569">🚨NN</Badge> {t("marketing.actions.footnote.post")}
+              <Badge bg="#f2f4f7" fg="#344054">🚨NN</Badge> {t("marketing.actions.footnote.post")}
             </div>
           </Card>
 

@@ -42,8 +42,8 @@ export interface AssignTone {
 
 /** Touch status → badge tone + i18n key (не тронут / дозвонились / недозвон / …). */
 export const ASSIGN_STATUS: Record<AssignStatus, AssignTone> = {
-  not_touched: { bg: "#f1f5f9", fg: "#64748b", labelKey: "players.queue.status.not_touched" },
-  answered: { bg: "#dbeafe", fg: "#1e40af", labelKey: "players.queue.status.answered" },
+  not_touched: { bg: "#f2f4f7", fg: "#667085", labelKey: "players.queue.status.not_touched" },
+  answered: { bg: "#dde9ff", fg: "#1e40af", labelKey: "players.queue.status.answered" },
   no_answer: { bg: "#fef9c3", fg: "#854d0e", labelKey: "players.queue.status.no_answer" },
   agreed: { bg: "#dcfce7", fg: "#166534", labelKey: "players.queue.status.agreed" },
   refused: { bg: "#fee2e2", fg: "#991b1b", labelKey: "players.queue.status.refused" },
@@ -52,8 +52,8 @@ export const ASSIGN_STATUS: Record<AssignStatus, AssignTone> = {
 
 /** bg/fg for an unrecognised status; no label text (dash — not translatable copy). */
 export const ASSIGN_STATUS_FALLBACK: { bg: string; fg: string } = {
-  bg: "#f1f5f9",
-  fg: "#64748b",
+  bg: "#f2f4f7",
+  fg: "#667085",
 };
 
 /** Call outcome → i18n key (players.precall.outcome.*) — «сегодня звонил X — недозвон». */

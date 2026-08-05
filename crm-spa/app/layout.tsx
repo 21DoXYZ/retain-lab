@@ -1,18 +1,14 @@
 import type { Metadata } from "next";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 import { resolveLocale } from "@/lib/i18n/server";
 
-// System-font stack only (no web fonts) — matches the live dashboard.
-//
-// The <meta name="description"> below is SEO/tab-preview content, not UI a
-// signed-in operator reads — it is intentionally left as static Russian
-// rather than wired to lib/i18n (that would mean inventing a new dictionary
-// namespace outside this pass's login.*/affiliate.* scope for a string
-// nobody-facing sees). <html lang> DOES matter for accessibility/SEO across
-// locales, so that one is resolved from the locale cookie below.
+// Outfit — шрифт пресета TailAdmin; переменную читает --font-sans в globals.css.
+const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
+
 export const metadata: Metadata = {
   title: "Revenue Autopilot",
-  description: "CRM · колл-центр · аналитика",
+  description: "Revenue automation for SaaS",
 };
 
 export default async function RootLayout({
@@ -22,7 +18,7 @@ export default async function RootLayout({
 }>) {
   const locale = await resolveLocale();
   return (
-    <html lang={locale} className="h-full antialiased">
+    <html lang={locale} className={`h-full antialiased ${outfit.variable}`}>
       <body className="min-h-full flex flex-col font-sans">{children}</body>
     </html>
   );

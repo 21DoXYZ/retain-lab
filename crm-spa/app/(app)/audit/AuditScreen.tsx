@@ -31,10 +31,10 @@ import { useAuditCategory } from "@/lib/auditCategory";
  * Данные из /api/v1/audit. Роли: director/finance/risk_officer/head_retention/super_admin.
  */
 
-const OR = "#2563eb";
-const ST = "#64748b";
+const OR = "#465fff";
+const ST = "#667085";
 const HA = "#e5e7eb";
-const INK = "#1e293b";
+const INK = "#101828";
 
 function ChartSkeleton({ height }: { height: number }) {
   return <div className="animate-pulse rounded-md bg-hair2/60" style={{ height }} />;

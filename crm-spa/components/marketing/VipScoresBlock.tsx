@@ -139,7 +139,7 @@ export function VipScoresBlock() {
                             {formatPct((p.score ?? 0) * 100)}
                           </td>
                           <td className="px-3 py-2 border-b border-hair text-right">
-                            <Badge bg="#f1f5f9" fg="#475569">{p.lifecycle}</Badge>
+                            <Badge bg="#f2f4f7" fg="#344054">{p.lifecycle}</Badge>
                           </td>
                           <td className="px-3 py-2 border-b border-hair font-mono text-right">{p.vip_level}</td>
                           <td className="px-3 py-2 border-b border-hair font-mono text-right">

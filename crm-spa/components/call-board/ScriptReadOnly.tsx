@@ -64,6 +64,6 @@ function BlockView({ index, block }: { index: number; block: ScriptBlock }) {
 function MarkBadge({ level }: { level: CheckLevel }) {
   const t = useT();
   if (level === "verbatim") return <Badge bg="#fef3c7" fg="#92400e">{t("callsboard.script.mark.zorunlu")}</Badge>;
-  if (level === "none") return <Badge bg="#e5e7eb" fg="#475569">{t("callsboard.script.mark.serbest")}</Badge>;
-  return <Badge bg="#eff6ff" fg="#1e40af">{t("callsboard.script.mark.adim")}</Badge>;
+  if (level === "none") return <Badge bg="#e5e7eb" fg="#344054">{t("callsboard.script.mark.serbest")}</Badge>;
+  return <Badge bg="#ecf3ff" fg="#1e40af">{t("callsboard.script.mark.adim")}</Badge>;
 }

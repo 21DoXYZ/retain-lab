@@ -52,7 +52,7 @@ interface VipRiskData {
 }
 
 const TIER_COLORS: Record<string, { bg: string; fg: string }> = {
-  Silver: { bg: "#f1f5f9", fg: "#475569" },
+  Silver: { bg: "#f2f4f7", fg: "#344054" },
   Gold: { bg: "#fef9c3", fg: "#854d0e" },
   Platinum: { bg: "#e0e7ff", fg: "#3730a3" },
   Diamond: { bg: "#cffafe", fg: "#155e75" },
@@ -77,7 +77,7 @@ export function VipRiskScreen() {
       header: t("monitor.vipRisk.col.tier"),
       align: "left",
       render: (r) => {
-        const c = TIER_COLORS[r.tier] ?? { bg: "#f1f5f9", fg: "#475569" };
+        const c = TIER_COLORS[r.tier] ?? { bg: "#f2f4f7", fg: "#344054" };
         return <Badge bg={c.bg} fg={c.fg}>{r.tier}</Badge>;
       },
     },

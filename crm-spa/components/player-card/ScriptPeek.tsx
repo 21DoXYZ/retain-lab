@@ -27,8 +27,8 @@ interface PeekData {
 function LevelBadge({ level }: { level: PeekBlock["check_level"] }) {
   const t = useT();
   if (level === "verbatim") return <Badge bg="#fef3c7" fg="#92400e">{t("callsboard.script.mark.zorunlu")}</Badge>;
-  if (level === "none") return <Badge bg="#f1f5f9" fg="#475569">{t("callsboard.script.mark.serbest")}</Badge>;
-  return <Badge bg="#dbeafe" fg="#1e40af">{t("callsboard.script.mark.adim")}</Badge>;
+  if (level === "none") return <Badge bg="#f2f4f7" fg="#344054">{t("callsboard.script.mark.serbest")}</Badge>;
+  return <Badge bg="#dde9ff" fg="#1e40af">{t("callsboard.script.mark.adim")}</Badge>;
 }
 
 export function ScriptPeek() {

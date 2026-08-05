@@ -41,10 +41,10 @@ const mn = formatMoneyMn;
 const f = formatInt;
 
 // board palette (shared with AuditScreen)
-const OR = "#2563eb";
-const ST = "#64748b";
+const OR = "#465fff";
+const ST = "#667085";
 const HA = "#e5e7eb";
-const INK = "#1e293b";
+const INK = "#101828";
 
 /** GGR value cell — green when ≥0, red when <0 (board `.num.pos/.neg`). */
 function Ggr({ v }: { v: number }): ReactNode {
@@ -87,8 +87,8 @@ export function GgrDashboard({ tab }: { tab: GgrDashboardTab }) {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: "rgba(37,99,235,.25)" },
-              { offset: 1, color: "rgba(37,99,235,0)" },
+              { offset: 0, color: "rgba(70,95,255,.25)" },
+              { offset: 1, color: "rgba(70,95,255,0)" },
             ],
           },
         },

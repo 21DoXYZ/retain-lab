@@ -186,7 +186,7 @@ export function ScriptEditor({
         right={
           <div className="flex flex-wrap items-center gap-2">
             <Badge bg={isDefault ? "#f0fdf4" : "#f5f3ff"} fg={isDefault ? "#166534" : "#5b21b6"}>{scopeBadge}</Badge>
-            <Badge bg="#eff6ff" fg="#1e293b">{badge}</Badge>
+            <Badge bg="#ecf3ff" fg="#101828">{badge}</Badge>
             <Button size="sm" variant="ghost" onClick={() => setPasting(true)}>{t("callsboard.script.pasteButton")}</Button>
             <Button size="sm" variant="ghost" loading={busy} disabled={!blocks.length} onClick={runDryRun}>{t("callsboard.script.dryRun")}</Button>
             <Button size="sm" variant="ghost" loading={busy} disabled={!blocks.length} onClick={saveDraft}>{t("callsboard.script.saveDraft")}</Button>

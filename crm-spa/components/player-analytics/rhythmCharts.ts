@@ -83,8 +83,8 @@ export function hourOption(hour: number[]): EChartsOption {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: "rgba(37,99,235,.25)" },
-              { offset: 1, color: "rgba(37,99,235,0)" },
+              { offset: 0, color: "rgba(70,95,255,.25)" },
+              { offset: 1, color: "rgba(70,95,255,0)" },
             ],
           },
         },

@@ -43,7 +43,7 @@ export function BonusesScreen() {
       align: "left",
       render: (r) => (
         <span className="whitespace-nowrap">
-          <Badge bg="#f1f5f9" fg="#475569">{r.kind_label}</Badge>
+          <Badge bg="#f2f4f7" fg="#344054">{r.kind_label}</Badge>
           <span className="text-steel ml-1.5 text-[12px]">{r.area}</span>
         </span>
       ),

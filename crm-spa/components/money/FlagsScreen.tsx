@@ -77,15 +77,15 @@ const KIND_META: Record<FlagKind, KindMeta> = {
     emoji: "🔴",
     labelKey: "risk.flags.kind.affiliate_players_win.label",
     subKey: "risk.flags.kind.affiliate_players_win.sub",
-    bg: "#dbeafe",
+    bg: "#dde9ff",
     fg: "#1e40af",
   },
   affiliate_cash_drain: {
     emoji: "📉",
     labelKey: "risk.flags.kind.affiliate_cash_drain.label",
     subKey: "risk.flags.kind.affiliate_cash_drain.sub",
-    bg: "#f1f5f9",
-    fg: "#475569",
+    bg: "#f2f4f7",
+    fg: "#344054",
   },
   bonus_abuse: {
     emoji: "🎁",

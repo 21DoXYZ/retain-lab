@@ -33,7 +33,7 @@ const ROADMAP: { key: string; labelKey: MessageKey; status: RoadmapStatus }[] = 
 
 const ROADMAP_STATUS: Record<RoadmapStatus, { bg: string; fg: string; labelKey: MessageKey }> = {
   done: { bg: "#e7f6ee", fg: "#1f9d57", labelKey: "monitor.schema.roadmap.status.done" },
-  soon: { bg: "#eef2f6", fg: "#475569", labelKey: "monitor.schema.roadmap.status.soon" },
+  soon: { bg: "#eef2f6", fg: "#344054", labelKey: "monitor.schema.roadmap.status.soon" },
   waitingCasino: { bg: "#fef9c3", fg: "#854d0e", labelKey: "monitor.schema.roadmap.status.waitingCasino" },
 };
 

@@ -100,7 +100,7 @@ export function SavedReportsList({ onOpen, reloadKey }: SavedReportsListProps) {
       header: t("reports.saved.col.visibility"),
       align: "left",
       render: (r) => (
-        <Badge bg="#eef2f6" fg="#475569">
+        <Badge bg="#eef2f6" fg="#344054">
           {t(VIS_KEY[r.visibility] ?? "reports.saved.vis.personal")}
         </Badge>
       ),

@@ -55,7 +55,7 @@ function PlanCell({ row }: { row: QueueRow }) {
   }
   if (s.today) {
     return (
-      <Badge bg="#dbeafe" fg="#1e40af" title={s.comment ?? undefined}>
+      <Badge bg="#dde9ff" fg="#1e40af" title={s.comment ?? undefined}>
         {t("players.queue.plan.today", { when })}
       </Badge>
     );

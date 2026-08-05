@@ -143,8 +143,8 @@ function weeklyOption(weekly: SummaryData["weekly"], t: TFn) {
     xAxis: { type: "category", data: weekly.map((w) => w.week.slice(5)) },
     yAxis: { type: "value" },
     series: [
-      { name: t("callsboard.summary.weekly.attempts"), type: "bar", data: weekly.map((w) => w.attempts), itemStyle: { color: "#cbd5e1" } },
-      { name: t("callsboard.summary.weekly.connected"), type: "bar", data: weekly.map((w) => w.connected), itemStyle: { color: "#2563eb" } },
+      { name: t("callsboard.summary.weekly.attempts"), type: "bar", data: weekly.map((w) => w.attempts), itemStyle: { color: "#d0d5dd" } },
+      { name: t("callsboard.summary.weekly.connected"), type: "bar", data: weekly.map((w) => w.connected), itemStyle: { color: "#465fff" } },
       { name: t("callsboard.summary.weekly.talks"), type: "bar", data: weekly.map((w) => w.talks), itemStyle: { color: "#16a34a" } },
     ],
   };

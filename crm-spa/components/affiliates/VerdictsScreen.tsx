@@ -66,15 +66,15 @@ interface VerdictsResponse {
 /** Filled pill tones — kept inside the board palette (green pos / red neg / steel / muted). */
 const VERDICT_STYLE: Record<Verdict, { bg: string; fg: string }> = {
   scale: { bg: "#e7f6ee", fg: "#1f9d57" },
-  watch: { bg: "#eef2f6", fg: "#475569" },
+  watch: { bg: "#eef2f6", fg: "#344054" },
   disable: { bg: "#fdeaea", fg: "#dc2626" },
-  maturing: { bg: "#f1f5f9", fg: "#94a3b8" },
+  maturing: { bg: "#f2f4f7", fg: "#98a2b3" },
 };
 
 const CONF_STYLE: Record<Confidence, { bg: string; fg: string }> = {
   high: { bg: "#e7f6ee", fg: "#1f9d57" },
-  mid: { bg: "#eef2f6", fg: "#475569" },
-  low: { bg: "#f1f5f9", fg: "#94a3b8" },
+  mid: { bg: "#eef2f6", fg: "#344054" },
+  low: { bg: "#f2f4f7", fg: "#98a2b3" },
 };
 
 const DAY_OPTIONS = [7, 14, 30, 90] as const;

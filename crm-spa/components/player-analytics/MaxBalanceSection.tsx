@@ -443,7 +443,7 @@ function EventsJournal({ events }: { events: BalanceEvent[] }) {
       <Panel className="max-h-[300px] overflow-y-auto">
         <ul className="divide-y divide-hair">
           {events.map((e, i) => {
-            const st = EV_STYLE[e.kind] ?? { bg: "#f1f5f9", fg: "#475569" };
+            const st = EV_STYLE[e.kind] ?? { bg: "#f2f4f7", fg: "#344054" };
             const neg = e.kind === "withdrawal";
             return (
               <li key={i} className="py-1.5 flex items-center gap-3 text-[13px]">

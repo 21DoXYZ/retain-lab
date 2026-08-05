@@ -56,8 +56,8 @@ function LoginForm() {
           <span
             className="grid place-items-center w-11 h-11 rounded-xl text-white font-extrabold text-lg flex-none"
             style={{
-              background: "linear-gradient(135deg,#60a5fa,#3b82f6)",
-              boxShadow: "0 8px 20px rgba(59,130,246,.25)",
+              background: "linear-gradient(135deg,#7592ff,#465fff)",
+              boxShadow: "0 8px 20px rgba(70,95,255,.25)",
             }}
           >
             R

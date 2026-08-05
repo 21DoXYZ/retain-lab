@@ -193,11 +193,11 @@ export function SegmentsList() {
       align: "left",
       render: (s) =>
         s.is_trigger ? (
-          <Badge bg="#dbeafe" fg="#1e40af">
+          <Badge bg="#dde9ff" fg="#1e40af">
             {t("automation.list.badge.trigger")}
           </Badge>
         ) : (
-          <Badge bg="#eef2f6" fg="#475569">
+          <Badge bg="#eef2f6" fg="#344054">
             {t("automation.list.badge.scheduled")}
           </Badge>
         ),
@@ -208,7 +208,7 @@ export function SegmentsList() {
       align: "left",
       render: (s) =>
         s.archived_at ? (
-          <Badge bg="#f1f5f9" fg="#94a3b8">
+          <Badge bg="#f2f4f7" fg="#98a2b3">
             {t("automation.list.badge.archived")}
           </Badge>
         ) : (
@@ -289,7 +289,7 @@ export function SegmentsList() {
                     <div className="flex items-center gap-2">
                       <span className="text-base">{p.icon}</span>
                       <span className="font-semibold text-ink text-[14px]">{p.name}</span>
-                      <Badge bg="#eef2f6" fg="#475569">
+                      <Badge bg="#eef2f6" fg="#344054">
                         {t(`automation.presets.kind.${p.kind}` as MessageKey)}
                       </Badge>
                     </div>

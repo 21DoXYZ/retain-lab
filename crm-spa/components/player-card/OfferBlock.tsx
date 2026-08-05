@@ -45,7 +45,7 @@ const STATUS_KEY: Record<OfferStatusCode, MessageKey> = {
 /** Цвета бейджа — из player_board.OFFER_STATUS (bg, fg), чтобы совпадало с бордом. */
 const STATUS_TONE: Record<OfferStatusCode, { bg: string; fg: string }> = {
   approved: { bg: "#dcfce7", fg: "#166534" },
-  edited: { bg: "#dbeafe", fg: "#1e40af" },
+  edited: { bg: "#dde9ff", fg: "#1e40af" },
   rejected: { bg: "#fee2e2", fg: "#991b1b" },
   sent: { bg: "#fef9c3", fg: "#854d0e" },
 };

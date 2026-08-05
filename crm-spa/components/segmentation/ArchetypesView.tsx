@@ -14,7 +14,7 @@ import type { ArchetypesResponse, Archetype } from "./types";
  */
 
 const ARCHETYPE_GRID = "grid gap-3.5 [grid-template-columns:repeat(auto-fill,minmax(380px,1fr))]";
-const BAR_GRADIENT = "linear-gradient(90deg,#2563eb,#60a5fa)";
+const BAR_GRADIENT = "linear-gradient(90deg,#465fff,#7592ff)";
 
 interface StatProps {
   label: string;
