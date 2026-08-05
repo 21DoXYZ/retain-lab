@@ -467,6 +467,30 @@ CREATE TABLE IF NOT EXISTS retention.campaign_send_log
 ENGINE = MergeTree
 ORDER BY (tenant_id, campaign_id, identity_id, ts);
 
+-- In-app канал (виджет сниппета): очередь баннеров для показа в продукте
+-- тенанта. Пишет campaign_tick (action=inapp), читает /public/saas/inbox.
+-- Баннер живёт, пока юзер в стадии entry_stage (оплатил -> стадия сменилась ->
+-- не сервится), не истёк expires_at и не был закрыт/кликнут (события
+-- inapp_dismissed/inapp_clicked в saas_events).
+CREATE TABLE IF NOT EXISTS retention.inapp_inbox
+(
+    `tenant_id`      LowCardinality(String),
+    `message_id`     String,                    -- campaign:step:identity
+    `client_user_id` String,
+    `identity_id`    String,
+    `campaign_id`    LowCardinality(String),
+    `step_idx`       Int32,
+    `title`          String,
+    `body`           String,
+    `cta_label`      String,
+    `cta_url`        String,
+    `entry_stage`    LowCardinality(String),
+    `expires_at`     DateTime,
+    `created_at`     DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (tenant_id, message_id);
+
 -- ============================================================================
 -- Phase 6 — Замер: недельный uplift-отчёт по кампаниям (target vs holdout).
 -- ============================================================================

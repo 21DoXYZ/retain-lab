@@ -19,6 +19,11 @@ ra.187-77-157-6.sslip.io {
 		reverse_proxy 127.0.0.1:8050
 	}
 
+	# Публичные ручки сниппета (in-app inbox): Bearer = ingest-токен тенанта.
+	handle /public/* {
+		reverse_proxy 127.0.0.1:8050
+	}
+
 	# Ingest: сниппеты тенантов постят события сюда.
 	handle /ingest/* {
 		reverse_proxy 127.0.0.1:8081

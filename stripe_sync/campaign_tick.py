@@ -29,7 +29,7 @@ from pathlib import Path
 from executors import ExecConfig
 from hygiene import holdout_split
 from issue import issue_offer
-from saas_senders import (EmailConfig, MessagingConfig, route_message,
+from saas_senders import (EmailConfig, MessagingConfig, render, route_message,
                           send_email, tenant_configs)
 
 CAMPAIGNS_PATH = Path(__file__).parent / "saas_campaigns.json"
@@ -72,6 +72,24 @@ def exit_status(current_stage: str, entry_stage: str, step_idx: int,
     if step_idx >= n_steps:
         return "done"
     return None
+
+
+INAPP_COLUMNS = ["tenant_id", "message_id", "client_user_id", "identity_id",
+                 "campaign_id", "step_idx", "title", "body", "cta_label",
+                 "cta_url", "entry_stage", "expires_at", "created_at"]
+
+
+def inapp_row(tenant: str, camp: dict, step: dict, step_idx: int, identity: str,
+              cuid: str, now: datetime, ctx: dict) -> list:
+    """Строка inapp_inbox для показа виджетом. message_id детерминированный -
+    повторный тик по тому же шагу схлопнется Replacing'ом, не задвоив баннер."""
+    ttl = timedelta(days=float(step.get("ttl_days", 7)))
+    return [tenant, f"{camp['campaign_id']}:{step_idx}:{identity}", cuid, identity,
+            camp["campaign_id"], step_idx,
+            render(step.get("subject", ""), ctx), render(step["body"], ctx),
+            render(step.get("cta_label", "Open"), ctx),
+            render(step.get("cta_url", "{{app_url}}"), ctx),
+            camp["entry_stage"], now + ttl, now]
 
 
 def effective_configs(conf: dict, email_cfg: "EmailConfig",
@@ -199,6 +217,26 @@ def tick(client, tenant: str) -> dict[str, int]:
                             _log_send(client, tenant, cid, identity, i, channel,
                                       step.get("subject", ""), detail if ok else "rejected",
                                       "" if ok else detail)
+                    elif step["action"] == "inapp":
+                        # Баннер в продукте тенанта - касание, поэтому уважает
+                        # dry-run (autopilot=false -> в очередь не пишем).
+                        if not cuid:
+                            _log_send(client, tenant, cid, identity, i, "inapp",
+                                      step.get("subject", ""), "rejected",
+                                      "no_client_user_id")
+                        elif email_cfg.dry_run:
+                            _log_send(client, tenant, cid, identity, i, "inapp",
+                                      step.get("subject", ""), "dry_run", "")
+                        else:
+                            ctx = {"app_url": email_cfg.app_url,
+                                   "card_update_url": email_cfg.card_update_url}
+                            client.insert(
+                                "retention.inapp_inbox",
+                                [inapp_row(tenant, camp, step, i, identity,
+                                           cuid, now, ctx)],
+                                column_names=INAPP_COLUMNS)
+                            _log_send(client, tenant, cid, identity, i, "inapp",
+                                      step.get("subject", ""), "queued", "")
                     elif step["action"] == "offer":
                         status, reason = issue_offer(
                             client, tenant, identity, step["offer_id"],

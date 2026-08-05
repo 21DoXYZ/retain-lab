@@ -46,7 +46,9 @@ def _require_auth():
     # вебхука Tegsoft. Пропускать сюда нельзя технически: basic-auth и Bearer
     # используют один заголовок Authorization, и токен SPA затирал бы креды —
     # любой запрос SPA получал бы 401 basic-auth, не доходя до проверки JWT.
-    if request.path.startswith('/api/'):
+    # /public/* — ручки сниппета на сайтах тенантов: Bearer = ingest-токен
+    # (api/public.py, fail-closed), та же коллизия заголовка Authorization.
+    if request.path.startswith('/api/') or request.path.startswith('/public/'):
         return
     if not BOARD_USER:
         if REQUIRE_AUTH:

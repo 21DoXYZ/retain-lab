@@ -65,6 +65,15 @@
         "steps": [
           {
             "delay_h": 0,
+            "action": "inapp",
+            "subject": "Payment issue - action needed",
+            "body": "Your last payment did not go through. Update your card - it takes 30 seconds, your work is safe.",
+            "cta_label": "Update card",
+            "cta_url": "{{card_update_url}}",
+            "ttl_days": 7
+          },
+          {
+            "delay_h": 0,
             "action": "email",
             "subject": "Payment issue - your account is safe",
             "body": "Your last payment did not go through (this is usually a card issue, not you). Update your card in 30 seconds: {{card_update_url}}. Your videos and tokens are safe."

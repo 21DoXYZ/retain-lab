@@ -62,3 +62,35 @@ def test_tenant_identity_overrides_env(tmp_path, monkeypatch):
 
     e2, m2 = tenant_configs("unknown", EmailConfig(email_from="p@x"), MessagingConfig())
     assert e2.email_from == "p@x"
+
+
+def test_inapp_row_renders_and_expires():
+    from datetime import timedelta
+    from stripe_sync.campaign_tick import INAPP_COLUMNS, inapp_row
+
+    camp = {"campaign_id": "K3_payment_recovery", "entry_stage": "DUNNING"}
+    step = {"action": "inapp", "subject": "Payment issue",
+            "body": "Update your card: {{card_update_url}}",
+            "cta_label": "Update card", "cta_url": "{{card_update_url}}",
+            "ttl_days": 7}
+    row = inapp_row("hub", camp, step, 0, "id-1", "u_1", T0,
+                    {"card_update_url": "https://b.example/p"})
+    assert len(row) == len(INAPP_COLUMNS)
+    d = dict(zip(INAPP_COLUMNS, row))
+    assert d["message_id"] == "K3_payment_recovery:0:id-1"
+    assert d["client_user_id"] == "u_1"
+    assert d["body"] == "Update your card: https://b.example/p"
+    assert d["cta_url"] == "https://b.example/p"
+    assert d["entry_stage"] == "DUNNING"
+    assert d["expires_at"] == T0 + timedelta(days=7)
+
+
+def test_inapp_row_defaults():
+    from stripe_sync.campaign_tick import INAPP_COLUMNS, inapp_row
+
+    camp = {"campaign_id": "K2", "entry_stage": "CONVERT"}
+    d = dict(zip(INAPP_COLUMNS,
+                 inapp_row("hub", camp, {"action": "inapp", "body": "hi"},
+                           2, "id-9", "u_9", T0, {"app_url": "https://a.pp"})))
+    assert d["cta_label"] == "Open" and d["cta_url"] == "https://a.pp"
+    assert d["title"] == ""
