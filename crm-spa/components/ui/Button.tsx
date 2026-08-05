@@ -47,7 +47,7 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-ctl font-medium transition-colors",
+        "inline-flex items-center justify-center gap-2 rounded-ctl font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[.98]",
         "disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer",
         VARIANT[variant],
         SIZE[size],

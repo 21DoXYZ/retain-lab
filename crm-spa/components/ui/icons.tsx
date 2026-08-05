@@ -6,6 +6,45 @@ import type { ReactNode } from "react";
  * icon fall back to their emoji in the nav data (as the board does).
  */
 const PATHS: Record<string, ReactNode> = {
+  // SaaS-пресет: иконки новых экранов (feather-стиль, как остальные)
+  users: (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </>
+  ),
+  offers: (
+    <>
+      <polyline points="20 12 20 22 4 22 4 12" />
+      <rect x="2" y="7" width="20" height="5" rx="1" />
+      <line x1="12" y1="22" x2="12" y2="7" />
+      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+      <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+    </>
+  ),
+  "leak-audit": (
+    <>
+      <path d="M12 2.7l5.66 5.66a8 8 0 1 1-11.31 0z" />
+      <path d="M9 13a3 3 0 0 0 3 3" />
+    </>
+  ),
+  uplift: (
+    <>
+      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+      <polyline points="17 6 23 6 23 12" />
+    </>
+  ),
+  "channel-settings": (
+    <>
+      <circle cx="12" cy="12" r="2" />
+      <path d="M16.24 7.76a6 6 0 0 1 0 8.49" />
+      <path d="M7.76 16.25a6 6 0 0 1 0-8.49" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+      <path d="M4.93 19.07a10 10 0 0 1 0-14.14" />
+    </>
+  ),
   overview: (
     <>
       <rect x="3" y="3" width="7" height="9" rx="1" />

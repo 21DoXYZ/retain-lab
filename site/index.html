@@ -20,9 +20,13 @@
   body{background:var(--off);color:var(--black);
        font-family:'Golos Text',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
   ::selection{background:var(--red);color:var(--white)}
+  input,textarea{caret-color:var(--red)}
+  ::-webkit-scrollbar{width:10px}
+  ::-webkit-scrollbar-thumb{background:#c9c9cb;border-radius:100px}
+  ::-webkit-scrollbar-thumb:hover{background:#b3b3b6}
   .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
   .wrap{max-width:1240px;margin-inline:auto;padding-inline:28px}
-  .display{font-weight:500;letter-spacing:-.045em;line-height:.96;text-wrap:balance}
+  .display{font-weight:500;letter-spacing:-.035em;line-height:.96;text-wrap:balance}
   @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
   .rise{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
   .rise-2{animation-delay:.07s}.rise-3{animation-delay:.14s}.rise-4{animation-delay:.21s}
@@ -87,11 +91,10 @@
   <svg class="ast" viewBox="-60 -60 120 120" style="width:min(58vw,780px);right:-14%;top:-18%;opacity:.92"><use href="#ast" fill="var(--pink)"/></svg>
   <svg class="ast" viewBox="-60 -60 120 120" style="width:200px;left:-60px;bottom:-70px;opacity:.35"><use href="#ast" fill="#1b1b1c"/></svg>
   <div class="wrap" style="position:relative">
-    <div class="eyebrow rise">revenue autopilot for subscription saas</div>
-    <h1 class="display rise rise-2" style="font-size:clamp(52px,8.6vw,120px);margin-top:26px;max-width:11ch">
+    <h1 class="display rise rise-2" style="font-size:clamp(48px,7.4vw,96px);margin-top:26px;max-width:11ch">
       Your revenue is leak&#8209;ing.
     </h1>
-    <h1 class="display rise rise-2" style="font-size:clamp(52px,8.6vw,120px);color:var(--black)">
+    <h1 class="display rise rise-2" style="font-size:clamp(48px,7.4vw,96px);color:var(--black)">
       We put it back.
     </h1>
     <p class="rise rise-3" style="max-width:560px;font-size:19px;margin-top:30px;opacity:.94">
@@ -108,9 +111,7 @@
         see how it works
       </a>
     </div>
-    <div class="mono" style="font-size:12.5px;margin-top:24px;opacity:.75">
-      built on a battle-tested retention engine · first tenant onboarding now
-    </div>
+    <div style="font-size:13.5px;margin-top:24px;opacity:.78">built on a battle-tested retention engine · first tenant onboarding now</div>
   </div>
 </section>
 
@@ -118,39 +119,33 @@
 <section id="leaks" style="background:var(--black);color:var(--white);padding:110px 0">
   <svg class="ast" viewBox="-60 -60 120 120" style="width:460px;right:-140px;bottom:-160px;opacity:.14"><use href="#ast" fill="var(--red)"/></svg>
   <div class="wrap" style="position:relative">
-    <div class="eyebrow">where the money goes</div>
     <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px;max-width:16ch">
       Four quiet leaks in every subscription product
     </h2>
-    <div class="grid g4" style="margin-top:48px">
-      <div class="card-b">
-        <div class="num" style="color:var(--red);font-size:13px">01 · dunning</div>
-        <h3 style="font-size:18px;margin-top:12px;font-weight:600">Cards silently die</h3>
-        <p style="opacity:.7;font-size:14.5px;margin-top:8px">Failed renewals are 20-40% of churn.
-        Nobody even asked the user to update the card.</p>
+    <div class="grid g2" style="margin-top:52px;gap:0;border-top:1px solid rgba(250,250,250,.16)">
+      <div style="padding:30px 34px 30px 0;border-bottom:1px solid rgba(250,250,250,.16)">
+        <h3 style="font-size:21px;font-weight:600">Cards silently die<span style="color:var(--red)">.</span></h3>
+        <p style="opacity:.68;font-size:15px;margin-top:8px;max-width:44ch">Failed renewals are
+        20-40% of churn. Nobody even asked the user to update the card.</p>
       </div>
-      <div class="card-b">
-        <div class="num" style="color:var(--red);font-size:13px">02 · dead trials</div>
-        <h3 style="font-size:18px;margin-top:12px;font-weight:600">Trials expire unpaid</h3>
-        <p style="opacity:.7;font-size:14.5px;margin-top:8px">Users sign up, run out of time,
-        and the trial quietly ends without a nudge.</p>
+      <div style="padding:30px 0 30px 34px;border-bottom:1px solid rgba(250,250,250,.16)">
+        <h3 style="font-size:21px;font-weight:600">Trials expire unpaid<span style="color:var(--red)">.</span></h3>
+        <p style="opacity:.68;font-size:15px;margin-top:8px;max-width:44ch">Users sign up, run out
+        of time, and the trial quietly ends without a nudge.</p>
       </div>
-      <div class="card-b">
-        <div class="num" style="color:var(--red);font-size:13px">03 · silent cancels</div>
-        <h3 style="font-size:18px;margin-top:12px;font-weight:600">Cancels nobody fights</h3>
-        <p style="opacity:.7;font-size:14.5px;margin-top:8px">No pause offer, no downgrade,
-        no win-back. Most users leave without one save attempt.</p>
+      <div style="padding:30px 34px 30px 0;border-bottom:1px solid rgba(250,250,250,.16)">
+        <h3 style="font-size:21px;font-weight:600">Cancels nobody fights<span style="color:var(--red)">.</span></h3>
+        <p style="opacity:.68;font-size:15px;margin-top:8px;max-width:44ch">No pause offer, no
+        downgrade, no win-back. Most users leave without one save attempt.</p>
       </div>
-      <div class="card-b">
-        <div class="num" style="color:var(--red);font-size:13px">04 · missed upgrades</div>
-        <h3 style="font-size:18px;margin-top:12px;font-weight:600">Power users stay cheap</h3>
-        <p style="opacity:.7;font-size:14.5px;margin-top:8px">Heavy users burn the plan limit
-        and never get asked to move up.</p>
+      <div style="padding:30px 0 30px 34px;border-bottom:1px solid rgba(250,250,250,.16)">
+        <h3 style="font-size:21px;font-weight:600">Power users stay cheap<span style="color:var(--red)">.</span></h3>
+        <p style="opacity:.68;font-size:15px;margin-top:8px;max-width:44ch">Heavy users burn the
+        plan limit and never get asked to move up.</p>
       </div>
     </div>
     <div style="margin-top:46px;border-top:1px solid rgba(250,250,250,.18);padding-top:34px;
                 display:flex;gap:34px;align-items:baseline;flex-wrap:wrap">
-      <div class="eyebrow">leak audit · sample tenant</div>
       <div class="display" style="font-size:clamp(34px,4.4vw,58px)">you are leaking
         <span style="color:var(--red)">~$772/mo</span></div>
       <div class="mono" style="font-size:13px;opacity:.6">dunning $457 · silent cancels $291 · upgrades $25 · +$473 trial pipeline</div>
@@ -161,7 +156,6 @@
 <!-- HOW: off-white передышка -->
 <section id="how" style="padding:110px 0">
   <div class="wrap">
-    <div class="eyebrow" style="color:var(--gray)">how it works</div>
     <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px">
       Connected in a day.<br>Working while you sleep.
     </h2>
@@ -198,7 +192,6 @@
 <section id="features" style="background:var(--pink);padding:110px 0">
   <svg class="ast" viewBox="-60 -60 120 120" style="width:520px;left:-180px;top:-180px;opacity:.5"><use href="#ast" fill="var(--red)"/></svg>
   <div class="wrap" style="position:relative">
-    <div class="eyebrow" style="color:var(--black)">what you get</div>
     <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px">
       A revenue team,<br>in software form
     </h2>
@@ -228,27 +221,22 @@
 <!-- PRICING: black -->
 <section id="pricing" style="background:var(--black);color:var(--white);padding:110px 0">
   <div class="wrap">
-    <div class="eyebrow">pricing</div>
     <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px">
       We earn when<br>you recover revenue
     </h2>
     <div class="grid g2" style="margin-top:48px;max-width:920px">
       <div class="card-b">
-        <div class="eyebrow">base</div>
         <div class="display" style="font-size:56px;margin-top:14px">$99-199<span style="font-size:18px;opacity:.6">/mo</span></div>
         <p style="opacity:.7;font-size:14.5px;margin-top:10px">Platform, scoring, campaigns,
         reports. Scales with your user base.</p>
       </div>
       <div class="card-b" style="border-color:var(--red)">
-        <div class="eyebrow" style="color:var(--red);opacity:1">aligned</div>
         <div class="display" style="font-size:56px;margin-top:14px">10-20%<span style="font-size:18px;opacity:.6"> of uplift</span></div>
         <p style="opacity:.7;font-size:14.5px;margin-top:10px">Only on incremental revenue confirmed
         by the control group. No uplift - no percentage.</p>
       </div>
     </div>
-    <div class="mono" style="margin-top:26px;font-size:13px;opacity:.65">
-      no engineering sprint · cancel anytime · your data stays yours · dry-run until you approve
-    </div>
+    <div style="margin-top:26px;font-size:14px;opacity:.7">no engineering sprint · cancel anytime · your data stays yours · dry-run until you approve</div>
   </div>
 </section>
 
@@ -256,7 +244,7 @@
 <section style="background:var(--red);color:var(--white);padding:120px 0">
   <svg class="ast" viewBox="-60 -60 120 120" style="width:min(46vw,600px);right:-10%;bottom:-34%;opacity:.9"><use href="#ast" fill="var(--pink)"/></svg>
   <div class="wrap" style="position:relative">
-    <h2 class="display" style="font-size:clamp(44px,7vw,100px);max-width:13ch">
+    <h2 class="display" style="font-size:clamp(42px,6.4vw,88px);max-width:13ch">
       Find out what you are leak&#8209;ing.
     </h2>
     <p style="font-size:19px;margin-top:24px;max-width:520px;opacity:.94">
@@ -269,9 +257,7 @@
         book the teardown call
       </a>
     </div>
-    <div class="mono" style="font-size:12.5px;margin-top:18px;opacity:.8">
-      no deck, no pressure - just your numbers on screen
-    </div>
+    <div style="font-size:13.5px;margin-top:18px;opacity:.82">no deck, no pressure - just your numbers on screen</div>
   </div>
 </section>
 

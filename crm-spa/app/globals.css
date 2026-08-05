@@ -59,6 +59,24 @@
 }
 
 @layer base {
+  ::selection {
+    background: var(--color-primary);
+    color: #ffffff;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  input, textarea {
+    caret-color: var(--color-primary);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
   html,
   body {
     height: 100%;
