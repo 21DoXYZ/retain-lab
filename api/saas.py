@@ -27,6 +27,9 @@ bp = Blueprint('api_saas', __name__, url_prefix='/api/v1')
 LEAK_ROLES = ('super_admin', 'head_retention', 'director', 'analyst',
               'finance', 'marketing_manager')
 
+# Права на запись настроек (каналы, онбординг, автопилот) - только владельцы.
+CHANNEL_WRITE_ROLES = ('super_admin', 'director', 'head_retention')
+
 DEFAULT_TENANT = 'hubcontent'
 
 
@@ -375,8 +378,6 @@ import os as _os
 import secrets as _secrets
 
 from stripe_sync import channels_admin as ca
-
-CHANNEL_WRITE_ROLES = ('super_admin', 'director', 'head_retention')
 
 
 def _platform(name: str) -> bool:
