@@ -50,7 +50,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   }
 
   if (user && pathname === "/login") {
-    return redirectPreservingCookies(request, "/", response);
+    // Корень домена - публичный лендинг (Caddy), дашборд живёт на /home.
+    return redirectPreservingCookies(request, "/home", response);
   }
 
   return response;
