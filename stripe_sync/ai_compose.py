@@ -78,9 +78,10 @@ Offer-selection doctrine (value-first hierarchy, follow it):
    Never above max_discount_pct; if it is 0 - no coupons and no balance_credit.
 
 Business-type adaptation:
-- B2B seat-based (unit is seats/members): do NOT gift seats (that is raw
-  revenue) - gift time or a feature unlock (client_callback with feature +
-  days) instead; formal tone.
+- B2B seat-based (unit is seats/members/users): NEVER create a
+  client_callback offer whose amount grants seats/members/users - that is raw
+  revenue, it will be rejected. Gift time (trial_extend) or a feature unlock
+  (client_callback with feature + days, NO amount) instead; formal tone.
 - Usage-based (tokens/credits/renders/shoots): unit gifts everywhere.
 - Prosumer low-price (<$15): prefer content/feature unlocks and pause over
   discounts.
@@ -157,6 +158,12 @@ def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], lis
             continue
         if role:
             clean["role"] = role
+        seatish = str(clean["params"].get("unit", "")).lower()
+        if (clean["executor"] == "client_callback" and clean["params"].get("amount")
+                and seatish in ("seat", "seats", "member", "members", "user", "users",
+                                "место", "места", "мест")):
+            rejected.append(f"{clean['offer_id']}:seats_gift_banned")
+            continue
         # потолок скидки - железный, что бы модель ни решила
         pct = clean["params"].get("percent_off")
         if pct is not None and float(pct) > float(max_discount_pct):
@@ -199,10 +206,11 @@ K2 trial ending (<=3 days, unpaid):
 K3 payment failed (dunning):
   step 0 in-app banner: one calm line + card update action, 30 seconds.
   step 1 email (same hour): reassure - card issue not their fault, work is
-    safe, we retry automatically.
-  step 2 email (24h): short reminder, zero drama.
+    safe, we retry automatically. MUST contain {{card_update_url}}.
+  step 2 email (24h): short reminder, zero drama. MUST contain
+    {{card_update_url}}.
   step 3 email (72h): honest last call - access pauses soon, still 30 seconds
-    to fix. Firm but never threatening.
+    to fix. Firm but never threatening. MUST contain {{card_update_url}}.
 K4 save (cancel flow / activity dropped):
   step 1 email: acknowledge the right to leave; pause for a month as the
     no-cost alternative (keep history and data, pay nothing).
@@ -218,7 +226,9 @@ Hard rules:
 - Use the product name and its value unit naturally - never a generic
   "your product" voice.
 - Keep placeholders {{card_update_url}} and {{app_url}} EXACTLY where a link
-  belongs. No other placeholders.
+  belongs (double curly braces, verbatim). Every K3 email step (1,2,3) MUST
+  include {{card_update_url}} - an email asking to update a card without the
+  link is a broken email. No other placeholders.
 - Never invent numbers, discounts or bonus amounts - offers are attached by
   the platform separately. Refer to them generically ("your starter bonus").
 - No emoji, no em-dash, no ALL CAPS, no fake urgency, no guilt-tripping.
@@ -247,8 +257,13 @@ def parse_ai_copy(text: str) -> dict:
                 continue
             subject = str(txt.get("subject", "")).strip()[:200]
             body = str(txt.get("body", "")).strip()[:2000]
-            if body:
-                clean[i] = {"subject": subject, "body": body}
+            if not body:
+                continue
+            # дуннинг-письма обязаны нести ссылку обновления карты - иначе
+            # письмо без действия; шаг отбрасывается (останется шаблон)
+            if str(cid) == "K3_payment_recovery" and i in (1, 2, 3)                     and "{{card_update_url}}" not in body:
+                continue
+            clean[i] = {"subject": subject, "body": body}
         if clean:
             out[str(cid)] = clean
     return out
