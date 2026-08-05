@@ -20,8 +20,29 @@ interface OfferRow {
   max_per_user_30d: number;
   params: Record<string, unknown>;
   edited: boolean;
+  custom: boolean;
+  disabled: boolean;
   stats: { issued: number; dry_run: number; holdout: number; rejected: number };
 }
+
+/** Поля исполнителей (зеркало EXECUTOR_SCHEMAS в api/saas.py). */
+const EXECUTOR_FIELDS: Record<string, { key: string; kind: "str" | "num" | "enum"; req: boolean; options?: string[] }[]> = {
+  client_callback: [
+    { key: "command", kind: "str", req: true },
+    { key: "tokens", kind: "num", req: false },
+    { key: "days", kind: "num", req: false },
+    { key: "expires_days", kind: "num", req: false },
+    { key: "feature", kind: "str", req: false },
+  ],
+  stripe_coupon: [
+    { key: "percent_off", kind: "num", req: true },
+    { key: "duration", kind: "enum", req: true, options: ["once", "repeating", "forever"] },
+    { key: "duration_in_months", kind: "num", req: false },
+  ],
+  trial_extend: [{ key: "days", kind: "num", req: true }],
+  pause_collection: [{ key: "months", kind: "num", req: true }],
+  balance_credit: [{ key: "amount_usd", kind: "num", req: true }],
+};
 
 interface OffersData {
   control_pct: number;
@@ -131,11 +152,127 @@ function OfferEditor({
   );
 }
 
+function NewOfferForm({ onDone }: { onDone: (reload: boolean) => void }) {
+  const t = useT();
+  const [title, setTitle] = useState("");
+  const [executor, setExecutor] = useState("client_callback");
+  const [cap, setCap] = useState("1");
+  const [cost, setCost] = useState("0");
+  const [params, setParams] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const fields = EXECUTOR_FIELDS[executor] ?? [];
+
+  return (
+    <Card className="flex flex-col gap-3 p-5">
+      <div className="text-[15px] font-semibold text-ink">{t("saas.offers.new.title")}</div>
+      <p className="text-[13px] text-steel">{t("saas.offers.new.lead")}</p>
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-[12px] text-steel sm:col-span-2">
+          {t("saas.offers.f.title")}
+          <input className={inputCls} placeholder={t("saas.offers.new.titlePh")}
+                 value={title} onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <label className="flex flex-col gap-1 text-[12px] text-steel">
+          {t("saas.offers.new.executor")}
+          <select
+            className={inputCls + " cursor-pointer"}
+            value={executor}
+            onChange={(e) => {
+              setExecutor(e.target.value);
+              setParams({});
+            }}
+          >
+            {Object.keys(EXECUTOR_FIELDS).map((ex) => (
+              <option key={ex} value={ex}>{t(`saas.offers.exec.${ex}` as Parameters<typeof t>[0])}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-[12px] text-steel">
+          {t("saas.offers.col.limit")}
+          <input className={inputCls} value={cap} inputMode="numeric"
+                 onChange={(e) => setCap(e.target.value)} />
+        </label>
+        {fields.map((f) => (
+          <label key={f.key} className="flex flex-col gap-1 text-[12px] text-steel">
+            <span className="font-mono">
+              {f.key}
+              {f.req ? " *" : ""}
+            </span>
+            {f.kind === "enum" ? (
+              <select className={inputCls + " cursor-pointer"} value={params[f.key] ?? ""}
+                      onChange={(e) => setParams((p) => ({ ...p, [f.key]: e.target.value }))}>
+                <option value="" disabled>-</option>
+                {f.options?.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ) : (
+              <input className={inputCls} value={params[f.key] ?? ""}
+                     inputMode={f.kind === "num" ? "decimal" : "text"}
+                     onChange={(e) => setParams((p) => ({ ...p, [f.key]: e.target.value }))} />
+            )}
+          </label>
+        ))}
+        <label className="flex flex-col gap-1 text-[12px] text-steel">
+          {t("saas.offers.col.cost")}
+          <input className={inputCls} value={cost} inputMode="decimal"
+                 onChange={(e) => setCost(e.target.value)} />
+        </label>
+      </div>
+      <p className="text-[11.5px] text-steel">{t("saas.offers.exec.hint")}</p>
+      {err && <p className="text-[12px] text-neg">{err}</p>}
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="brand" size="sm" loading={busy} disabled={!title.trim()}
+          onClick={() => {
+            setBusy(true);
+            setErr("");
+            const body: Record<string, unknown> = {
+              title: title.trim(), executor,
+              max_per_user_30d: Number(cap), cost_estimate: Number(cost),
+              params: Object.fromEntries(
+                Object.entries(params).filter(([, v]) => v !== "").map(([k, v]) => {
+                  const f = fields.find((x) => x.key === k);
+                  return [k, f?.kind === "num" ? Number(v) : v];
+                }),
+              ),
+            };
+            flaskFetch("/api/v1/saas/offers/create", { method: "POST", body })
+              .then(() => onDone(true))
+              .catch((e: unknown) => setErr(e instanceof Error ? e.message : t("saas.channels.err.generic")))
+              .finally(() => setBusy(false));
+          }}
+        >
+          {t("saas.offers.new.create")}
+        </Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={() => onDone(false)}>
+          {t("saas.camp.cancel")}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 export function OffersView() {
   const t = useT();
   const [data, setData] = useState<OffersData | null>(null);
   const [state, setState] = useState<TableState>("loading");
   const [editId, setEditId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const toggleDisabled = (r: OfferRow) => {
+    setBusyId(r.offer_id);
+    flaskFetch("/api/v1/saas/offers/disable", {
+      method: "POST",
+      body: { offer_id: r.offer_id, disabled: !r.disabled },
+    })
+      .then(() => load())
+      .catch(() => {})
+      .finally(() => setBusyId(null));
+  };
 
   const load = useCallback(() => {
     setState("loading");
@@ -153,12 +290,22 @@ export function OffersView() {
     {
       key: "offer_id", header: t("saas.offers.col.offer"),
       render: (r) => (
-        <div className="min-w-0">
+        <div className={"min-w-0" + (r.disabled ? " opacity-50" : "")}>
           <div className="font-medium text-ink">
             {r.title}
-            {r.edited && (
+            {r.edited && !r.custom && (
               <span className="ml-2 inline-block rounded-full border border-[#b2ddff] bg-[#eff8ff] px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                 {t("saas.camp.edited")}
+              </span>
+            )}
+            {r.custom && (
+              <span className="ml-2 inline-block rounded-full border border-[#abefc6] bg-[#ecfdf3] px-1.5 py-0.5 text-[10px] font-semibold text-pos">
+                {t("saas.offers.customChip")}
+              </span>
+            )}
+            {r.disabled && (
+              <span className="ml-2 inline-block rounded-full border border-hair2 bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-steel">
+                {t("saas.offers.disabledChip")}
               </span>
             )}
           </div>
@@ -193,13 +340,23 @@ export function OffersView() {
     {
       key: "edit", header: "",
       render: (r) => (
-        <button
-          type="button"
-          className="cursor-pointer rounded-md border border-hair2 px-2 py-0.5 text-[11.5px] text-steel transition-[color,border-color] duration-150 hover:border-primary hover:text-primary"
-          onClick={() => setEditId(r.offer_id)}
-        >
-          {t("saas.camp.edit")}
-        </button>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            className="cursor-pointer rounded-md border border-hair2 px-2 py-0.5 text-[11.5px] text-steel transition-[color,border-color] duration-150 hover:border-primary hover:text-primary"
+            onClick={() => setEditId(r.offer_id)}
+          >
+            {t("saas.camp.edit")}
+          </button>
+          <button
+            type="button"
+            disabled={busyId === r.offer_id}
+            className="cursor-pointer rounded-md border border-hair2 px-2 py-0.5 text-[11.5px] text-steel transition-[color,border-color] duration-150 hover:border-neg hover:text-neg disabled:opacity-50"
+            onClick={() => toggleDisabled(r)}
+          >
+            {r.disabled ? t("saas.offers.enable") : t("saas.offers.disable")}
+          </button>
+        </div>
       ),
     },
   ];
@@ -211,7 +368,22 @@ export function OffersView() {
       <PageHeader
         title={t("saas.offers.title")}
         lead={t("saas.offers.lead", { pct: data?.control_pct ?? 10 })}
+        right={
+          !creating ? (
+            <Button variant="brand" size="sm" onClick={() => setCreating(true)}>
+              {t("saas.offers.new.btn")}
+            </Button>
+          ) : undefined
+        }
       />
+      {creating && (
+        <NewOfferForm
+          onDone={(reload) => {
+            setCreating(false);
+            if (reload) load();
+          }}
+        />
+      )}
       {editing && (
         <OfferEditor
           key={editing.offer_id + (editing.edited ? ":e" : ":b")}

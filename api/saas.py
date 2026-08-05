@@ -235,7 +235,9 @@ def _tenant_offers(tenant: str) -> list:
         ovr.load_tenant(tenant))
     return [{'offer_id': o['offer_id'], 'title': o['title'],
              'max_per_user_30d': int(o.get('max_per_user_30d') or 0),
-             'edited': bool(o.get('_edited'))}
+             'edited': bool(o.get('_edited')),
+             'custom': bool(o.get('_custom')),
+             'disabled': bool(o.get('_disabled'))}
             for o in catalog.get('offers', [])]
 
 
@@ -311,6 +313,65 @@ def saas_onboarding():
         },
         'channels': [{'channel': c['channel'], 'state': c['state']} for c in ch],
     })
+
+
+def _avg_plan_price(tenant: str) -> float:
+    """Средний чек из Stripe-планов (важнее ручного ответа опросника)."""
+    try:
+        return _flt(q(
+            "SELECT coalesce(avg(toFloat64(mrr)), 0) FROM tenant_plans_current "
+            "WHERE tenant_id = {t:String} AND mrr > 0", {'t': tenant})[1][0][0])
+    except Exception:
+        return 0.0
+
+
+@bp.get('/saas/questionnaire')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_questionnaire():
+    """Опросник селф-онбординга офферов + сохранённые ответы."""
+    from stripe_sync.compose import QUESTIONS
+    tenant = _tenant_arg()
+    answers = (ca.load_tenants().get(tenant, {}) or {}).get('onboarding_answers') or {}
+    return api_json({'questions': QUESTIONS, 'answers': answers,
+                     'ai_enabled': _platform('ANTHROPIC_API_KEY'),
+                     'avg_plan_price': _avg_plan_price(tenant)})
+
+
+@bp.post('/saas/questionnaire')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_questionnaire_submit():
+    """Селф-онбординг: ответы -> детерминированная сборка офферов
+    (compose_offers) + AI-слой при наличии ANTHROPIC_API_KEY (каждый AI-оффер
+    валидируется теми же схемами). Пересборка идемпотентна (A_/AI_)."""
+    from stripe_sync import overrides as ovr
+    from stripe_sync.compose import compose_offers, validate_answers
+
+    tenant = _tenant_arg()
+    raw = (request.get_json(silent=True) or {}).get('answers') or {}
+    answers, reason = validate_answers(raw)
+    if reason:
+        return _bad(reason)
+
+    avg_price = _avg_plan_price(tenant) or float(answers.get('avg_plan_price') or 0)
+    base = compose_offers(answers, avg_price)
+
+    ai_note = 'ai_not_configured'
+    ai_offers = []
+    if _platform('ANTHROPIC_API_KEY'):
+        from stripe_sync.ai_compose import ai_compose
+        ai_offers, ai_note = ai_compose(answers, avg_price)
+
+    # AI-набор (если есть) вытесняет детерминированный: он богаче, но прошёл
+    # те же схемы; без AI - живёт база. Ручные C_ офферы не трогаются.
+    final = ai_offers if ai_offers else base
+    ovr.replace_auto_offers(tenant, final)
+    ca.update_tenant(tenant, {'onboarding_answers': answers,
+                              'offers_reviewed': True,
+                              'callback_url': answers.get('callback_url') or None})
+    print(f'[onboarding] {tenant}: опросник -> {len(final)} офферов '
+          f'(ai={"yes" if ai_offers else ai_note})', flush=True)
+    return api_json({'created': [o['offer_id'] for o in final],
+                     'ai': bool(ai_offers), 'ai_note': ai_note})
 
 
 @bp.post('/saas/onboarding/offers-reviewed')
@@ -403,6 +464,8 @@ def saas_offers():
         'max_per_user_30d': int(o.get('max_per_user_30d') or 0),
         'params': o.get('params') or {},
         'edited': bool(o.get('_edited')),
+        'custom': bool(o.get('_custom')),
+        'disabled': bool(o.get('_disabled')),
         'stats': stats.get(o['offer_id'],
                            {'issued': 0, 'dry_run': 0, 'holdout': 0, 'rejected': 0}),
     } for o in catalog.get('offers', [])]
@@ -670,6 +733,53 @@ def saas_offer_edit():
 
     ovr.set_offer(tenant, oid, patch)
     print(f'[edit] {tenant}: оффер {oid} обновлён {sorted(patch)}', flush=True)
+    return api_json({'ok': True})
+
+
+@bp.post('/saas/offers/create')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_offer_create():
+    """Создание оффера с нуля из CRM. Валидация - compose.validate_offer
+    (единые схемы исполнителей с AI-компоновщиком); id генерится из названия."""
+    import re as _re
+    from stripe_sync import overrides as ovr
+    from stripe_sync.compose import validate_offer
+
+    tenant = _tenant_arg()
+    body = request.get_json(silent=True) or {}
+    clean, reason = validate_offer(body)
+    if reason:
+        return _bad(reason)
+
+    slug = _re.sub(r'[^a-z0-9]+', '_', clean['title'].lower()).strip('_')[:24] or 'offer'
+    existing = {o['offer_id'] for o in _tenant_offers(tenant)}
+    oid = f'C_{slug}'
+    n = 2
+    while oid in existing:
+        oid = f'C_{slug}_{n}'
+        n += 1
+    clean['offer_id'] = oid
+
+    ovr.add_custom_offer(tenant, clean)
+    print(f'[edit] {tenant}: создан оффер {oid} ({clean["executor"]})', flush=True)
+    return api_json({'offer_id': oid})
+
+
+@bp.post('/saas/offers/disable')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_offer_disable():
+    """Отключить/включить оффер (отключённый не выдаётся; custom при
+    отключении удаляется совсем)."""
+    from stripe_sync import overrides as ovr
+
+    tenant = _tenant_arg()
+    body = request.get_json(silent=True) or {}
+    oid = str(body.get('offer_id', ''))
+    if oid not in {o['offer_id'] for o in _tenant_offers(tenant)}:
+        return _bad('unknown_offer')
+    ovr.set_offer_disabled(tenant, oid, bool(body.get('disabled', True)))
+    print(f'[edit] {tenant}: оффер {oid} disabled={bool(body.get("disabled", True))}',
+          flush=True)
     return api_json({'ok': True})
 
 

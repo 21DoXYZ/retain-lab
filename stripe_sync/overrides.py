@@ -116,9 +116,12 @@ def merge_campaign_conf(conf: dict, ov: dict) -> dict:
 
 def merge_catalog(catalog: dict, ov: dict) -> dict:
     """Копия каталога офферов с правками щедрости/лимитов. params мержатся
-    по ключам (новые ключи не добавляются - исполнители ждут свой контракт)."""
+    по ключам (новые ключи не добавляются - исполнители ждут свой контракт).
+    Плюс пользовательские офферы (custom_offers - созданы из CRM с нуля,
+    для клиентов без git-пресета) и отключённые (disabled_offers)."""
     out = copy.deepcopy(catalog)
-    by_offer = (ov or {}).get("offers", {})
+    ov = ov or {}
+    by_offer = ov.get("offers", {})
     for offer in out.get("offers", []):
         patch = by_offer.get(offer["offer_id"])
         if not patch:
@@ -131,4 +134,67 @@ def merge_catalog(catalog: dict, ov: dict) -> dict:
             if k in (offer.get("params") or {}) and v is not None:
                 offer["params"][k] = v
         offer["_edited"] = True
+
+    base_ids = {o["offer_id"] for o in out.get("offers", [])}
+    for extra in ov.get("custom_offers", []) or []:
+        if extra.get("offer_id") and extra["offer_id"] not in base_ids:
+            e = copy.deepcopy(extra)
+            e["_custom"] = True
+            out.setdefault("offers", []).append(e)
+
+    disabled = set(ov.get("disabled_offers", []) or [])
+    if disabled:
+        for o in out.get("offers", []):
+            if o["offer_id"] in disabled:
+                o["_disabled"] = True
     return out
+
+
+def active_offers(catalog: dict) -> list:
+    """Офферы, доступные выдаче (issue/campaign_tick): без отключённых."""
+    return [o for o in catalog.get("offers", []) if not o.get("_disabled")]
+
+
+def add_custom_offer(tenant_id: str, offer: dict, path: str = "") -> None:
+    p = path or OVERRIDES_FILE
+    data = load_all(p)
+    t = data.setdefault(tenant_id, {})
+    lst = t.setdefault("custom_offers", [])
+    lst[:] = [o for o in lst if o.get("offer_id") != offer.get("offer_id")]
+    lst.append(offer)
+    _atomic_write(data, p)
+
+
+def replace_auto_offers(tenant_id: str, offers: list, prefixes: tuple = ("A_", "AI_"),
+                        path: str = "") -> None:
+    """Идемпотентная пересборка авто-каталога: снести прежние A_/AI_ офферы
+    (и их disabled-флаги), записать новый набор. Ручные C_ не трогаются."""
+    p = path or OVERRIDES_FILE
+    data = load_all(p)
+    t = data.setdefault(tenant_id, {})
+    keep = [o for o in (t.get("custom_offers") or [])
+            if not str(o.get("offer_id", "")).startswith(prefixes)]
+    t["custom_offers"] = keep + list(offers)
+    t["disabled_offers"] = [x for x in (t.get("disabled_offers") or [])
+                            if not str(x).startswith(prefixes)]
+    _atomic_write(data, p)
+
+
+def set_offer_disabled(tenant_id: str, offer_id: str, disabled: bool,
+                       path: str = "") -> None:
+    p = path or OVERRIDES_FILE
+    data = load_all(p)
+    t = data.setdefault(tenant_id, {})
+    cur = set(t.get("disabled_offers", []) or [])
+    if disabled:
+        cur.add(offer_id)
+    else:
+        cur.discard(offer_id)
+    # свой (custom) оффер при отключении просто удаляем совсем
+    if disabled:
+        customs = t.get("custom_offers", []) or []
+        if any(o.get("offer_id") == offer_id for o in customs):
+            t["custom_offers"] = [o for o in customs if o.get("offer_id") != offer_id]
+            cur.discard(offer_id)
+    t["disabled_offers"] = sorted(cur)
+    _atomic_write(data, p)

@@ -56,6 +56,11 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
     offer = next((o for o in catalog["offers"] if o["offer_id"] == offer_id), None)
     if offer is None:
         raise SystemExit(f"оффер {offer_id} не найден в каталоге {tenant_id}")
+    if offer.get("_disabled"):
+        _log(client, tenant_id, offer,
+             {"identity_id": identity_id, "client_user_id": "", "stripe_customer_id": ""},
+             campaign_id, False, "rejected", "offer_disabled")
+        return "rejected", "offer_disabled"
 
     rows = client.query(
         """
