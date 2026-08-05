@@ -171,6 +171,16 @@ export const saas: Partial<Messages> = {
   "saas.offers.f.title": "",
   "saas.offers.f.note": "",
 
+  "saas.ob.progress": "",
+  "saas.ob.offers.title": "",
+  "saas.ob.offers.waiting": "",
+  "saas.ob.offers.desc": "",
+  "saas.ob.offers.cap": "",
+  "saas.ob.offers.cta": "",
+  "saas.ob.offers.review": "",
+  "saas.home.golive.offers.title": "",
+  "saas.home.golive.offers.desc": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

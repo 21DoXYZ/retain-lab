@@ -13,11 +13,14 @@ import { Button, Card, PageHeader } from "@/components/ui";
  */
 
 interface Payload {
-  steps: { snippet: boolean; stripe: boolean; channels: boolean; autopilot: boolean };
+  steps: { snippet: boolean; stripe: boolean; channels: boolean; offers: boolean; autopilot: boolean };
   snippet: { token: string; html: string; ingest_url: string };
   stripe: { webhook_url: string; events: string[]; secret_set: boolean };
   channels: { channel: string; state: string }[];
+  offers: { offer_id: string; title: string; max_per_user_30d: number; edited: boolean }[];
 }
+
+const STEP_ORDER = ["snippet", "stripe", "channels", "offers", "autopilot"] as const;
 
 function CopyBtn({ text, label, copied }: { text: string; label: string; copied: string }) {
   const [done, setDone] = useState(false);
@@ -66,7 +69,7 @@ export function OnboardingView() {
 
   useEffect(load, [load]);
 
-  const doneCount = data ? Object.values(data.steps).filter(Boolean).length : 0;
+  const doneCount = data ? STEP_ORDER.filter((k) => data.steps[k]).length : 0;
 
   return (
     <div className="flex flex-col gap-5">
@@ -74,11 +77,44 @@ export function OnboardingView() {
         title={t("saas.ob.title")}
         lead={t("saas.ob.lead")}
         right={
-          <span className="font-mono text-[13px] text-steel">
-            {doneCount}/4 · <button className="cursor-pointer underline decoration-hair2 underline-offset-2 hover:text-primary" onClick={load}>{t("saas.ob.refresh")}</button>
-          </span>
+          <Button variant="ghost" size="sm" onClick={load}>
+            {t("saas.ob.refresh")}
+          </Button>
         }
       />
+
+      {/* Шкала прогресса: что сделано / что осталось - видно сразу */}
+      {data && (
+        <div className="rounded-card border border-hair bg-canvas p-4">
+          <div className="mb-2.5 flex items-baseline justify-between">
+            <span className="text-[13.5px] font-semibold text-ink">
+              {t("saas.ob.progress", { n: doneCount, total: STEP_ORDER.length })}
+            </span>
+            <span className="font-mono text-[12px] text-steel">
+              {Math.round((doneCount / STEP_ORDER.length) * 100)}%
+            </span>
+          </div>
+          <div className="flex gap-1.5">
+            {STEP_ORDER.map((k) => (
+              <div
+                key={k}
+                title={t(`saas.ob.${k}.title` as MessageKey)}
+                className={
+                  "h-2 flex-1 rounded-full transition-colors duration-300 " +
+                  (data.steps[k] ? "bg-pos" : "bg-surface border border-hair2")
+                }
+              />
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            {STEP_ORDER.map((k, i) => (
+              <span key={k} className={"text-[11.5px] " + (data.steps[k] ? "text-pos" : "text-steel")}>
+                {data.steps[k] ? "✓" : i + 1} {t(`saas.ob.${k}.title` as MessageKey)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {state === "loading" && (
         <div className="flex flex-col gap-4">
@@ -165,11 +201,57 @@ export function OnboardingView() {
             </div>
           </Card>
 
-          {/* ── Шаг 4: автопилот ── */}
+          {/* ── Шаг 4: офферы (щедрость и лимиты) ── */}
           <Card className="flex flex-col gap-3 p-5">
             <div className="flex items-center justify-between gap-3">
               <div className="text-[15px] font-semibold text-ink">
                 <span className="mr-2 text-steel">4</span>
+                {t("saas.ob.offers.title")}
+              </div>
+              <StepBadge done={data.steps.offers} waitKey="saas.ob.offers.waiting" />
+            </div>
+            <p className="text-[13.5px] leading-relaxed text-slate">{t("saas.ob.offers.desc")}</p>
+            <div className="flex flex-col">
+              {data.offers.map((o) => (
+                <div key={o.offer_id} className="flex items-center justify-between gap-3 border-b border-hair py-1.5 text-[13px] last:border-0">
+                  <span className="min-w-0 truncate text-ink">
+                    {o.title}
+                    {o.edited && (
+                      <span className="ml-2 inline-block rounded-full border border-[#b2ddff] bg-[#eff8ff] px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                        {t("saas.camp.edited")}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex-none font-mono text-[12px] text-steel">
+                    {t("saas.ob.offers.cap", { n: o.max_per_user_30d })}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/offers">
+                <Button variant="brand" size="sm">{t("saas.ob.offers.cta")}</Button>
+              </Link>
+              {!data.steps.offers && (
+                <Button
+                  variant="ghost" size="sm"
+                  onClick={() => {
+                    flaskFetch<Payload>("/api/v1/saas/onboarding/offers-reviewed", { method: "POST", body: {} })
+                      .then(setData)
+                      .catch(() => {});
+                  }}
+                >
+                  {t("saas.ob.offers.review")}
+                </Button>
+              )}
+            </div>
+          </Card>
+
+          {/* ── Шаг 5: автопилот ── */}
+          <Card className="flex flex-col gap-3 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[15px] font-semibold text-ink">
+                <span className="mr-2 text-steel">5</span>
                 {t("saas.ob.autopilot.title")}
               </div>
               <StepBadge done={data.steps.autopilot} waitKey="saas.ob.autopilot.waiting" />

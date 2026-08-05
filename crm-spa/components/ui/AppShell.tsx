@@ -41,7 +41,7 @@ export function AppShell({ active, role, children, headerRight, t }: AppShellPro
       {/* Sidebar — hidden below ~lg, like the board. Own scroll + full-height dark
           bg (fix: min-h-screen let long nav overflow the dark panel onto the body). */}
       <aside className="hidden lg:flex w-[260px] flex-none flex-col overflow-y-auto bg-sb text-sb-text border-r border-sb-line px-4 py-[22px]">
-        <div className="flex items-center gap-3 rounded-2xl px-3 py-[11px] mb-[22px] bg-sb-card border border-sb-line">
+        <Link href="/home" className="flex items-center gap-3 rounded-2xl px-3 py-[11px] mb-[22px] bg-sb-card border border-sb-line transition-colors hover:border-primary">
           <span
             className="grid place-items-center w-10 h-10 rounded-xl text-white font-extrabold text-base flex-none"
             style={{
@@ -55,7 +55,7 @@ export function AppShell({ active, role, children, headerRight, t }: AppShellPro
             <div className="text-sm font-semibold text-ink">Revenue Autopilot</div>
             <div className="text-xs text-sb-grp mt-0.5">live</div>
           </div>
-        </div>
+        </Link>
 
         <nav className="flex flex-col gap-[5px]">
           {NAV_GROUPS.filter((g) => isGroupEnabled(g.title)).map((group) => {

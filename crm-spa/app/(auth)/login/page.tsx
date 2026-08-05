@@ -18,7 +18,7 @@ function LoginForm() {
   const t = useT();
   const router = useRouter();
   const params = useSearchParams();
-  const nextPath = params.get("next") || "/";
+  const nextPath = params.get("next") || "/home";
   const blocked = params.get("blocked") === "1";
 
   const [email, setEmail] = useState("");

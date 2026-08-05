@@ -111,7 +111,7 @@ export const saas = {
   "saas.camp.holdout": "Контроль",
   "saas.camp.touches": "Касаний",
 
-  "saas.home.golive.title": "Запуск: 4 шага до живого автопилота",
+  "saas.home.golive.title": "Запуск: 5 шагов до живого автопилота",
   "saas.home.golive.open": "Открыть",
   "saas.home.golive.stripe.title": "Подключить биллинг (Stripe)",
   "saas.home.golive.stripe.desc": "Один вебхук в Stripe Dashboard + restricted-ключ. Инструкция на экране подключения - код не нужен.",
@@ -176,6 +176,16 @@ export const saas = {
   "saas.offers.editTitle": "Правка оффера",
   "saas.offers.f.title": "Название",
   "saas.offers.f.note": "Числа - щедрость и лимиты (токены, проценты, дни). Способ исполнения и структуру оффера меняет платформа.",
+
+  "saas.ob.progress": "Онбординг: {n} из {total} шагов",
+  "saas.ob.offers.title": "Проверь офферы (что дарим и лимиты)",
+  "saas.ob.offers.waiting": "не проверены",
+  "saas.ob.offers.desc": "Это стимулы, которые кампании выдают юзерам: бонус-токены, скидка, продление триала. Проверь щедрость и лимиты - или поправь под себя на экране Offers.",
+  "saas.ob.offers.cap": "до {n}/30д",
+  "saas.ob.offers.cta": "Открыть офферы",
+  "saas.ob.offers.review": "Всё ок, проверено",
+  "saas.home.golive.offers.title": "Проверить офферы",
+  "saas.home.golive.offers.desc": "Бонусы, скидки, продления - что автопилот может дарить юзерам и в каких лимитах.",
 
   "nav.channelsSetup": "Каналы",
 

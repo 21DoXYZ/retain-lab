@@ -19,7 +19,7 @@ interface HomeData {
   at_risk_now: number;
   dunning_mrr: number;
   campaigns: { active_enrollments: number; holdout: number; touches_7d: number };
-  setup: { stripe_connected: boolean; snippet_connected: boolean; channels_connected: boolean; autopilot: boolean };
+  setup: { stripe_connected: boolean; snippet_connected: boolean; channels_connected: boolean; offers_ready: boolean; autopilot: boolean };
 }
 
 interface LeakData {
@@ -60,6 +60,7 @@ export function HomeView() {
     { key: "stripe", ok: data?.setup.stripe_connected ?? false, href: "/onboarding" },
     { key: "snippet", ok: data?.setup.snippet_connected ?? false, href: "/onboarding" },
     { key: "channels", ok: data?.setup.channels_connected ?? false, href: "/channel-settings" },
+    { key: "offers", ok: data?.setup.offers_ready ?? false, href: "/onboarding" },
     { key: "autopilot", ok: data?.setup.autopilot ?? false, href: "/campaigns" },
   ] as const;
   const goliveDone = golive.filter((s) => s.ok).length;

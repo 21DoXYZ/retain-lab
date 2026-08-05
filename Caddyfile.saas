@@ -45,13 +45,9 @@ ra.187-77-157-6.sslip.io {
 		file_server
 	}
 
-	# Корень для ГОСТЯ - продуктовый лендинг; залогиненный (auth-кука Supabase)
-	# на том же URL попадает в приложение. Вход: /login.
-	@guest_root {
-		path /
-		not header_regexp Cookie "sb-[^=]*-auth-token"
-	}
-	handle @guest_root {
+	# Корень домена - ВСЕГДА продуктовый лендинг (и для залогиненных тоже).
+	# Приложение живёт на /home и глубже; вход: /login (после - редирект /home).
+	handle / {
 		root * /srv/ra/site
 		rewrite * /index.html
 		file_server

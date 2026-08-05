@@ -210,6 +210,7 @@ def home():
         'setup': {'stripe_connected': live_customers > 0,
                   'snippet_connected': snippet_events > 0,
                   'channels_connected': _any_channel_active(tenant),
+                  'offers_ready': _offers_step_done(tenant),
                   'autopilot': _autopilot_resolved(_campaigns_conf(tenant), tenant)},
     })
 
@@ -220,6 +221,28 @@ def _any_channel_active(tenant: str) -> bool:
     tch = ca.load_tenants().get(tenant, {}) or {}
     email_ok = ca.email_state(tch, _platform('RESEND_API_KEY')) == 'active'
     return email_ok or bool(tch.get('telegram_bot_token'))
+
+
+def _tenant_offers(tenant: str) -> list:
+    """Каталог офферов тенанта с учётом правок - компакт для онбординга.
+    Шаг «офферы» закрыт, если что-то правлено ЛИБО отмечено «проверено»."""
+    import json as _json
+    from pathlib import Path as _Path
+    from stripe_sync import overrides as ovr
+    p = _Path(__file__).resolve().parent.parent / 'stripe_sync' / 'offers_catalog.json'
+    catalog = ovr.merge_catalog(
+        (_json.loads(p.read_text()).get(tenant) or {}) if p.exists() else {},
+        ovr.load_tenant(tenant))
+    return [{'offer_id': o['offer_id'], 'title': o['title'],
+             'max_per_user_30d': int(o.get('max_per_user_30d') or 0),
+             'edited': bool(o.get('_edited'))}
+            for o in catalog.get('offers', [])]
+
+
+def _offers_step_done(tenant: str) -> bool:
+    if any(o['edited'] for o in _tenant_offers(tenant)):
+        return True
+    return bool((ca.load_tenants().get(tenant, {}) or {}).get('offers_reviewed'))
 
 
 def _snippet_token() -> str:
@@ -262,14 +285,20 @@ def saas_onboarding():
     ch = _channels_payload(tenant)['channels']
     camp_conf = _campaigns_conf(tenant)
 
+    offers_list = _tenant_offers(tenant)
+    offers_edited = any(o['edited'] for o in offers_list)
+    offers_reviewed = bool((ca.load_tenants().get(tenant, {}) or {}).get('offers_reviewed'))
+
     return api_json({
         'tenant': tenant,
         'steps': {
             'snippet': snippet_events > 0,
             'stripe': live_customers > 0,
             'channels': _any_channel_active(tenant),
+            'offers': offers_edited or offers_reviewed,
             'autopilot': _autopilot_resolved(camp_conf, tenant),
         },
+        'offers': offers_list,
         'snippet': {'token': token, 'html': snippet_html,
                     'ingest_url': f'https://{host}/ingest/saas/events' if host else ''},
         'stripe': {
@@ -282,6 +311,15 @@ def saas_onboarding():
         },
         'channels': [{'channel': c['channel'], 'state': c['state']} for c in ch],
     })
+
+
+@bp.post('/saas/onboarding/offers-reviewed')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_onboarding_offers_reviewed():
+    """Владелец подтвердил, что просмотрел каталог офферов (шаг онбординга)."""
+    tenant = _tenant_arg()
+    ca.update_tenant(tenant, {'offers_reviewed': True})
+    return saas_onboarding()
 
 
 @bp.get('/saas/users')

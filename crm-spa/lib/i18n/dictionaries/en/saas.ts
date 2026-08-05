@@ -112,7 +112,7 @@ export const saas: Partial<Messages> = {
   "saas.camp.holdout": "Holdout",
   "saas.camp.touches": "Touches",
 
-  "saas.home.golive.title": "Go live: 4 steps to a working autopilot",
+  "saas.home.golive.title": "Go live: 5 steps to a working autopilot",
   "saas.home.golive.open": "Open",
   "saas.home.golive.stripe.title": "Connect billing (Stripe)",
   "saas.home.golive.stripe.desc": "One webhook in Stripe Dashboard + a restricted key. Instructions on the connect screen - no code needed.",
@@ -177,6 +177,16 @@ export const saas: Partial<Messages> = {
   "saas.offers.editTitle": "Edit offer",
   "saas.offers.f.title": "Title",
   "saas.offers.f.note": "Numbers control generosity and caps (tokens, percent, days). Executor and offer structure are platform-managed.",
+
+  "saas.ob.progress": "Onboarding: {n} of {total} steps",
+  "saas.ob.offers.title": "Review offers (what we give and caps)",
+  "saas.ob.offers.waiting": "not reviewed",
+  "saas.ob.offers.desc": "These are the incentives campaigns hand out: bonus tokens, a discount, a trial extension. Check the generosity and caps - or tune them on the Offers screen.",
+  "saas.ob.offers.cap": "up to {n}/30d",
+  "saas.ob.offers.cta": "Open offers",
+  "saas.ob.offers.review": "Looks good, reviewed",
+  "saas.home.golive.offers.title": "Review offers",
+  "saas.home.golive.offers.desc": "Bonuses, discounts, extensions - what the autopilot may give users and within what caps.",
 
   "nav.channelsSetup": "Channels",
 
