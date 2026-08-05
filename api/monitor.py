@@ -527,14 +527,33 @@ def glossary():
 
 # ════════════════════════════════════════════════════════════════════════════
 # /keys — ключи интеграции (super_admin). Секреты НЕ отдаём в открытую.
+# SaaS-пресет: при заданном SAAS_HOST показываем ingest СНИППЕТА/Server Events
+# API (saas.events), а не казино-шлюз cas.21do.xyz (легаси-фолбэк).
 # ════════════════════════════════════════════════════════════════════════════
-_INGEST_URL = 'https://cas.21do.xyz/ingest/events'
-_CURL_EXAMPLE = (
-    'curl -X POST https://cas.21do.xyz/ingest/events \\\n'
-    '  -H "Authorization: Bearer <токен>" -H "Content-Type: application/json" \\\n'
-    '  -d \'{"event_id":"...","event_type":"bet","casino_player_id":40,"ts":"...","bet_amount":5,"currency":"TRY"}\''
-)
-_KAFKA_NOTE = ('⚠️ Kafka-креды (SASL) меняются скриптом create_producer.sh на сервере — не из UI.')
+import os as _os
+
+_SAAS_HOST = _os.environ.get('SAAS_HOST', '').strip()
+if _SAAS_HOST:
+    _INGEST_URL = f'https://{_SAAS_HOST}/ingest/saas/events'
+    _CURL_EXAMPLE = (
+        f'<script src="https://{_SAAS_HOST}/snippet/ra.js"\n'
+        f'        data-endpoint="https://{_SAAS_HOST}/ingest/saas/events"\n'
+        '        data-token="<token>" data-tenant="hubcontent"></script>\n'
+        '\n'
+        f'curl -X POST https://{_SAAS_HOST}/ingest/saas/events \\\n'
+        '  -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \\\n'
+        '  -d \'{"event_id":"...","tenant_id":"hubcontent","event_type":"generation_completed",'
+        '"ts":"2026-08-05 12:00:00.000","client_user_id":"u_18342","tokens_spent":12}\''
+    )
+    _KAFKA_NOTE = ''
+else:
+    _INGEST_URL = 'https://cas.21do.xyz/ingest/events'
+    _CURL_EXAMPLE = (
+        'curl -X POST https://cas.21do.xyz/ingest/events \\\n'
+        '  -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \\\n'
+        '  -d \'{"event_id":"...","event_type":"bet","casino_player_id":40,"ts":"...","bet_amount":5,"currency":"TRY"}\''
+    )
+    _KAFKA_NOTE = ('⚠️ Kafka-креды (SASL) меняются скриптом create_producer.sh на сервере — не из UI.')
 
 
 def _mask_token(val: str) -> str:
@@ -547,11 +566,17 @@ def _mask_token(val: str) -> str:
 
 def _keys_payload() -> dict:
     toks = pb._load_tokens()
+    if not isinstance(toks, dict):   # легаси-формат (список) - показываем как один слот
+        toks = {'ingest_prod': (toks or [''])[0] if toks else ''}
+    # Показываем ВСЕ ключи файла (реальные имена), TOKEN_LABELS - как подписи
+    # и как пустые слоты, если файла ещё нет.
+    keys = list(dict.fromkeys(list(toks.keys()) + list(pb.TOKEN_LABELS.keys())))
     tokens = []
-    for k, label in pb.TOKEN_LABELS.items():
+    for k in keys:
         val = toks.get(k, '') or ''
+        label = pb.TOKEN_LABELS.get(k, f'Ingest token - {k}')
         tokens.append({'key': k, 'label': label, 'is_set': bool(val),
-                       'masked': _mask_token(val), 'length': len(val)})
+                       'masked': _mask_token(val), 'length': len(str(val))})
     return {
         'tokens': tokens,
         'ips': pb._load_ips(),
@@ -574,16 +599,20 @@ def keys_regenerate():
     Тело: {"which": "ingest_prod"|"ingest_test"}."""
     body = request.get_json(silent=True) or {}
     which = str(body.get('which', ''))
-    if which not in pb.TOKEN_LABELS:
-        return api_json(error='unknown token key', code=400)
     toks = pb._load_tokens()
+    if not isinstance(toks, dict):
+        toks = {'ingest_prod': (toks or [''])[0] if toks else ''}
+    # регенерировать можно и реальные ключи файла (SaaS: имя = тенант)
+    if which not in pb.TOKEN_LABELS and which not in toks:
+        return api_json(error='unknown token key', code=400)
     new_token = _secrets.token_urlsafe(24)
     toks[which] = new_token
     try:
         pb._save_tokens(toks)
     except Exception as e:
         return api_json(error=f'не удалось сохранить токен: {e}', code=503)
-    return api_json({'key': which, 'label': pb.TOKEN_LABELS[which],
+    return api_json({'key': which,
+                     'label': pb.TOKEN_LABELS.get(which, f'Ingest token - {which}'),
                      'token': new_token, 'masked': _mask_token(new_token)})
 
 

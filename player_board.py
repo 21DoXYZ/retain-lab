@@ -3272,7 +3272,7 @@ def reviewer(rid):
 # ============================ КЛЮЧИ ИНТЕГРАЦИИ (просмотр / регенерация) ============================
 TOKENS_FILE = os.environ.get('TOKENS_FILE', '/secrets/tokens.json')
 IPS_FILE = os.environ.get('IPS_FILE', '/secrets/allowed_ips.json')
-TOKEN_LABELS = {'ingest_prod': 'HTTP ingest — PROD', 'ingest_test': 'HTTP ingest — TEST'}
+TOKEN_LABELS = {'ingest_prod': 'HTTP ingest - PROD', 'ingest_test': 'HTTP ingest - TEST'}
 
 def _load_tokens():
     try:

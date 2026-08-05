@@ -60,6 +60,7 @@ export const saas: Partial<Messages> = {
   "saas.home.allSections": "",
 
   "nav.saasOffers": "",
+  "saas.users.demoBanner": "",
   "saas.users.title": "",
   "saas.users.lead": "",
   "saas.users.all": "",

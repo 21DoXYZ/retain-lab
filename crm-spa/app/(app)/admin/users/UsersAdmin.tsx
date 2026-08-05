@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT, type MessageKey } from "@/lib/i18n";
+import { isNavKeyEnabled } from "@/lib/modules";
 import {
   PageHeader,
   Panel,
@@ -236,7 +237,8 @@ export function UsersAdmin({ me, initialUsers }: Props) {
 
   const needsDept = form.role === "operator" || form.role === "head_department";
   const needsAff = form.role === "affiliate";
-  const canMakeAffiliate = roles.includes("affiliate");
+  // SaaS-пресет: аффилиатский кабинет скрыт модулем - кнопку тоже прячем
+  const canMakeAffiliate = roles.includes("affiliate") && isNavKeyEnabled("affiliate_cabinet");
 
   return (
     <>

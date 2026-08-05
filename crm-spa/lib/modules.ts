@@ -40,6 +40,10 @@ const STATIC_DISABLED: readonly string[] = [
   "players",
   "bonus",
   "bonuses",
+  // Конструкторы сегментов/цепочек завязаны на казино-витрины (player_features,
+  // casino_player_id) - на SaaS-данных каталог полей пуст, экраны мёртвые.
+  "segments",
+  "chains",
   "analytics",
   "funnel",
   "ltv",

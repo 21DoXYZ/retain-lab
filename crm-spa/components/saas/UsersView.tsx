@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
-import { DataTable, PageHeader, type Column, type TableState } from "@/components/ui";
+import { Banner, DataTable, PageHeader, type Column, type TableState } from "@/components/ui";
 
 /**
  * /users — юзеры SaaS-контура (замена казино-экрана /players): стадия,
@@ -28,6 +28,7 @@ interface SaasUser {
 interface UsersData {
   stages: Record<string, number>;
   users: SaasUser[];
+  demo?: boolean;
 }
 
 const STAGE_ORDER = ["DUNNING", "SAVE", "CONVERT", "UPGRADE", "ACTIVATE", "WINBACK", "MONITOR"];
@@ -105,6 +106,8 @@ export function UsersView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader title={t("saas.users.title")} lead={t("saas.users.lead")} />
+
+      {data?.demo ? <Banner className="mt-0">{t("saas.users.demoBanner")}</Banner> : null}
 
       <div className="flex flex-wrap gap-2">
         <button

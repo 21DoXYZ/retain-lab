@@ -54,7 +54,7 @@ $$;
 -- ======================= 14 РОЛЕЙ (по одной учётке) =========================
 -- id-схема: 0000…000N (человекочитаемо). Пароль всем — crm12345.
 SELECT crm._seed_user('00000000-0000-0000-0000-000000000001','super_admin@crm.local',      'crm12345','Платформа (мы)',           'super_admin',       NULL,          NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-000000000002','director@crm.local',         'crm12345','Директор казино',           'director',          NULL,          NULL);
+SELECT crm._seed_user('00000000-0000-0000-0000-000000000002','director@crm.local',         'crm12345','Директор',           'director',          NULL,          NULL);
 SELECT crm._seed_user('00000000-0000-0000-0000-000000000003','head_retention@crm.local',   'crm12345','Глава ретеншена',           'head_retention',    'retention',   NULL);
 SELECT crm._seed_user('00000000-0000-0000-0000-000000000004','head_cc@crm.local',          'crm12345','Глава колл-центра',         'head_department',   'call_center', NULL);
 SELECT crm._seed_user('00000000-0000-0000-0000-000000000005','operator@crm.local',         'crm12345','Mehmet Yilmaz',             'operator',          'call_center', NULL);

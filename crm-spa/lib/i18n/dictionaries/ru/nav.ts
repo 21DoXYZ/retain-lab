@@ -11,13 +11,13 @@ export const nav = {
   "nav.section.layer": "Слой / фундамент",
 
   // Group titles — 7 модулей (components/ui/nav.ts NAV_GROUPS[].title)
-  "nav.group.traffic": "📡 Трафик и аффилиаты",
-  "nav.group.vip": "🐋 VIP-радар",
-  "nav.group.bonuseco": "🎁 Бонус-экономика",
-  "nav.group.risk": "🛡 Риск и фрод",
-  "nav.group.core": "⚡ Retention-автоматизация",
-  "nav.group.analytics": "📊 Аналитика",
-  "nav.group.data": "🧱 Данные / API",
+  "nav.group.traffic": "Трафик и аффилиаты",
+  "nav.group.vip": "VIP-радар",
+  "nav.group.bonuseco": "Бонус-экономика",
+  "nav.group.risk": "Риск и фрод",
+  "nav.group.core": "Retention-автоматизация",
+  "nav.group.analytics": "Аналитика",
+  "nav.group.data": "Данные / API",
 
   // Legacy group titles — сохранены для обратной совместимости словаря (не используются в NAV_GROUPS)
   "nav.group.work": "Моя работа",

@@ -248,7 +248,15 @@ def saas_users():
         "SELECT stage, count() FROM user_actions WHERE tenant_id = {t:String} GROUP BY stage",
         {'t': tenant})[1]}
 
-    return api_json({'tenant': tenant, 'stages': stages, 'users': users})
+    # Демо-набор или живой Stripe? (та же логика, что на главной) - фронт
+    # показывает плашку «это демо-данные», пока не подключён реальный ключ.
+    demo = int(q(
+        "SELECT count() FROM stripe_customers WHERE tenant_id = {t:String} "
+        "AND customer_id NOT LIKE 'cus_mock%' AND customer_id NOT LIKE 'cus_demo%'",
+        {'t': tenant})[1][0][0]) == 0
+
+    return api_json({'tenant': tenant, 'stages': stages, 'users': users,
+                     'demo': demo})
 
 
 @bp.get('/saas/offers')

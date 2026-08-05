@@ -66,6 +66,7 @@ export const saas: Partial<Messages> = {
 
   "nav.saasOffers": "Offers",
 
+  "saas.users.demoBanner": "This is a demo dataset (generated users to prove the pipeline). Live data replaces it automatically once the client's Stripe key is connected.",
   "saas.users.title": "Users",
   "saas.users.lead": "Every user: lifecycle stage, recommended action, value at stake and scores.",
   "saas.users.all": "All",
