@@ -227,7 +227,7 @@ export const marketing: Partial<Messages> = {
 
   // ── VipScoresBlock (on /actions) ─────────────────────────────────────
   "marketing.vipScores.action.churn": "call first - power user is leaving",
-  "marketing.vipScores.action.early": "grow into a future whale",
+  "marketing.vipScores.action.early": "grow into a future top spender",
   "marketing.vipScores.action.nonPromising": "free up the power user manager",
   "marketing.vipScores.unavailable": "scoring table unavailable",
   "marketing.vipScores.card.sub1": "of {scored} scored · avg {avg}",

@@ -98,3 +98,59 @@ def leak_audit():
                                'expansion_potential': round(upgrade_pot, 2)},
         },
     })
+
+
+@bp.get('/saas/uplift')
+@require_auth(roles=LEAK_ROLES)
+def uplift():
+    """Последний uplift-отчёт по каждой кампании (uplift_reports пишет
+    stripe_sync/uplift_report.py, расписание - Пн 08:00). Инкремент = 
+    (conv_target - conv_control) x N_target x средний чек; n_control=0 -> n/a."""
+    tenant = request.args.get('tenant') or DEFAULT_TENANT
+
+    rows = q(
+        """
+        SELECT campaign_id,
+               argMax(period_start, computed_at)    AS period_start,
+               argMax(period_end, computed_at)      AS period_end,
+               argMax(n_target, computed_at)        AS n_target,
+               argMax(n_control, computed_at)       AS n_control,
+               argMax(conv_target, computed_at)     AS conv_target,
+               argMax(conv_control, computed_at)    AS conv_control,
+               argMax(avg_check, computed_at)       AS avg_check,
+               argMax(incremental_usd, computed_at) AS incremental_usd,
+               argMax(goal_event, computed_at)      AS goal_event,
+               max(computed_at)                     AS computed_at
+        FROM uplift_reports
+        WHERE tenant_id = {t:String}
+        GROUP BY campaign_id
+        ORDER BY campaign_id
+        """,
+        {'t': tenant})[1]
+
+    campaigns = []
+    total = 0.0
+    for r in rows:
+        has_holdout = int(r[4]) > 0
+        inc = _flt(r[8]) if has_holdout else None
+        if inc is not None:
+            total += inc
+        campaigns.append({
+            'campaign_id': r[0],
+            'period_start': str(r[1]),
+            'period_end': str(r[2]),
+            'n_target': int(r[3]),
+            'n_control': int(r[4]),
+            'conv_target': _flt(r[5]),
+            'conv_control': _flt(r[6]),
+            'avg_check': round(_flt(r[7]), 2),
+            'incremental_usd': inc,
+            'goal_event': r[9],
+            'computed_at': str(r[10]),
+        })
+
+    return api_json({
+        'tenant': tenant,
+        'total_incremental': round(total, 2),
+        'campaigns': campaigns,
+    })

@@ -18,4 +18,21 @@ export const saas: Partial<Messages> = {
   "saas.leak.upgradesSub": "{count} power users at plan limit",
   "saas.leak.deadTrials": "Dead trials",
   "saas.leak.deadTrialsSub": "{count} expired without paying - pipeline",
+
+  "nav.uplift": "Campaign uplift",
+
+  "saas.uplift.title": "Uplift report",
+  "saas.uplift.lead":
+    "Honest measurement: target vs holdout conversion per campaign - in incremental dollars.",
+  "saas.uplift.total": "Incremental this period: {amount}",
+  "saas.uplift.col.campaign": "Campaign",
+  "saas.uplift.col.target": "Target",
+  "saas.uplift.col.holdout": "Holdout",
+  "saas.uplift.col.check": "Avg check",
+  "saas.uplift.col.incremental": "Incremental",
+  "saas.uplift.col.goal": "Goal",
+  "saas.uplift.na": "n/a - empty holdout",
+  "saas.uplift.groupN": "n={n}",
+  "saas.uplift.empty.title": "No reports yet",
+  "saas.uplift.empty.desc": "The first uplift report lands after a weekly campaign run (Mon 08:00).",
 };

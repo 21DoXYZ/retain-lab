@@ -211,6 +211,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // Revenue Autopilot (SaaS-пресет): отчёт «где утекает выручка» (REBUILD §2).
       // Роли = LEAK_ROLES в api/saas.py (ANALYSTS + finance, как segmentation).
       { key: "leak-audit", href: "/leak-audit", emoji: "💸", label: "nav.leakAudit", roles: [...ANALYSTS, "finance"] },
+      { key: "uplift", href: "/uplift", emoji: "📈", label: "nav.uplift", roles: [...ANALYSTS, "finance"] },
       { key: "overview", href: "/overview", emoji: "📊", label: "nav.overview", roles: MONEY },
       // Конструктор отчётов (W5-T4). Роли = REPORT_ROLES в api/reports.py (1:1):
       // MONEY (super_admin/head_retention/director/finance/analyst) + marketing_manager.

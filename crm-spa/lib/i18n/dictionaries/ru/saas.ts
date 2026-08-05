@@ -17,4 +17,21 @@ export const saas = {
   "saas.leak.upgradesSub": "{count} power-юзеров у лимита плана",
   "saas.leak.deadTrials": "Мёртвые триалы",
   "saas.leak.deadTrialsSub": "{count} истекли без оплаты - потенциал",
+
+  "nav.uplift": "Инкремент кампаний",
+
+  "saas.uplift.title": "Uplift-отчёт",
+  "saas.uplift.lead":
+    "Честный замер: конверсия target против holdout по каждой кампании - в долларах инкремента.",
+  "saas.uplift.total": "Инкремент за период: {amount}",
+  "saas.uplift.col.campaign": "Кампания",
+  "saas.uplift.col.target": "Target",
+  "saas.uplift.col.holdout": "Holdout",
+  "saas.uplift.col.check": "Средний чек",
+  "saas.uplift.col.incremental": "Инкремент",
+  "saas.uplift.col.goal": "Цель",
+  "saas.uplift.na": "n/a - пустой holdout",
+  "saas.uplift.groupN": "n={n}",
+  "saas.uplift.empty.title": "Отчётов ещё нет",
+  "saas.uplift.empty.desc": "Первый uplift-отчёт появится после недельного прогона кампаний (Пн 08:00).",
 };

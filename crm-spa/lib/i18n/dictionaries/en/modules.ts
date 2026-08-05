@@ -19,7 +19,7 @@ export const modules: Partial<Messages> = {
   // ── 2. VIP radar ──────────────────────────────────────────────────────
   "modules.vip.chair": "Power user manager / head of retention",
   "modules.vip.pain": "Whales bring the lion's share of the cash, yet they are lost silently",
-  "modules.vip.action": "Find an at-risk whale and take them into work before they leave",
+  "modules.vip.action": "Find an at-risk top spender and take them into work before they leave",
 
   // ── 3. Bonus economics ────────────────────────────────────────────────
   "modules.bonuseco.chair": "CMO / offer manager",
