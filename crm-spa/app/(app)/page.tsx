@@ -20,12 +20,21 @@ import { resolveLocale } from "@/lib/i18n/server";
  * The role→home mapping already lives in lib/permissions.roleHome(); flip the
  * marked line below to `redirect(roleHome(user.role))` once those pages exist.
  */
+/** Роли, видящие дашборд владельца (= LEAK_ROLES в api/saas.py). */
+const OWNER_ROLES = new Set([
+  "super_admin", "head_retention", "director", "analyst", "finance", "marketing_manager",
+]);
+
 export default async function AppHome() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  // --- Flip to hard redirect when B2/B4/C target pages are live: ---
-  // redirect(roleHome(user.role));
+  // SaaS-пресет: владельцу/аналитику - дашборд «цифры + с чего начать»
+  // (ответ на «зашёл и ничего не понятно»), операторам - прежний лаунчер.
+  if (OWNER_ROLES.has(user.role)) {
+    const { HomeView } = await import("@/components/saas/HomeView");
+    return <HomeView />;
+  }
 
   // Server-side translation for the nav item labels below (this page renders
   // outside AppChrome's useT()-driven tree, but resolveLocale()/getMessages()

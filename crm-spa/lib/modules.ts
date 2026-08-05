@@ -33,6 +33,30 @@ const STATIC_DISABLED: readonly string[] = [
   "risk",
   "live",
   "calls.nav.group",
+  // Фидбек владельца «куча кнопок, ничего не понятно»: для MVP наружу смотрит
+  // короткое меню (дашборд + revenue-экраны + автоматизация + ключи). Всё
+  // скрытое живо и доступно по прямому URL; вернуть пункт = убрать строку.
+  "channels",
+  "ltv",
+  "dist",
+  "flags",
+  "desk",
+  "queue",
+  "calendar",
+  "report",
+  "actions",
+  "exports",
+  "overview",
+  "reports",
+  "rfm",
+  "cohorts",
+  "archetypes",
+  "cash",
+  "schema",
+  "formulas",
+  "glossary",
+  "signals",
+  "extensions",
 ];
 
 function fromEnv(): string[] {

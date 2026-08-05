@@ -154,3 +154,56 @@ def uplift():
         'total_incremental': round(total, 2),
         'campaigns': campaigns,
     })
+
+
+@bp.get('/saas/home')
+@require_auth(roles=LEAK_ROLES)
+def home():
+    """Домашний дашборд владельца: цифры + статусы онбординга. Один вызов -
+    всё, что нужно главной, чтобы ответить «что происходит и что делать»."""
+    tenant = request.args.get('tenant') or DEFAULT_TENANT
+
+    mrr = _flt(q(
+        "SELECT coalesce(sum(mrr), 0) FROM mrr_facts WHERE tenant_id = {t:String}",
+        {'t': tenant})[1][0][0])
+
+    stages = {r[0]: int(r[1]) for r in q(
+        "SELECT stage, count() FROM user_actions WHERE tenant_id = {t:String} GROUP BY stage",
+        {'t': tenant})[1]}
+
+    dunning_mrr = _flt(q(
+        "SELECT coalesce(sum(toFloat64(mrr)), 0) FROM user_actions "
+        "WHERE tenant_id = {t:String} AND stage = 'DUNNING'", {'t': tenant})[1][0][0])
+
+    camp = q(
+        """
+        SELECT countIf(status = 'active'), sum(control)
+        FROM campaign_enrollments_current WHERE tenant_id = {t:String}
+        """, {'t': tenant})[1][0]
+    touches_7d = int(q(
+        "SELECT count() FROM campaign_send_log "
+        "WHERE tenant_id = {t:String} AND ts >= now() - INTERVAL 7 DAY",
+        {'t': tenant})[1][0][0])
+
+    # Онбординг: демо-данные или живой Stripe; сниппет уже шлёт события?
+    live_customers = int(q(
+        "SELECT count() FROM stripe_customers WHERE tenant_id = {t:String} "
+        "AND customer_id NOT LIKE 'cus_mock%' AND customer_id NOT LIKE 'cus_demo%'",
+        {'t': tenant})[1][0][0])
+    snippet_events = int(q(
+        "SELECT count() FROM saas_events WHERE tenant_id = {t:String} AND source = 'snippet'",
+        {'t': tenant})[1][0][0])
+
+    return api_json({
+        'tenant': tenant,
+        'mrr': round(mrr, 2),
+        'users_total': sum(stages.values()),
+        'stages': stages,
+        'at_risk_now': stages.get('DUNNING', 0) + stages.get('SAVE', 0),
+        'dunning_mrr': round(dunning_mrr, 2),
+        'campaigns': {'active_enrollments': int(camp[0] or 0),
+                      'holdout': int(camp[1] or 0),
+                      'touches_7d': touches_7d},
+        'setup': {'stripe_connected': live_customers > 0,
+                  'snippet_connected': snippet_events > 0},
+    })
