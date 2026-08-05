@@ -240,6 +240,9 @@ export const saas: Partial<Messages> = {
   "saas.offers.p.amount_usd": "",
 
   "saas.camp.platformDry": "",
+  "saas.q.avg_plan_price": "",
+  "saas.q.avg_plan_price.ph": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

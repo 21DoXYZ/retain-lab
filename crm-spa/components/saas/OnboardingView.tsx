@@ -35,6 +35,7 @@ const Q_FIELDS: { key: string; kind: "str" | "num" | "bool"; showIf?: (a: Record
   { key: "callback_url", kind: "str", showIf: (a) => a.client_api === "yes" },
   { key: "has_trial", kind: "bool" },
   { key: "trial_days", kind: "num", showIf: (a) => a.has_trial === "yes" },
+  { key: "avg_plan_price", kind: "num" },
   { key: "max_discount_pct", kind: "num" },
   { key: "can_pause", kind: "bool" },
 ];

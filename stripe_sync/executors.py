@@ -110,7 +110,7 @@ def execute(offer: dict, user: dict, tenant_id: str, cfg: ExecConfig) -> tuple[b
             print(f"[offer dry_run] callback -> {json.dumps(body, separators=(',', ':'))}", flush=True)
             return True, "dry_run"
         if not cfg.callback_url:
-            return False, "callback_not_configured"
+            return False, "callback_not_configured"  # см. tenant_exec_config
         return _post_callback(cfg.callback_url, cfg.callback_token, body)
 
     # ── Stripe Level C ────────────────────────────────────────────────────────
@@ -156,3 +156,22 @@ def execute(offer: dict, user: dict, tenant_id: str, cfg: ExecConfig) -> tuple[b
     except Exception as exc:
         return False, f"stripe_error:{type(exc).__name__}"
     return False, "unreachable"
+
+
+def tenant_exec_config(tenant_id: str, cfg: "ExecConfig") -> "ExecConfig":
+    """Накладывает callback клиента из tenants.json (пишет опросник:
+    ответ callback_url) поверх платформенного env. Без этого бонус-офферы
+    падали бы в callback_not_configured даже после ответа клиента."""
+    from dataclasses import replace
+    try:
+        from saas_senders import load_tenant_channels
+    except ImportError:
+        from stripe_sync.saas_senders import load_tenant_channels
+    tc = load_tenant_channels(tenant_id) or {}
+    url = str(tc.get("callback_url") or "").strip()
+    token = str(tc.get("callback_token") or "").strip()
+    if url:
+        cfg = replace(cfg, callback_url=url)
+    if token:
+        cfg = replace(cfg, callback_token=token)
+    return cfg

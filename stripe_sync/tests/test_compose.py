@@ -109,3 +109,22 @@ def test_default_campaigns_block_is_neutral():
     assert "video" not in txt and "token" not in txt.replace("tokens_credit", "")
     offer_steps = [s for c in d["campaigns"] for s in c["steps"] if s["action"] == "offer"]
     assert offer_steps and all(s["offer_id"] == "" for s in offer_steps)
+
+
+def test_plan_rows_maps_stripe_price_and_client_limit():
+    """Цена - из Stripe (годовые /12), лимит - из ответа клиента."""
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from plans_sync import plan_rows
+
+    rows = plan_rows([("pro_monthly", 49, "month"),
+                      ("agency_yearly", 1500, "year"),
+                      ("", 10, "month")],          # без plan_id - пропускаем
+                     monthly_units=500, tenant="hub", now="2026-08-05 10:00:00.000")
+    assert len(rows) == 2
+    by_id = {r[1]: r for r in rows}
+    assert by_id["pro_monthly"][3] == 49.0
+    assert by_id["agency_yearly"][3] == 125.0      # 1500/12
+    assert all(r[2] == 500 for r in rows)          # лимит из опросника
+    # без ответа клиента лимит 0 - burn_rate останется 0 (честно)
+    assert plan_rows([("p", 10, "month")], 0, "hub", "t")[0][2] == 0

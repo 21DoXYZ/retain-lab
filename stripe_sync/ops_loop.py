@@ -26,6 +26,9 @@ JOBS = [
      lambda t: t.minute == 5),
     ("contacts", ["python", "contacts_sync.py"],
      lambda t: t.minute == 5),
+    # планы (цена из Stripe + лимит из опросника) - вход для burn_rate/UPGRADE
+    ("plans", ["python", "plans_sync.py"],
+     lambda t: t.minute == 5),
     ("scoring", ["python", "scoring.py"],
      lambda t: t.hour == 3 and t.minute == 10),
     ("uplift_report", ["python", "uplift_report.py"],
@@ -51,7 +54,7 @@ def run_job(name: str, argv: list[str]) -> None:
 
 
 def main() -> None:
-    print("[ops] scheduler up (UTC): tick */15m · stitch :05 · scoring 03:10 · uplift Mon 08:00",
+    print("[ops] scheduler up (UTC): tick */15m · stitch+contacts+plans :05 · scoring 03:10 · uplift Mon 08:00",
           flush=True)
     last_key = ""
     while True:

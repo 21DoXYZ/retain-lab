@@ -247,6 +247,9 @@ export const saas: Partial<Messages> = {
   "saas.offers.p.amount_usd": "Amount, $",
 
   "saas.camp.platformDry": "Autopilot is on, but a platform-level dry-run is still active (channel keys not yet enabled) - touches are not leaving yet. We lift it when the keys go live.",
+  "saas.q.avg_plan_price": "Average paid plan price, $ (if Stripe is not connected yet)",
+  "saas.q.avg_plan_price.ph": "49",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

@@ -246,6 +246,9 @@ export const saas = {
   "saas.offers.p.amount_usd": "Сумма, $",
 
   "saas.camp.platformDry": "Автопилот включён, но действует платформенный dry-run (ключи каналов ещё не активированы) - касания пока не уходят. Снимем при выдаче ключей.",
+  "saas.q.avg_plan_price": "Средняя цена платного плана, $ (если Stripe ещё не подключён)",
+  "saas.q.avg_plan_price.ph": "49 (долларов)",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

@@ -159,6 +159,9 @@ def tick(client, tenant: str) -> dict[str, int]:
         msg_cfg = _replace(msg_cfg, dry_run=True)
     # идентичность отправителя = бренд тенанта (from-домен, альфа-имя, бот)
     email_cfg, msg_cfg = tenant_configs(tenant, email_cfg, msg_cfg)
+    # исполнитель бонусов = вебхук клиента из опросника (tenants.json)
+    from executors import tenant_exec_config
+    exec_cfg = tenant_exec_config(tenant, exec_cfg)
     now = _now_dt()
     stats = {"enrolled": 0, "control": 0, "steps": 0, "done": 0, "exited": 0}
 

@@ -109,7 +109,9 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
         _log(client, tenant_id, offer, user, campaign_id, True, "holdout", "")
         return "holdout", ""
 
-    cfg = cfg or ExecConfig.from_env()
+    if cfg is None:
+        from executors import tenant_exec_config
+        cfg = tenant_exec_config(tenant_id, ExecConfig.from_env())
     exec_ok, detail = execute(offer, user, tenant_id, cfg)
     status = "dry_run" if (exec_ok and detail == "dry_run") else ("issued" if exec_ok else "rejected")
     _log(client, tenant_id, offer, user, campaign_id, False, status,
