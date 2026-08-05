@@ -376,33 +376,33 @@ def saas_questionnaire_submit():
                               'offers_reviewed': True,
                               'callback_url': answers.get('callback_url') or None})
 
-    # Тексты кампаний под продукт: AI либо детерминированные шаблоны -
-    # пишутся как overrides шагов (движок подхватит на следующем тике).
+    # Тексты кампаний под продукт: ПОЛНЫЙ рефреш каждого текстового шага -
+    # AI-текст, иначе детерминированный шаблон, иначе сброс к базе. Иначе при
+    # ресабмите отброшенный гардом AI-шаг оставлял текст ПРЕЖНЕГО продукта.
     from stripe_sync.compose import compose_campaign_copy
+    det_map = compose_campaign_copy(answers)
+    ai_map = {}
     copy_note = 'deterministic'
-    copy_map = {}
     if _ai_enabled():
         from stripe_sync.ai_compose import ai_compose_copy
-        copy_map, note = ai_compose_copy(answers)
-        copy_note = 'ai' if copy_map else note
-    if not copy_map:
-        copy_map = compose_campaign_copy(answers)
+        ai_map, note = ai_compose_copy(answers)
+        copy_note = 'ai' if ai_map else note
 
     conf = _campaigns_conf(tenant)
     by_id = {c['campaign_id']: c for c in conf.get('campaigns', [])}
     written = 0
-    for cid, steps in copy_map.items():
-        camp = by_id.get(cid)
-        if not camp:
-            continue
-        for idx, txt in steps.items():
-            i = int(idx)
-            if not (0 <= i < len(camp['steps'])) or camp['steps'][i].get('action') == 'offer':
+    for cid, camp in by_id.items():
+        for i, step in enumerate(camp.get('steps', [])):
+            if step.get('action') == 'offer':
                 continue
-            ovr.set_campaign_step(tenant, cid, i,
-                                  {'subject': txt.get('subject', ''),
-                                   'body': txt.get('body', '')})
-            written += 1
+            txt = (ai_map.get(cid) or {}).get(i) or (det_map.get(cid) or {}).get(i)
+            if txt:
+                ovr.set_campaign_step(tenant, cid, i,
+                                      {'subject': txt.get('subject', ''),
+                                       'body': txt.get('body', '')})
+                written += 1
+            else:
+                ovr.set_campaign_step(tenant, cid, i, None)
 
     # Привязка авто-офферов к offer-шагам каркаса (роль -> шаг).
     bind_roles = {'K1_activation': 'activation', 'K2_trial_conversion': 'conversion',
