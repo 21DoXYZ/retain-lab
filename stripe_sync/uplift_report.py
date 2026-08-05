@@ -18,7 +18,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from saas_senders import EmailConfig, send_email
+from saas_senders import EmailConfig, MessagingConfig, send_email, tenant_configs
 
 CAMPAIGNS_PATH = Path(__file__).parent / "saas_campaigns.json"
 
@@ -136,8 +136,8 @@ def main() -> None:
 
     owner = os.environ.get("OWNER_EMAIL", "").strip()
     if owner and lines:
-        send_email(owner, f"Uplift report {now.date()} - {tenant}", report,
-                   EmailConfig.from_env())
+        ecfg, _ = tenant_configs(tenant, EmailConfig.from_env(), MessagingConfig.from_env())
+        send_email(owner, f"Uplift report {now.date()} - {tenant}", report, ecfg)
 
 
 if __name__ == "__main__":

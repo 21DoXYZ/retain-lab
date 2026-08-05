@@ -37,3 +37,28 @@ def test_render_known_and_unknown_placeholders():
     out = render("Update card: {{card_update_url}} ({{mystery}})",
                  {"card_update_url": "https://b.example/p"})
     assert out == "Update card: https://b.example/p ({{mystery}})"
+
+
+def test_tenant_identity_overrides_env(tmp_path, monkeypatch):
+    """Отправитель = бренд тенанта: tenants.json важнее платформенного env."""
+    import json
+    from stripe_sync import saas_senders as sn
+    from stripe_sync.saas_senders import EmailConfig, MessagingConfig, tenant_configs
+
+    f = tmp_path / "tenants.json"
+    f.write_text(json.dumps({"hubcontent": {
+        "email_from": "Hub Content <care@mail.hubcontent.com>",
+        "sms_sender": "HubContent", "telegram_bot_token": "tt"}}))
+    monkeypatch.setattr(sn, "TENANTS_FILE", str(f))
+
+    e, m = tenant_configs(
+        "hubcontent",
+        EmailConfig(email_from="platform@retivo.digital"),
+        MessagingConfig(sms_sender="Retivo", viber_sender="Retivo"))
+    assert e.email_from == "Hub Content <care@mail.hubcontent.com>"
+    assert m.sms_sender == "HubContent"
+    assert m.viber_sender == "Retivo"          # не задан у тенанта - фолбэк env
+    assert m.telegram_bot_token == "tt"
+
+    e2, m2 = tenant_configs("unknown", EmailConfig(email_from="p@x"), MessagingConfig())
+    assert e2.email_from == "p@x"

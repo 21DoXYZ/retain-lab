@@ -309,24 +309,34 @@ def channels():
     def _set(name):
         return bool(_os.environ.get(name, '').strip())
 
+    # Идентичность отправителя тенанта (from-домен, альфа-имена, бот):
+    # secrets/tenants.json - тот же файл, что читают сендеры.
+    import json as _json
+    try:
+        with open(_os.environ.get('TENANTS_FILE', '/secrets/tenants.json')) as _fh:
+            tch = _json.load(_fh).get(tenant, {}) or {}
+    except Exception:
+        tch = {}
+
     providers = [
         {'channel': 'email', 'provider': 'Resend',
-         'configured': _set('RESEND_API_KEY') and _set('EMAIL_FROM'),
-         'detail': _os.environ.get('EMAIL_FROM', ''),
+         'configured': _set('RESEND_API_KEY') and bool(tch.get('email_from') or _set('EMAIL_FROM')),
+         'detail': tch.get('email_from') or _os.environ.get('EMAIL_FROM', ''),
          'contacts': email_users, 'consented': email_users},
         {'channel': 'sms', 'provider': 'DecisionTelecom',
-         'configured': _set('DECISION_API_KEY') and _set('DECISION_SMS_SENDER'),
-         'detail': _os.environ.get('DECISION_SMS_SENDER', ''),
+         'configured': _set('DECISION_API_KEY') and bool(tch.get('sms_sender') or _set('DECISION_SMS_SENDER')),
+         'detail': tch.get('sms_sender') or _os.environ.get('DECISION_SMS_SENDER', ''),
          **cov.get('sms', {'contacts': 0, 'consented': 0})},
         {'channel': 'viber', 'provider': 'DecisionTelecom',
-         'configured': _set('DECISION_API_KEY') and _set('DECISION_VIBER_SENDER'),
-         'detail': _os.environ.get('DECISION_VIBER_SENDER', ''),
+         'configured': _set('DECISION_API_KEY') and bool(tch.get('viber_sender') or _set('DECISION_VIBER_SENDER')),
+         'detail': tch.get('viber_sender') or _os.environ.get('DECISION_VIBER_SENDER', ''),
          **cov.get('viber', {'contacts': 0, 'consented': 0})},
         {'channel': 'whatsapp', 'provider': 'DecisionTelecom',
          'configured': False, 'detail': 'WABA onboarding pending',
          **cov.get('whatsapp', {'contacts': 0, 'consented': 0})},
         {'channel': 'telegram', 'provider': 'Bot API',
-         'configured': _set('TELEGRAM_BOT_TOKEN'), 'detail': '',
+         'configured': bool(tch.get('telegram_bot_token')) or _set('TELEGRAM_BOT_TOKEN'),
+         'detail': 'tenant bot' if tch.get('telegram_bot_token') else '',
          **cov.get('telegram', {'contacts': 0, 'consented': 0})},
     ]
     return api_json({'tenant': tenant, 'providers': providers})

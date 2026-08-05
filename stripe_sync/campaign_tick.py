@@ -29,7 +29,8 @@ from pathlib import Path
 from executors import ExecConfig
 from hygiene import holdout_split
 from issue import issue_offer
-from saas_senders import EmailConfig, MessagingConfig, route_message, send_email
+from saas_senders import (EmailConfig, MessagingConfig, route_message,
+                          send_email, tenant_configs)
 
 CAMPAIGNS_PATH = Path(__file__).parent / "saas_campaigns.json"
 REENTRY_DAYS = 30
@@ -124,6 +125,8 @@ def tick(client, tenant: str) -> dict[str, int]:
     if not conf.get("autopilot"):
         from dataclasses import replace as _replace
         msg_cfg = _replace(msg_cfg, dry_run=True)
+    # идентичность отправителя = бренд тенанта (from-домен, альфа-имя, бот)
+    email_cfg, msg_cfg = tenant_configs(tenant, email_cfg, msg_cfg)
     now = _now_dt()
     stats = {"enrolled": 0, "control": 0, "steps": 0, "done": 0, "exited": 0}
 

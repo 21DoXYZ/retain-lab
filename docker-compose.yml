@@ -173,6 +173,8 @@ services:
       CALLBACK_URL: ${CALLBACK_URL:-}
       CALLBACK_TOKEN: ${CALLBACK_TOKEN:-}
       SIGNALS_DRY_RUN: ${SIGNALS_DRY_RUN:-1}
+    volumes:
+      - ./secrets:/secrets:ro   # tenants.json - идентичность отправителей тенантов
     restart: unless-stopped
 
   # Пушер сигналов модели -> колбэк казино. Батч-задача (profiles: не стартует с up).

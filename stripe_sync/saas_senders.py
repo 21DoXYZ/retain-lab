@@ -174,3 +174,40 @@ def route_message(channel: str, address: str, subject: str, body: str,
     if channel == "telegram":
         return send_telegram(address, text, msg_cfg)
     return False, f"unknown_channel:{channel}"
+
+
+# ── Per-tenant отправители: инфраструктура наша - ИДЕНТИЧНОСТЬ клиента ────────
+# Письма уходят с домена тенанта (DKIM/SPF на его поддомене, верифицированном
+# в нашем Resend), SMS/Viber - с его альфа-имени, Telegram - его брендированный
+# бот. Конфиг: secrets/tenants.json (в git не попадает, монтируется томом):
+#   {"hubcontent": {"email_from": "Hub Content <care@mail.hubcontent.com>",
+#                   "sms_sender": "HubContent", "viber_sender": "HubContent",
+#                   "telegram_bot_token": "..."}}
+# Env-переменные остаются платформенным фолбэком (dev/наши собственные письма).
+
+TENANTS_FILE = os.environ.get("TENANTS_FILE", "/secrets/tenants.json")
+
+
+def load_tenant_channels(tenant_id: str) -> dict:
+    try:
+        with open(TENANTS_FILE) as fh:
+            return json.load(fh).get(tenant_id, {}) or {}
+    except Exception:
+        return {}
+
+
+def tenant_configs(tenant_id: str, email_cfg: EmailConfig,
+                   msg_cfg: MessagingConfig) -> tuple[EmailConfig, MessagingConfig]:
+    """Поверх env-конфигов накладывает идентичность тенанта (from/имена/бот)."""
+    from dataclasses import replace
+    tc = load_tenant_channels(tenant_id)
+    if tc.get("email_from"):
+        email_cfg = replace(email_cfg, email_from=str(tc["email_from"]))
+    msg_over = {}
+    for src, dst in (("sms_sender", "sms_sender"), ("viber_sender", "viber_sender"),
+                     ("telegram_bot_token", "telegram_bot_token")):
+        if tc.get(src):
+            msg_over[dst] = str(tc[src])
+    if msg_over:
+        msg_cfg = replace(msg_cfg, **msg_over)
+    return email_cfg, msg_cfg

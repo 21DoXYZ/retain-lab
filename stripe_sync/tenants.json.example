@@ -1,0 +1,9 @@
+{
+  "hubcontent": {
+    "email_from": "Hub Content <care@mail.hubcontent.com>",
+    "email_domain_status": "pending_dns",
+    "sms_sender": "HubContent",
+    "viber_sender": "HubContent",
+    "telegram_bot_token": ""
+  }
+}
