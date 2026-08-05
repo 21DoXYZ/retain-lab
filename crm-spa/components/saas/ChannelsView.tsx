@@ -334,6 +334,13 @@ function ChannelCard({
         </>
       )}
 
+      {/* ── In-app: живёт на сниппете, отдельной настройки нет ── */}
+      {row.channel === "inapp" && (
+        <p className="text-[13px] text-steel">
+          {t(st === "active" ? "saas.channels.inapp.activeNote" : "saas.channels.inapp.setupNote")}
+        </p>
+      )}
+
       {/* ── WhatsApp: после WABA-онбординга ── */}
       {row.channel === "whatsapp" && (
         <p className="text-[13px] text-steel">{t("saas.channels.wa.note")}</p>

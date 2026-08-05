@@ -105,6 +105,9 @@ export const saas = {
   "saas.channels.name.sms": "SMS",
   "saas.channels.name.viber": "Viber",
   "saas.channels.name.telegram": "Telegram",
+  "saas.channels.name.inapp": "In-app",
+  "saas.channels.inapp.activeNote": "Баннеры показываются прямо в вашем продукте через установленный сниппет - самый конверсионный канал для дуннинга. Отдельной настройки не нужно.",
+  "saas.channels.inapp.setupNote": "Заработает автоматически, как только сниппет установлен и юзеры идентифицированы (ra.identify).",
   "saas.channels.name.whatsapp": "WhatsApp",
 
   "saas.channels.state.active": "подключён",

@@ -106,6 +106,9 @@ export const saas: Partial<Messages> = {
   "saas.channels.name.sms": "SMS",
   "saas.channels.name.viber": "Viber",
   "saas.channels.name.telegram": "Telegram",
+  "saas.channels.name.inapp": "In-app",
+  "saas.channels.inapp.activeNote": "Banners show right inside your product via the installed snippet - the highest-converting channel for dunning. No extra setup.",
+  "saas.channels.inapp.setupNote": "Activates automatically once the snippet is installed and users are identified (ra.identify).",
   "saas.channels.name.whatsapp": "WhatsApp",
 
   "saas.channels.state.active": "connected",

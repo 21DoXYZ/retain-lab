@@ -324,6 +324,16 @@ def _channels_payload(tenant: str) -> dict:
     dt_key = _platform('DECISION_API_KEY')
     bot_user = str(tch.get('telegram_bot_username', ''))
 
+    # In-app: живёт на сниппете - "подключён", если события сниппета идут
+    # и юзеры идентифицированы (им есть кому показывать баннеры).
+    identified = int(q(
+        "SELECT countIf(client_user_id != '') FROM user_actions "
+        "WHERE tenant_id = {t:String}", {'t': tenant})[1][0][0])
+    snippet_alive = int(q(
+        "SELECT count() FROM saas_events WHERE tenant_id = {t:String} "
+        "AND source = 'snippet' AND ts > now() - INTERVAL 7 DAY",
+        {'t': tenant})[1][0][0]) > 0
+
     channels = [
         {'channel': 'email', 'provider': 'Resend', 'state': ca.email_state(tch, resend_key),
          'detail': tch.get('email_from') or tch.get('email_domain', ''),
@@ -331,6 +341,9 @@ def _channels_payload(tenant: str) -> dict:
          'email': {'domain': tch.get('email_domain', ''),
                    'from': tch.get('email_from', ''),
                    'dns_records': tch.get('email_dns_records', [])}},
+        {'channel': 'inapp', 'provider': 'Site snippet',
+         'state': 'active' if snippet_alive and identified else 'not_connected',
+         'detail': '', 'contacts': identified, 'consented': identified},
         {'channel': 'sms', 'provider': 'DecisionTelecom',
          'state': ca.messaging_state(tch, 'sms', dt_key),
          'detail': tch.get('sms_sender') or tch.get('requested_sms_sender', ''),
