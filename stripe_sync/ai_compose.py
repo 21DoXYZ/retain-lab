@@ -62,7 +62,7 @@ Executors and their exact params (no other keys allowed):
 - balance_credit: amount_usd (number).
 
 role - which lifecycle lever this offer serves (exactly one of):
-"activation" | "conversion" | "dunning" | "save" | "upgrade"
+"activation" | "conversion" | "dunning" | "save" | "upgrade" | "winback"
 
 Offer-selection doctrine (value-first hierarchy, follow it):
 1. Product units (client_callback) - cheapest real value; first choice for
@@ -95,8 +95,12 @@ discount20_2mo, trial_plus7) - no prefixes, unique. Titles are shown to the
 client's USERS in the product's own language: short, concrete, name the unit.
 No emoji, no em-dash.
 
-Produce 4-6 offers covering DIFFERENT roles (at least activation, conversion,
-save, upgrade when the answers allow them)."""
+Winback (canceled 30+ days ago): one strong ONE-TIME discount (duration
+"once", up to max_discount_pct, cap 30) - the single case where a bold
+discount is correct.
+
+Produce 4-7 offers covering DIFFERENT roles (at least activation, conversion,
+save, upgrade, winback when the answers allow them)."""
 
 
 def build_user_prompt(answers: dict, avg_price: float) -> str:
@@ -150,7 +154,7 @@ def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], lis
     seen = set()
     for raw in (doc.get("offers") or [])[:6]:
         role = str(raw.pop("role", "") or "").lower()
-        if role not in ("activation", "conversion", "dunning", "save", "upgrade"):
+        if role not in ("activation", "conversion", "dunning", "save", "upgrade", "winback"):
             role = ""
         clean, reason = validate_offer(raw)
         if reason:
@@ -189,7 +193,8 @@ copy for ONE SaaS product, in ITS voice, to ITS users. Output ONLY valid JSON:
 {"K1_activation": {"0": {"subject": "...", "body": "..."}, "2": {...}},
  "K2_trial_conversion": {"0": {...}, "2": {...}},
  "K3_payment_recovery": {"0": {...}, "1": {...}, "2": {...}, "3": {...}},
- "K4_save": {"1": {...}, "2": {...}}, "K5_upgrade": {"0": {...}, "2": {...}}}
+ "K4_save": {"1": {...}, "2": {...}}, "K5_upgrade": {"0": {...}, "2": {...}},
+ "K6_winback": {"0": {...}, "2": {...}}}
 
 The skeleton is fixed - write copy ONLY for these steps, with this intent:
 
@@ -220,6 +225,10 @@ K5 upgrade (80%+ of plan limit):
   step 0 email: compliment the power use, then the math - the higher tier is
     cheaper per unit at their volume.
   step 2 email: the annual option in plain numbers for heavy months.
+K6 winback (canceled 30+ days ago):
+  step 0 email: no guilt - what is NEW in the product since they left, one
+    concrete improvement.
+  step 2 email: their account and history are safe, the door is open.
 
 Hard rules:
 - Subjects under 60 chars, bodies 1-3 sentences, ONE call to action per email.
@@ -262,6 +271,9 @@ def parse_ai_copy(text: str) -> dict:
             # дуннинг-письма обязаны нести ссылку обновления карты - иначе
             # письмо без действия; шаг отбрасывается (останется шаблон)
             if str(cid) == "K3_payment_recovery" and i in (1, 2, 3)                     and "{{card_update_url}}" not in body:
+                continue
+            # баннер без заголовка - обрубок; шаг уходит на шаблон
+            if str(cid) == "K3_payment_recovery" and i == 0 and not subject:
                 continue
             clean[i] = {"subject": subject, "body": body}
         if clean:

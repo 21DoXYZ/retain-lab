@@ -152,6 +152,34 @@
           "event_type": "billing.subscription_updated",
           "window_days": 30
         }
+      },
+      {
+        "campaign_id": "K6_winback",
+        "title": "Winback: canceled 30+ days ago",
+        "entry_stage": "WINBACK",
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "A lot changed since you left",
+            "body": "Here is what is new in the product since you canceled - worth a fresh look: {{app_url}}"
+          },
+          {
+            "delay_h": 24,
+            "action": "offer",
+            "offer_id": ""
+          },
+          {
+            "delay_h": 96,
+            "action": "email",
+            "subject": "Your account is still here",
+            "body": "Your history and settings are saved. Come back anytime: {{app_url}}"
+          }
+        ],
+        "goal": {
+          "event_type": "billing.invoice_paid",
+          "window_days": 30
+        }
       }
     ],
     "autopilot": false
@@ -308,6 +336,34 @@
         ],
         "goal": {
           "event_type": "billing.subscription_updated",
+          "window_days": 30
+        }
+      },
+      {
+        "campaign_id": "K6_winback",
+        "title": "Winback: canceled 30+ days ago",
+        "entry_stage": "WINBACK",
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "A lot changed since you left",
+            "body": "Here is what is new in the product since you canceled - worth a fresh look: {{app_url}}"
+          },
+          {
+            "delay_h": 24,
+            "action": "offer",
+            "offer_id": ""
+          },
+          {
+            "delay_h": 96,
+            "action": "email",
+            "subject": "Your account is still here",
+            "body": "Your history and settings are saved. Come back anytime: {{app_url}}"
+          }
+        ],
+        "goal": {
+          "event_type": "billing.invoice_paid",
           "window_days": 30
         }
       }

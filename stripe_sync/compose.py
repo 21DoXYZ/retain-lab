@@ -210,6 +210,17 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
             "params": {"months": 1},
         })
 
+    if ceiling > 0:
+        pct_wb = int(min(30, ceiling))
+        out.append({
+            "offer_id": f"{AUTO_PREFIX}winback{pct_wb}", "role": "winback",
+            "title": f"{pct_wb}% off your first month back",
+            "executor": "stripe_coupon", "monetary": True,
+            "cost_estimate": round(price * pct_wb / 100, 2),
+            "max_per_user_30d": 1,
+            "params": {"percent_off": pct_wb, "duration": "once"},
+        })
+
     if ceiling > 0 and price > 0:
         credit = round(min(25.0, price * 0.2))
         if credit >= 1:
@@ -272,6 +283,13 @@ def compose_campaign_copy(answers: dict) -> dict:
                         f"history{units}, pay nothing: {app}"},
             2: {"subject": f"What is new in {name}",
                 "body": f"Here is what changed since you last visited: {app}"},
+        },
+        "K6_winback": {
+            0: {"subject": f"A lot changed in {name} since you left",
+                "body": f"Here is what is new since you canceled - worth a "
+                        f"fresh look: {app}"},
+            2: {"subject": "Your account is still here",
+                "body": f"Your history{units} are saved. Come back anytime: {app}"},
         },
         "K5_upgrade": {
             0: {"subject": "You are hitting your plan limit",
