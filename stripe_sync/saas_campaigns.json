@@ -56,7 +56,8 @@
         "goal": {
           "event_type": "billing.invoice_paid",
           "window_days": 14
-        }
+        },
+        "reentry_days": 7
       },
       {
         "campaign_id": "K3_payment_recovery",
@@ -94,7 +95,8 @@
         "goal": {
           "event_type": "billing.invoice_paid",
           "window_days": 7
-        }
+        },
+        "reentry_days": 2
       },
       {
         "campaign_id": "K4_save",
@@ -179,7 +181,8 @@
         "goal": {
           "event_type": "billing.invoice_paid",
           "window_days": 30
-        }
+        },
+        "reentry_days": 90
       }
     ],
     "autopilot": false
@@ -242,7 +245,8 @@
         "goal": {
           "event_type": "billing.invoice_paid",
           "window_days": 14
-        }
+        },
+        "reentry_days": 7
       },
       {
         "campaign_id": "K3_payment_recovery",
@@ -280,7 +284,8 @@
         "goal": {
           "event_type": "billing.invoice_paid",
           "window_days": 7
-        }
+        },
+        "reentry_days": 2
       },
       {
         "campaign_id": "K4_save",
@@ -365,7 +370,8 @@
         "goal": {
           "event_type": "billing.invoice_paid",
           "window_days": 30
-        }
+        },
+        "reentry_days": 90
       }
     ]
   }

@@ -245,6 +245,7 @@ export const saas = {
   "saas.offers.p.months": "Месяцев",
   "saas.offers.p.amount_usd": "Сумма, $",
 
+  "saas.camp.platformDry": "Автопилот включён, но действует платформенный dry-run (ключи каналов ещё не активированы) - касания пока не уходят. Снимем при выдаче ключей.",
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

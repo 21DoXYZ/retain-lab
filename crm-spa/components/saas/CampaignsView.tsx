@@ -34,6 +34,7 @@ interface Campaign {
 
 interface Payload {
   autopilot: boolean;
+  platform_dry_run: boolean;
   control_pct: number;
   campaigns: Campaign[];
 }
@@ -324,6 +325,10 @@ export function CampaignsView() {
               </Button>
             </div>
           </Card>
+
+          {data.autopilot && data.platform_dry_run && (
+            <Banner>{t("saas.camp.platformDry")}</Banner>
+          )}
 
           {data.campaigns.map((c) => (
             <Card key={c.campaign_id} className="flex flex-col gap-4 p-5">

@@ -174,6 +174,9 @@ def tick(client, tenant: str) -> dict[str, int]:
 
     for camp in conf["campaigns"]:
         cid, steps = camp["campaign_id"], camp["steps"]
+        # Кулдаун повторного входа СВОЙ у кампании: дуннинг обязан отработать
+        # каждый новый несписанный платёж (2д), винбэк - наоборот, редкий (90д).
+        reentry = int(camp.get("reentry_days", REENTRY_DAYS))
 
         enrolled = {r[0]: dict(zip(
             ["identity_id", "control", "entry_stage", "step_idx",
@@ -184,7 +187,7 @@ def tick(client, tenant: str) -> dict[str, int]:
             FROM retention.campaign_enrollments_current
             WHERE tenant_id = %(t)s AND campaign_id = %(c)s
               AND (status = 'active' OR enrolled_at >= now() - INTERVAL %(d)s DAY)
-            """, parameters={"t": tenant, "c": cid, "d": REENTRY_DAYS},
+            """, parameters={"t": tenant, "c": cid, "d": reentry},
         ).result_rows}
 
         # 1. ENROLL

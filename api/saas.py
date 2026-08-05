@@ -353,7 +353,9 @@ def saas_questionnaire_submit():
     from stripe_sync import overrides as ovr
     from stripe_sync.compose import compose_offers, validate_answers
 
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     raw = (request.get_json(silent=True) or {}).get('answers') or {}
     answers, reason = validate_answers(raw)
     if reason:
@@ -444,7 +446,9 @@ def saas_questionnaire_submit():
 @require_auth(roles=CHANNEL_WRITE_ROLES)
 def saas_onboarding_offers_reviewed():
     """Владелец подтвердил, что просмотрел каталог офферов (шаг онбординга)."""
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     ca.update_tenant(tenant, {'offers_reviewed': True})
     return saas_onboarding()
 
@@ -558,6 +562,30 @@ def _platform(name: str) -> bool:
 def _tenant_arg() -> str:
     return (request.args.get('tenant') or (request.get_json(silent=True) or {}).get('tenant')
             or DEFAULT_TENANT)
+
+
+def _known_tenants() -> set:
+    """Тенанты, в которые разрешена ЗАПИСЬ: git-конфиг кампаний (кроме
+    _default) + уже заведённые в tenants.json. Иначе ?tenant=мусор плодил бы
+    фантомные записи в runtime-файлах."""
+    import json as _json
+    from pathlib import Path as _Path
+    out = set(ca.load_tenants().keys())
+    p = _Path(__file__).resolve().parent.parent / 'stripe_sync' / 'saas_campaigns.json'
+    try:
+        out |= {k for k in _json.loads(p.read_text()).keys() if k != '_default'}
+    except Exception:
+        pass
+    out.add(DEFAULT_TENANT)
+    return out
+
+
+def _tenant_arg_write():
+    """(tenant, None) либо (None, error-response) для write-ручек."""
+    t = _tenant_arg()
+    if t not in _known_tenants():
+        return None, _bad('unknown_tenant', 404)
+    return t, None
 
 
 def _channels_payload(tenant: str) -> dict:
@@ -677,7 +705,10 @@ def _campaigns_payload(tenant: str) -> dict:
                   'touches': touches.get(c['campaign_id'], 0)},
     } for c in conf.get('campaigns', [])]
 
+    import os as _os3
+    platform_dry = _os3.environ.get('SIGNALS_DRY_RUN', '1') not in ('0', 'false', 'False', '')
     return {'tenant': tenant, 'autopilot': _autopilot_resolved(conf, tenant),
+            'platform_dry_run': platform_dry,
             'control_pct': int(conf.get('control_pct', 10)), 'campaigns': campaigns}
 
 
@@ -694,7 +725,9 @@ def saas_campaign_step_edit():
     Структуру (добавить/удалить шаг, сменить канал) правит платформа."""
     from stripe_sync import overrides as ovr
 
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     body = request.get_json(silent=True) or {}
     cid = str(body.get('campaign_id', ''))
     try:
@@ -750,7 +783,9 @@ def saas_offer_edit():
     import os as _os2
     from stripe_sync import overrides as ovr
 
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     body = request.get_json(silent=True) or {}
     oid = str(body.get('offer_id', ''))
 
@@ -812,7 +847,9 @@ def saas_offer_create():
     from stripe_sync import overrides as ovr
     from stripe_sync.compose import validate_offer
 
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     body = request.get_json(silent=True) or {}
     clean, reason = validate_offer(body)
     if reason:
@@ -839,7 +876,9 @@ def saas_offer_disable():
     отключении удаляется совсем)."""
     from stripe_sync import overrides as ovr
 
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     body = request.get_json(silent=True) or {}
     oid = str(body.get('offer_id', ''))
     if oid not in {o['offer_id'] for o in _tenant_offers(tenant)}:
@@ -855,7 +894,9 @@ def saas_offer_disable():
 def saas_campaigns_autopilot():
     """Рубильник автопилота: false = все касания принудительно dry-run.
     Пишется в tenants.json (рантайм) - контент кампаний остаётся в git."""
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     body = request.get_json(silent=True) or {}
     enabled = bool(body.get('enabled'))
     ca.update_tenant(tenant, {'autopilot': enabled})
@@ -873,7 +914,9 @@ def channels_email_domain():
     """Клиент вводит свой поддомен отправки (mail.клиент.com). С ключом Resend
     сразу создаём домен и возвращаем DNS-записи; без ключа фиксируем запрос
     (awaiting_provider) - создание догонит /verify, когда ключ появится."""
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     domain = str((request.get_json(silent=True) or {}).get('domain', '')).strip().lower()
     if not ca.DOMAIN_RE.match(domain):
         return _bad('invalid_domain')
@@ -902,7 +945,9 @@ def channels_email_domain():
 @require_auth(roles=CHANNEL_WRITE_ROLES)
 def channels_email_verify():
     """Кнопка «Проверить DNS»: дергаем верификацию и перечитываем статус."""
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     tch = ca.load_tenants().get(tenant, {}) or {}
     domain = str(tch.get('email_domain', ''))
     if not domain:
@@ -937,7 +982,9 @@ def channels_email_verify():
 @require_auth(roles=CHANNEL_WRITE_ROLES)
 def channels_email_sender():
     """Имя и адрес «От кого» - строго на подключённом домене тенанта."""
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     body = request.get_json(silent=True) or {}
     name = str(body.get('from_name', '')).strip().replace('<', '').replace('>', '')[:60]
     addr = str(body.get('from_email', '')).strip().lower()
@@ -957,7 +1004,9 @@ def channels_email_sender():
 def channels_messaging():
     """Заявка на альфа-имя SMS/Viber. Регистрацию у DecisionTelecom ведёт
     платформа (менеджер DT), активация = перенос requested_* -> *_sender."""
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     body = request.get_json(silent=True) or {}
     patch = {}
     for kind in ('sms', 'viber'):
@@ -979,7 +1028,9 @@ def channels_messaging():
 def channels_telegram():
     """Подключение бота клиента: валидация токена (getMe) + вебхук на наш
     ingest с секретом. Пустой bot_token = отключить."""
-    tenant = _tenant_arg()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     token = str((request.get_json(silent=True) or {}).get('bot_token', '')).strip()
 
     if not token:

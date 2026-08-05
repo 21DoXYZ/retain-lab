@@ -246,6 +246,7 @@ export const saas: Partial<Messages> = {
   "saas.offers.p.months": "Months",
   "saas.offers.p.amount_usd": "Amount, $",
 
+  "saas.camp.platformDry": "Autopilot is on, but a platform-level dry-run is still active (channel keys not yet enabled) - touches are not leaving yet. We lift it when the keys go live.",
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",
