@@ -568,9 +568,11 @@ def _keys_payload() -> dict:
     toks = pb._load_tokens()
     if not isinstance(toks, dict):   # легаси-формат (список) - показываем как один слот
         toks = {'ingest_prod': (toks or [''])[0] if toks else ''}
-    # Показываем ВСЕ ключи файла (реальные имена), TOKEN_LABELS - как подписи
-    # и как пустые слоты, если файла ещё нет.
-    keys = list(dict.fromkeys(list(toks.keys()) + list(pb.TOKEN_LABELS.keys())))
+    # Показываем ВСЕ ключи файла (реальные имена). Пустые слоты из TOKEN_LABELS
+    # (казино-легаси prod/test) - только пока файла с токенами нет вообще.
+    has_real = any(v for v in toks.values())
+    keys = list(dict.fromkeys(
+        list(toks.keys()) + ([] if has_real else list(pb.TOKEN_LABELS.keys()))))
     tokens = []
     for k in keys:
         val = toks.get(k, '') or ''
