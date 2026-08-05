@@ -31,7 +31,10 @@ export function DataFreshness() {
     };
   }, []);
 
-  const until = f?.game_until ?? f?.money_until;
+  // Пустые витрины отдают эпоху (01.01.1970) - это «данных нет», не граница.
+  const real = (s: string | null | undefined) =>
+    s && !/(^|\.|\s|-)19[67]\d([.\s-]|$)/.test(s) ? s : null;
+  const until = real(f?.game_until) ?? real(f?.money_until);
   if (!until) return null;
   return (
     <span
