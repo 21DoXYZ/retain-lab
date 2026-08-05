@@ -1,7 +1,11 @@
 # Публичный вход Revenue Autopilot (SaaS-пресет). Caddy в host-network:
 # все апстримы - loopback хоста, наружу только 80/443 (ufw allow), LE-серт
-# автоматом. Хост задаётся env SAAS_HOST (sslip.io до покупки домена;
-# переключение на свой домен = поменять SAAS_HOST в .env + пересобрать SPA).
+# автоматом. Хост задаётся env SAAS_HOST (боевой: retivo.digital).
+
+# Старый технический адрес -> постоянный редирект на боевой домен.
+ra.187-77-157-6.sslip.io {
+	redir https://{$SAAS_HOST}{uri} permanent
+}
 {$SAAS_HOST} {
 	encode gzip
 
