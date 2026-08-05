@@ -24,8 +24,8 @@ except ImportError:
 
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL") or "claude-sonnet-5"
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL") or "gpt-4o-mini"
 _TIMEOUT = 60
 
 AI_PREFIX = "AI_"
