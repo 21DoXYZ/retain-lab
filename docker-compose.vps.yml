@@ -22,6 +22,11 @@ services:
   ingest:
     ports:
       - "127.0.0.1:8081:8081"
+  stripe-webhook:
+    ports:
+      - "127.0.0.1:8082:8082"
+    environment:
+      STRIPE_SIGVERIFY_OFF: "1"   # dev: моки без подписи; убрать при живом Stripe
   # SPA в host-сети: NEXT_PUBLIC_SUPABASE_URL=127.0.0.1:54321 обязан работать и в
   # server-runtime (proxy/route handlers), и в браузере (через SSH-туннель) — в
   # bridge-сети контейнерный 127.0.0.1 указывал бы на сам контейнер.

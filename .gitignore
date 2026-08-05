@@ -71,3 +71,4 @@ supabase/.branches/
 supabase/.temp/
 tegsoft_docs_full.txt
 scratch_api_coh.json
+.venv-test/

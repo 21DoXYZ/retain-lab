@@ -1,0 +1,5 @@
+flask==3.1.*
+gunicorn==23.*
+confluent-kafka==2.*
+clickhouse-connect==0.8.*
+stripe==12.*

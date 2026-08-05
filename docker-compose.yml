@@ -115,6 +115,32 @@ services:
     # порт наружу не публикуем — доступ только через caddy (https://cas.21do.xyz/ingest/*)
     restart: unless-stopped
 
+  # Stripe-адаптер SaaS-контура (Revenue Autopilot, Phase 1): вебхуки Stripe →
+  # топик saas.events + снапшоты объектов в stripe_*. Наружу не публикуется
+  # (в dev — loopback через оверлей; в прод — через reverse-proxy). Backfill:
+  #   docker compose run --rm stripe-webhook python backfill.py --mock 40
+  stripe-webhook:
+    build: ./stripe_sync
+    depends_on:
+      redpanda:
+        condition: service_started
+      clickhouse:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      SAAS_KAFKA_TOPIC: saas.events
+      SASL_USER: ${INGEST_KAFKA_USER:?set INGEST_KAFKA_USER in .env}
+      SASL_PASS: ${INGEST_KAFKA_PASS:?set INGEST_KAFKA_PASS in .env}
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      TENANT_ID: ${TENANT_ID:-hubcontent}
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_SIGVERIFY_OFF: ${STRIPE_SIGVERIFY_OFF:-}   # 1 = дев-моки без подписи (НЕ в проде)
+    restart: unless-stopped
+
   # Пушер сигналов модели -> колбэк казино. Батч-задача (profiles: не стартует с up).
   #   запуск:  docker compose run --rm pusher
   pusher:

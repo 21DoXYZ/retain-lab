@@ -79,6 +79,10 @@ MAX_BATCH = int(os.environ.get("MAX_BATCH", "1000"))
 
 REQUIRED = {"event_id", "event_type", "casino_player_id", "ts"}
 
+# SaaS-контур (Revenue Autopilot): свой топик и свой контракт (saas_schema.sql).
+SAAS_TOPIC = os.environ.get("SAAS_KAFKA_TOPIC", "saas.events")
+REQUIRED_SAAS = {"event_id", "tenant_id", "event_type", "ts"}
+
 producer = Producer({
     "bootstrap.servers": BROKER,
     "security.protocol": "SASL_PLAINTEXT",   # внутренний listener Redpanda (доверенная docker-сеть)
@@ -158,6 +162,45 @@ def ingest():
     producer.flush(10)
 
     if errs:   # хоть одно событие не доставлено в Kafka -> 503, казино ретраит весь батч
+        return jsonify(error="kafka delivery failed", detail=errs[:3]), 503
+    return jsonify(status="ok", accepted=len(events)), 200
+
+
+@app.post("/ingest/saas/events")
+def ingest_saas():
+    """События продукта (сниппет/API) → топик saas.events. Auth/лимиты — как /ingest/events."""
+    if not _ip_allowed():
+        return jsonify(error="forbidden (ip not allowed)"), 403
+    if not _auth_ok():
+        return jsonify(error="unauthorized"), 401
+    try:
+        body = request.get_json(force=True)
+    except Exception:
+        return jsonify(error="invalid json"), 400
+
+    events = body if isinstance(body, list) else [body]
+    if not events:
+        return jsonify(error="empty payload"), 400
+    if len(events) > MAX_BATCH:
+        return jsonify(error=f"batch too large (max {MAX_BATCH})"), 413
+
+    for i, e in enumerate(events):
+        if not isinstance(e, dict) or not REQUIRED_SAAS.issubset(e):
+            return jsonify(error="missing required fields", index=i,
+                           required=sorted(REQUIRED_SAAS)), 400
+
+    errs = []
+    def _cb(err, _msg):
+        if err is not None:
+            errs.append(str(err))
+
+    for e in events:
+        e.setdefault("source", "snippet")
+        key = e.get("client_user_id") or e.get("stripe_customer_id") or e["tenant_id"]
+        producer.produce(SAAS_TOPIC, key=str(key), value=json.dumps(e), on_delivery=_cb)
+    producer.flush(10)
+
+    if errs:
         return jsonify(error="kafka delivery failed", detail=errs[:3]), 503
     return jsonify(status="ok", accepted=len(events)), 200
 
