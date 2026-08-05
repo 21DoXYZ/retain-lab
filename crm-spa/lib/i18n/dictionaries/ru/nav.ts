@@ -62,6 +62,7 @@ export const nav = {
   "nav.signals": "Сигналы модели",
   "nav.keys": "Ключи интеграции",
   "nav.extensions": "Внутренние номера",
+  "nav.team": "Команда",
   "nav.users": "Пользователи",
   "nav.verdicts": "Вердикты по источникам",
   "nav.channels": "Каналы (срезы)",

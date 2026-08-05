@@ -11,7 +11,7 @@
             "delay_h": 0,
             "action": "email",
             "subject": "Your first video is 3 minutes away",
-            "body": "Hi! Pick a template and generate your first video - it takes ~3 minutes. We added {{tokens}} bonus tokens to get you started: {{app_url}}"
+            "body": "Hi! Pick a template and generate your first video - it takes ~3 minutes. We added bonus tokens to get you started: {{app_url}}"
           },
           {
             "delay_h": 0,
@@ -116,7 +116,7 @@
             "delay_h": 72,
             "action": "email",
             "subject": "What you created this month",
-            "body": "Your stats: {{videos_month}} videos generated. Here is what is new since you last visited: {{app_url}}/whats-new"
+            "body": "Here is what is new since you last visited - and your work is right where you left it: {{app_url}}/whats-new"
           }
         ],
         "goal": {

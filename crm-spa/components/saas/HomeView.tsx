@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
-import { Banner, Card, SCard, SCardGrid } from "@/components/ui";
+import { Banner, Card, Icon, SCard, SCardGrid } from "@/components/ui";
 
 /**
  * Домашний дашборд владельца (ответ на «зашёл и ничего не понятно»):
@@ -33,9 +33,9 @@ function usd(n: number | undefined): string {
 const STAGE_ORDER = ["ACTIVATE", "CONVERT", "UPGRADE", "SAVE", "DUNNING", "WINBACK", "MONITOR"];
 
 const START_CARDS = [
-  { href: "/leak-audit", emoji: "💸", title: "saas.home.start.leak.title", desc: "saas.home.start.leak.desc" },
-  { href: "/users", emoji: "👥", title: "saas.home.start.users.title", desc: "saas.home.start.users.desc" },
-  { href: "/uplift", emoji: "📈", title: "saas.home.start.uplift.title", desc: "saas.home.start.uplift.desc" },
+  { href: "/leak-audit", icon: "leak-audit", title: "saas.home.start.leak.title", desc: "saas.home.start.leak.desc" },
+  { href: "/users", icon: "users", title: "saas.home.start.users.title", desc: "saas.home.start.users.desc" },
+  { href: "/uplift", icon: "uplift", title: "saas.home.start.uplift.title", desc: "saas.home.start.uplift.desc" },
 ] as const;
 
 export function HomeView() {
@@ -141,7 +141,9 @@ export function HomeView() {
               href={c.href}
               className="bg-canvas border border-hair2 rounded-card px-5 py-5 transition-colors hover:border-primary"
             >
-              <div className="text-[26px] leading-none mb-3">{c.emoji}</div>
+              <div className="mb-3 text-primary">
+                <Icon name={c.icon} size={26} />
+              </div>
               <div className="text-[15px] font-semibold text-ink">{t(c.title)}</div>
               <div className="text-[12.5px] text-steel mt-1">{t(c.desc)}</div>
             </Link>

@@ -102,7 +102,11 @@ def main() -> None:
         password=os.environ.get("CH_PASSWORD", ""),
         database=os.environ.get("CH_DB", "retention"),
     )
-    conf = json.loads(CAMPAIGNS_PATH.read_text())[tenant]
+    cfgs = json.loads(CAMPAIGNS_PATH.read_text())
+    conf = cfgs.get(tenant) or cfgs.get("_default") or {"campaigns": []}
+    from saas_senders import load_tenant_channels
+    from campaign_tick import resolve_autopilot
+    autopilot_on = resolve_autopilot(conf, load_tenant_channels(tenant))
     now = datetime.now(tz=timezone.utc)
     period_start = (now - timedelta(days=args.days)).date()
     lines, rows = [], []
@@ -125,6 +129,9 @@ def main() -> None:
 
     report = f"Revenue Autopilot · uplift {period_start} → {now.date()} ({tenant})\n" + \
              ("\n".join(lines) if lines else "no enrolled cohorts in period")
+    if lines and not autopilot_on:
+        report += ("\n\nNOTE: autopilot was OFF (dry-run) - touches did not reach"
+                   " users, so target vs holdout is NOT causal yet.")
     print(report)
 
     if rows:

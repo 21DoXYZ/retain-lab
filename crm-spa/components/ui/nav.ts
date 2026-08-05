@@ -249,7 +249,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { key: "channel-settings", href: "/channel-settings", emoji: "📡", label: "nav.channelsSetup", roles: [...ANALYSTS, "finance"] },
       { key: "keys", href: "/keys", emoji: "🔑", label: "nav.keys", roles: ["super_admin"] },
       { key: "extensions", href: "/extensions", emoji: "☎️", label: "nav.extensions", roles: ["super_admin", "head_retention", "head_department"] },
-      { key: "users", href: "/admin/users", emoji: "👤", label: "nav.users", roles: ["super_admin", "head_retention", "head_department"] },
+      { key: "team", href: "/admin/users", emoji: "👤", label: "nav.team", roles: ["super_admin", "head_retention", "head_department"] },
     ],
   },
 ];

@@ -213,7 +213,7 @@ export const monitor: Partial<Messages> = {
   "monitor.keys.note":
     "The list returns only token metadata (mask + length). The raw secret is available exactly once - in the modal right after \"Regenerate\". It cannot be recovered once the modal is closed.",
   "monitor.keys.tokensHint":
-    "The token authorizes events from your site. Press Regenerate, copy the token from the popup (shown exactly once) and paste it into the snippet's data-token below.",
+    "The ready-to-paste snippet with this token lives on the Get started screen - no need to regenerate anything. Regenerate ONLY to rotate a leaked token: the old one stops working immediately.",
   "monitor.keys.snippetHint":
     "Paste this line into your site's HTML (before </head>), replacing <token> with your token. After login call ra.identify(userId, email) - that is what links product activity to billing. Backend events can also be sent server-side with the same token (curl below).",
   "monitor.keys.snippetCheck":

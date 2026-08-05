@@ -58,6 +58,7 @@ export const nav: Partial<Messages> = {
   "nav.signals": "Model signals",
   "nav.keys": "Integration keys",
   "nav.extensions": "Extensions",
+  "nav.team": "Team",
   "nav.users": "Users",
   "nav.verdicts": "Source verdicts",
   "nav.channels": "Channels (slices)",

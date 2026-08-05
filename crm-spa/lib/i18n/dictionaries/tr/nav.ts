@@ -58,6 +58,7 @@ export const nav: Partial<Messages> = {
   "nav.signals": "Model sinyalleri",
   "nav.keys": "Entegrasyon anahtarları",
   "nav.extensions": "Dahili numaralar",
+  "nav.team": "",
   "nav.users": "Kullanıcılar",
   "nav.verdicts": "Kaynak kararları",
   "nav.channels": "Kanallar (kesitler)",

@@ -51,6 +51,12 @@ const PATHS: Record<string, ReactNode> = {
       <line x1="4" y1="22" x2="4" y2="15" />
     </>
   ),
+  team: (
+    <>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </>
+  ),
   segments: (
     <>
       <polygon points="12 2 2 7 12 12 22 7 12 2" />

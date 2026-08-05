@@ -266,7 +266,7 @@ export function CampaignsView() {
             <div className="mb-3 text-[15px] font-semibold text-ink">{t("saas.camp.how.title")}</div>
             <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-[13.5px] leading-relaxed text-slate">
               <li>{t("saas.camp.how.1")}</li>
-              <li>{t("saas.camp.how.2")}</li>
+              <li>{t("saas.camp.how.2", { pct: data.control_pct })}</li>
               <li>{t("saas.camp.how.3")}</li>
               <li>{t("saas.camp.how.4")}</li>
             </ol>
