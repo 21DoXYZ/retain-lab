@@ -19,7 +19,7 @@ interface HomeData {
   at_risk_now: number;
   dunning_mrr: number;
   campaigns: { active_enrollments: number; holdout: number; touches_7d: number };
-  setup: { stripe_connected: boolean; snippet_connected: boolean };
+  setup: { stripe_connected: boolean; snippet_connected: boolean; channels_connected: boolean; autopilot: boolean };
 }
 
 interface LeakData {
@@ -55,21 +55,14 @@ export function HomeView() {
     });
   }, []);
 
-  const setup = [
-    {
-      label: t("saas.home.setup.stripe"),
-      ok: data?.setup.stripe_connected ?? false,
-      text: data?.setup.stripe_connected
-        ? t("saas.home.setup.stripe.on") : t("saas.home.setup.stripe.off"),
-    },
-    {
-      label: t("saas.home.setup.snippet"),
-      ok: data?.setup.snippet_connected ?? false,
-      text: data?.setup.snippet_connected
-        ? t("saas.home.setup.snippet.on") : t("saas.home.setup.snippet.off"),
-    },
-    { label: t("saas.home.setup.autopilot"), ok: false, text: t("saas.home.setup.autopilot.off") },
-  ];
+  // Go-live чеклист: 4 шага онбординга, статусы из живых данных.
+  const golive = [
+    { key: "stripe", ok: data?.setup.stripe_connected ?? false, href: "/keys" },
+    { key: "snippet", ok: data?.setup.snippet_connected ?? false, href: "/keys" },
+    { key: "channels", ok: data?.setup.channels_connected ?? false, href: "/channel-settings" },
+    { key: "autopilot", ok: data?.setup.autopilot ?? false, href: "/campaigns" },
+  ] as const;
+  const goliveDone = golive.filter((s) => s.ok).length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -92,6 +85,49 @@ export function HomeView() {
           valueTone="neg"
         />
       </SCardGrid>
+
+      {!loading && goliveDone < golive.length ? (
+        <Card className="p-5">
+          <div className="flex items-baseline justify-between gap-3 mb-4">
+            <div className="text-[15px] font-semibold text-ink">{t("saas.home.golive.title")}</div>
+            <span className="font-mono text-[12.5px] text-steel">{goliveDone}/{golive.length}</span>
+          </div>
+          <ol className="flex flex-col gap-4">
+            {golive.map((s, i) => (
+              <li key={s.key} className="flex items-start gap-3.5">
+                <span
+                  className={
+                    "flex h-6 w-6 flex-none items-center justify-center rounded-full border text-[12px] font-semibold " +
+                    (s.ok
+                      ? "border-[#abefc6] bg-[#ecfdf3] text-pos"
+                      : "border-hair2 bg-surface text-slate")
+                  }
+                >
+                  {s.ok ? "✓" : i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className={"text-[14px] font-medium " + (s.ok ? "text-steel line-through decoration-hair2" : "text-ink")}>
+                    {t(`saas.home.golive.${s.key}.title` as Parameters<typeof t>[0])}
+                  </div>
+                  {!s.ok && (
+                    <p className="mt-0.5 text-[12.5px] text-steel">
+                      {t(`saas.home.golive.${s.key}.desc` as Parameters<typeof t>[0])}
+                    </p>
+                  )}
+                </div>
+                {!s.ok && (
+                  <Link
+                    href={s.href}
+                    className="flex-none rounded-ctl border border-hair2 px-3 py-1.5 text-[12.5px] font-medium text-slate transition-[color,border-color] duration-150 hover:border-primary hover:text-primary"
+                  >
+                    {t("saas.home.golive.open")}
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ol>
+        </Card>
+      ) : null}
 
       <div>
         <div className="text-[11px] font-semibold uppercase tracking-[1px] text-primary mb-3">
@@ -123,21 +159,7 @@ export function HomeView() {
         </Banner>
       ) : null}
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card>
-          <div className="text-[12px] font-semibold uppercase tracking-[0.5px] text-steel mb-3">
-            {t("saas.home.setup")}
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {setup.map((s) => (
-              <div key={s.label} className="flex items-center gap-2.5 text-[13.5px]">
-                <span className={"w-2 h-2 rounded-full flex-none " + (s.ok ? "bg-pos" : "bg-stone")} />
-                <span className="font-medium text-ink">{s.label}</span>
-                <span className="text-steel">- {s.text}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
+      <div className="grid gap-3">
         <Card>
           <div className="text-[12px] font-semibold uppercase tracking-[0.5px] text-steel mb-3">
             {t("saas.uplift.col.campaign")} · stages

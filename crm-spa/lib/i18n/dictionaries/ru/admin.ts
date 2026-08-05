@@ -30,7 +30,7 @@ export const admin = {
   "admin.users.title": "Пользователи",
   "admin.users.lead":
     "Создание, блокировка, сброс пароля и передача игроков. Каждое действие пишется в журнал (audit_log).",
-  "admin.users.createOperator": "+ Создать оператора",
+  "admin.users.createOperator": "+ Сотрудник",
   "admin.users.createAffiliate": "+ Кабинет аффилиата",
 
   // Таблица

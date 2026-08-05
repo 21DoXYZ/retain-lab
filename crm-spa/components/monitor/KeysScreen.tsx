@@ -24,10 +24,10 @@ import { useResource, Note } from "./kit";
 import type { KeysData, KeyToken, KeyRegenerated } from "./types";
 
 /**
- * /keys — «Ключи интеграции» (paritet с keys() борда). super_admin only.
- * ВАЖНО: секреты НЕ показываем — только метаданные токена (маска + длина). Сырой
- * токен виден РОВНО ОДИН РАЗ — в ответе на «пересоздать» (момент выдачи). Здесь же
- * управление IP-allowlist приёма событий. Kafka-креды меняются на сервере, не из UI.
+ * /keys — «Подключение данных» (онбординг, шаги 1-2 go-live чеклиста).
+ * Структура ведёт за руку: 1) токен -> 2) сниппет на сайт -> 3) Stripe-вебхук.
+ * Секреты НЕ показываем — только маска+длина; сырой токен виден РОВНО ОДИН РАЗ
+ * в модалке после «пересоздать». IP-allowlist — внизу как advanced.
  */
 
 export function KeysScreen() {
@@ -121,6 +121,7 @@ export function KeysScreen() {
           ) : null}
 
           <Eyebrow>{t("monitor.keys.eyebrow.tokens")}</Eyebrow>
+          <p className="mt-1 mb-2 text-[13px] text-steel max-w-[640px]">{t("monitor.keys.tokensHint")}</p>
           {loading ? (
             <Card className="mt-1">
               <SkeletonText lines={4} />
@@ -158,7 +159,49 @@ export function KeysScreen() {
             </div>
           )}
 
+          <Eyebrow>{t("monitor.keys.eyebrow.ingest")}</Eyebrow>
+          <p className="mt-1 mb-2 text-[13px] text-steel max-w-[640px]">{t("monitor.keys.snippetHint")}</p>
+          <Card>
+            <Field label={t("monitor.keys.field.ingestUrl")} value={d?.ingest.url ?? "—"} />
+            {d?.ingest.example_curl ? (
+              <pre className="mt-3 overflow-x-auto rounded-ctl bg-sb text-sb-text2 text-[12px] leading-relaxed p-3.5 font-mono whitespace-pre">
+                {d.ingest.example_curl}
+              </pre>
+            ) : null}
+            <p className="mt-3 text-[13px] text-steel">{t("monitor.keys.snippetCheck")}</p>
+          </Card>
+
+          {d?.stripe ? (
+            <>
+              <Eyebrow>{t("monitor.keys.eyebrow.stripe")}</Eyebrow>
+              <p className="mt-1 mb-2 text-[13px] text-steel max-w-[640px]">{t("monitor.keys.stripeHint")}</p>
+              <Card>
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="text-[15px] font-semibold text-ink">{t("monitor.keys.stripe.title")}</h3>
+                  {d.stripe.secret_set ? (
+                    <Badge bg="#dcfce7" fg="#166534">{t("monitor.keys.stripe.on")}</Badge>
+                  ) : (
+                    <Badge bg="#fef3c7" fg="#92400e">{t("monitor.keys.stripe.off")}</Badge>
+                  )}
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <Field label={t("monitor.keys.stripe.urlLabel")} value={d.stripe.webhook_url} />
+                </div>
+                <p className="mt-3 text-[13px] text-slate">{t("monitor.keys.stripe.step1")}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {d.stripe.events.map((ev) => (
+                    <span key={ev} className="rounded-md border border-hair2 bg-surface px-2 py-0.5 font-mono text-[11.5px] text-slate">
+                      {ev}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-3 text-[13px] text-slate">{t("monitor.keys.stripe.step2")}</p>
+              </Card>
+            </>
+          ) : null}
+
           <Eyebrow>{t("monitor.keys.eyebrow.ipAllowlist")}</Eyebrow>
+          <p className="mt-1 mb-2 text-[13px] text-steel max-w-[640px]">{t("monitor.keys.ipHint")}</p>
           <Panel className="p-4">
             <div className="flex flex-wrap items-end gap-2">
               <FormField label={t("monitor.keys.ipField.label")} className="min-w-[240px] flex-1" hint={t("monitor.keys.ipField.hint")}>
@@ -204,16 +247,6 @@ export function KeysScreen() {
             </div>
           </Panel>
 
-          <Eyebrow>{t("monitor.keys.eyebrow.ingest")}</Eyebrow>
-          <Card>
-            <Field label={t("monitor.keys.field.ingestUrl")} value={d?.ingest.url ?? "—"} />
-            {d?.ingest.example_curl ? (
-              <pre className="mt-3 overflow-x-auto rounded-ctl bg-sb text-sb-text2 text-[12px] leading-relaxed p-3.5 font-mono whitespace-pre">
-                {d.ingest.example_curl}
-              </pre>
-            ) : null}
-          </Card>
-
           {d?.kafka_note ? <Banner>{d.kafka_note}</Banner> : null}
 
           <Note>{t("monitor.keys.note")}</Note>
@@ -239,6 +272,7 @@ export function KeysScreen() {
                 {revealed.token}
               </pre>
             </div>
+            <p className="text-[13px] text-steel">{t("monitor.keys.modal.nextStep")}</p>
           </div>
         ) : null}
       </Modal>

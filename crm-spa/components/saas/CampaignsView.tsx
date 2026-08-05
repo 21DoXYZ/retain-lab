@@ -114,6 +114,36 @@ export function CampaignsView() {
 
       {state === "data" && data && (
         <>
+          <Card className="p-5">
+            <div className="mb-3 text-[15px] font-semibold text-ink">{t("saas.camp.how.title")}</div>
+            <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-[13.5px] leading-relaxed text-slate">
+              <li>{t("saas.camp.how.1")}</li>
+              <li>{t("saas.camp.how.2")}</li>
+              <li>{t("saas.camp.how.3")}</li>
+              <li>{t("saas.camp.how.4")}</li>
+            </ol>
+            <div className="mt-4 mb-2 text-[12px] font-semibold uppercase tracking-[0.5px] text-steel">
+              {t("saas.camp.rules.title")}
+            </div>
+            <div className="flex flex-col">
+              {(["DUNNING", "WINBACK", "CONVERT", "SAVE", "UPGRADE", "ACTIVATE", "MONITOR"] as const).map((st) => (
+                <div key={st} className="flex items-start gap-3 border-b border-hair py-2 last:border-0">
+                  <span
+                    className={
+                      "mt-0.5 inline-block w-[86px] flex-none rounded-full border px-2 py-0.5 text-center text-[10.5px] font-semibold " +
+                      (STAGE_TONE[st] ?? "bg-surface text-steel border-hair2")
+                    }
+                  >
+                    {st}
+                  </span>
+                  <span className="text-[13px] leading-relaxed text-slate">
+                    {t(`saas.camp.rule.${st}`)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
           <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div className="min-w-0">
               <div className="text-[15px] font-semibold text-ink">{t("saas.camp.autopilot")}</div>

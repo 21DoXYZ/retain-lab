@@ -26,7 +26,7 @@ export const admin: Partial<Messages> = {
   "admin.users.title": "Users",
   "admin.users.lead":
     "Create, block, reset password and reassign users. Every action is written to the audit log.",
-  "admin.users.createOperator": "+ Create operator",
+  "admin.users.createOperator": "+ Team member",
   "admin.users.createAffiliate": "+ Affiliate cabinet",
 
   "admin.users.col.name": "Name",

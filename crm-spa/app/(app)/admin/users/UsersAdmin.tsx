@@ -98,7 +98,16 @@ export function UsersAdmin({ me, initialUsers }: Props) {
 
   // create form
   const [createOpen, setCreateOpen] = useState(false);
-  const roles = useMemo(() => creatableRoles(me.role), [me.role]);
+  // SaaS-пресет: колл-центр/VIP/риск/аффилиаты скрыты модулями - роли этих
+  // вертикалей в создании не предлагаем (DB-триггер по-прежнему пропустил бы).
+  const SAAS_ROLES: UserRole[] = useMemo(
+    () => ["director", "head_retention", "marketing_manager", "analyst", "finance", "viewer"],
+    [],
+  );
+  const roles = useMemo(
+    () => creatableRoles(me.role).filter((r) => SAAS_ROLES.includes(r)),
+    [me.role, SAAS_ROLES],
+  );
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -247,7 +256,7 @@ export function UsersAdmin({ me, initialUsers }: Props) {
         lead={t("admin.users.lead")}
         right={
           <>
-            <Button variant="brand" onClick={() => openCreate(roles.includes("operator") ? "operator" : roles[0])}>
+            <Button variant="brand" onClick={() => openCreate(roles[0])}>
               {t("admin.users.createOperator")}
             </Button>
             {canMakeAffiliate ? (

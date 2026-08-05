@@ -202,13 +202,13 @@ export const monitor = {
 
   // ── /keys — «Ключи интеграции» ───────────────────────────────────────────
   "monitor.keys.genericError": "Не удалось выполнить операцию",
-  "monitor.keys.title": "Ключи интеграции",
+  "monitor.keys.title": "Подключение данных",
   "monitor.keys.accent": "· только супер-админ",
   "monitor.keys.lead":
-    "HTTP-токены приёма событий и IP-allowlist · секреты не показываются — только маска и длина; новый токен виден один раз при пересоздании",
+    "Всё питают два источника: сниппет на сайте (продуктовые события) и Stripe (биллинг). Три шага, минут 15: 1 - получи API-токен, 2 - поставь сниппет на сайт, 3 - наведи Stripe-вебхук на нас.",
   "monitor.keys.pill.sensitive": "чувствительно",
   "monitor.keys.errorPrefix": "Ошибка:",
-  "monitor.keys.eyebrow.tokens": "HTTP-токены (Bearer)",
+  "monitor.keys.eyebrow.tokens": "Шаг 1 · Твой API-токен",
   "monitor.keys.badge.set": "задан",
   "monitor.keys.badge.unset": "не задан",
   "monitor.keys.field.mask": "Маска",
@@ -220,17 +220,38 @@ export const monitor = {
   "monitor.keys.confirm.regenerate":
     "Пересоздать «{label}»? Старый токен сразу перестанет работать — не забудьте выдать новый казино.",
   "monitor.keys.confirm.removeIp": "Удалить {ip} из белого списка?",
-  "monitor.keys.eyebrow.ipAllowlist": "IP-allowlist приёма событий",
+  "monitor.keys.eyebrow.ipAllowlist": "Продвинутое · IP-allowlist",
   "monitor.keys.ipField.label": "Добавить IP или CIDR",
   "monitor.keys.ipField.hint": "например 57.129.125.90 или 10.0.0.0/24",
   "monitor.keys.ipAdd": "Добавить",
   "monitor.keys.ipEmpty": "Список пуст — приём открыт по токену без IP-ограничения.",
   "monitor.keys.ipRemoveAria": "Убрать {ip}",
   "monitor.keys.ipRemoveTitle": "Убрать из allowlist",
-  "monitor.keys.eyebrow.ingest": "Приём событий",
+  "monitor.keys.eyebrow.ingest": "Шаг 2 · Поставь сниппет",
   "monitor.keys.field.ingestUrl": "Адрес приёма событий",
   "monitor.keys.note":
     "Список отдаёт только метаданные токенов (маска + длина). Сырой секрет доступен один раз — в модальном окне после «Пересоздать». После закрытия окна восстановить его нельзя.",
+  "monitor.keys.tokensHint":
+    "Токен авторизует события с твоего сайта. Нажми «Пересоздать», скопируй токен из окна (показывается ровно один раз) и вставь в data-token сниппета ниже.",
+  "monitor.keys.snippetHint":
+    "Вставь эту строку в HTML сайта (до </head>), заменив <token> на свой токен. После логина вызови ra.identify(userId, email) - именно это связывает активность с биллингом. Серверные события можно слать тем же токеном (curl ниже).",
+  "monitor.keys.snippetCheck":
+    "Как проверить: открой свой сайт, затем глянь Users здесь - статус сниппета на главной сменится на «события идут» в течение минуты.",
+  "monitor.keys.eyebrow.stripe": "Шаг 3 · Подключи Stripe",
+  "monitor.keys.stripeHint":
+    "Stripe - источник биллинга: подписки, несписания, возвраты. Один вебхук - без кода с твоей стороны.",
+  "monitor.keys.stripe.title": "Stripe-вебхук",
+  "monitor.keys.stripe.on": "секрет вебхука установлен",
+  "monitor.keys.stripe.off": "ждём секрет",
+  "monitor.keys.stripe.urlLabel": "Адрес (endpoint)",
+  "monitor.keys.stripe.step1":
+    "В Stripe Dashboard открой Developers - Webhooks - Add endpoint, вставь URL выше и выбери эти события:",
+  "monitor.keys.stripe.step2":
+    "Затем передай нам signing secret (whsec_...) и restricted-ключ API (read-only достаточно) - мы установим их на сервере и прогоним исторический бэкфил. До этого на экранах демо-набор.",
+  "monitor.keys.ipHint":
+    "Опциональное усиление: ограничить приём событий IP-адресами твоих серверов. Оставь пустым, если сниппет шлёт из браузеров.",
+  "monitor.keys.modal.nextStep":
+    "Дальше: вставь его в data-token сниппета в шаге 2 ниже.",
   "monitor.keys.modal.title": "Новый токен — скопируйте сейчас",
   "monitor.keys.modal.done": "Готово",
   "monitor.keys.modal.warning":

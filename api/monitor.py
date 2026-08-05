@@ -579,12 +579,24 @@ def _keys_payload() -> dict:
         label = pb.TOKEN_LABELS.get(k, f'Ingest token - {k}')
         tokens.append({'key': k, 'label': label, 'is_set': bool(val),
                        'masked': _mask_token(val), 'length': len(str(val))})
-    return {
+    out = {
         'tokens': tokens,
         'ips': pb._load_ips(),
         'ingest': {'url': _INGEST_URL, 'example_curl': _CURL_EXAMPLE},
         'kafka_note': _KAFKA_NOTE,
     }
+    if _SAAS_HOST:
+        # SaaS-онбординг: блок подключения Stripe (вебхук ставит клиент,
+        # секрет вносим мы на сервере - экран показывает статус).
+        out['stripe'] = {
+            'webhook_url': f'https://{_SAAS_HOST}/stripe/webhook',
+            'events': ['checkout.session.completed', 'customer.subscription.created',
+                       'customer.subscription.updated', 'customer.subscription.deleted',
+                       'invoice.paid', 'invoice.payment_failed',
+                       'charge.refunded', 'charge.dispute.created'],
+            'secret_set': bool(_os.environ.get('STRIPE_WEBHOOK_SECRET', '').strip()),
+        }
+    return out
 
 
 @bp.get('/keys')

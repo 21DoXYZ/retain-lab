@@ -205,8 +205,18 @@ def home():
                       'holdout': int(camp[1] or 0),
                       'touches_7d': touches_7d},
         'setup': {'stripe_connected': live_customers > 0,
-                  'snippet_connected': snippet_events > 0},
+                  'snippet_connected': snippet_events > 0,
+                  'channels_connected': _any_channel_active(tenant),
+                  'autopilot': _autopilot_resolved(_campaigns_conf(tenant), tenant)},
     })
+
+
+def _any_channel_active(tenant: str) -> bool:
+    """Хоть один внешний канал доведён до конца (email verified+from или
+    телеграм-бот подключён). In-app не считаем - он живёт на сниппете."""
+    tch = ca.load_tenants().get(tenant, {}) or {}
+    email_ok = ca.email_state(tch, _platform('RESEND_API_KEY')) == 'active'
+    return email_ok or bool(tch.get('telegram_bot_token'))
 
 
 @bp.get('/saas/users')

@@ -220,6 +220,8 @@ export interface KeysData {
   ips: string[];
   ingest: { url: string; example_curl: string };
   kafka_note: string;
+  /** SaaS-пресет: блок подключения Stripe (вебхук + статус секрета). */
+  stripe?: { webhook_url: string; events: string[]; secret_set: boolean };
 }
 
 /** POST /keys/regenerate — the raw token is returned exactly once. */

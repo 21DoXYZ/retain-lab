@@ -26,7 +26,7 @@ export const admin: Partial<Messages> = {
   "admin.users.title": "Kullanıcılar",
   "admin.users.lead":
     "Kullanıcı oluşturma, engelleme, şifre sıfırlama ve oyuncu devri. Her işlem denetim günlüğüne (audit_log) yazılır.",
-  "admin.users.createOperator": "+ Operatör oluştur",
+  "admin.users.createOperator": "",
   "admin.users.createAffiliate": "+ Ortak paneli",
 
   "admin.users.col.name": "Ad Soyad",

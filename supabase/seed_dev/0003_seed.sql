@@ -56,23 +56,11 @@ $$;
 SELECT crm._seed_user('00000000-0000-0000-0000-000000000001','super_admin@crm.local',      'crm12345','Платформа (мы)',           'super_admin',       NULL,          NULL);
 SELECT crm._seed_user('00000000-0000-0000-0000-000000000002','director@crm.local',         'crm12345','Директор',           'director',          NULL,          NULL);
 SELECT crm._seed_user('00000000-0000-0000-0000-000000000003','head_retention@crm.local',   'crm12345','Глава ретеншена',           'head_retention',    'retention',   NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-000000000004','head_cc@crm.local',          'crm12345','Глава колл-центра',         'head_department',   'call_center', NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-000000000005','operator@crm.local',         'crm12345','Mehmet Yilmaz',             'operator',          'call_center', NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-000000000006','vip_manager@crm.local',      'crm12345','VIP-менеджер',              'vip_manager',       NULL,          NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-000000000007','affiliate_manager@crm.local','crm12345','Трафик-менеджер',           'affiliate_manager', NULL,          NULL);
 SELECT crm._seed_user('00000000-0000-0000-0000-000000000008','marketing@crm.local',        'crm12345','Руководитель маркетинга',   'marketing_manager', NULL,          NULL);
 SELECT crm._seed_user('00000000-0000-0000-0000-000000000009','analyst@crm.local',          'crm12345','Аналитик',                  'analyst',           NULL,          NULL);
 SELECT crm._seed_user('00000000-0000-0000-0000-00000000000a','finance@crm.local',          'crm12345','Финансист',                 'finance',           NULL,          NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-00000000000b','risk@crm.local',             'crm12345','Риск-офицер',               'risk_officer',      NULL,          NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-00000000000c','support@crm.local',          'crm12345','Саппорт',                   'support',           NULL,          NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-00000000000d','affiliate@crm.local',        'crm12345','Аффилиат AF104',            'affiliate',         NULL,          'AF104');
-SELECT crm._seed_user('00000000-0000-0000-0000-00000000000e','viewer@crm.local',           'crm12345','Демо-гость',                'viewer',            NULL,          NULL);
 
 -- ============= ДОП. ОПЕРАТОРЫ КЦ (ещё 2) + ОПЕРАТОР WA + ГЛАВА WA ============
-SELECT crm._seed_user('00000000-0000-0000-0000-000000000014','head_wa@crm.local',    'crm12345','Глава WhatsApp',  'head_department', 'whatsapp',    NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-000000000015','operator2@crm.local',  'crm12345','Ayse Demir',      'operator',        'call_center', NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-000000000016','operator3@crm.local',  'crm12345','Can Kaya',        'operator',        'call_center', NULL);
-SELECT crm._seed_user('00000000-0000-0000-0000-000000000017','operator_wa@crm.local','crm12345','Zeynep Ak',       'operator',        'whatsapp',    NULL);
 
 -- created_by: проставим руководителей (для реалистичной картины «кто завёл»)
 UPDATE crm.crm_users SET created_by = '00000000-0000-0000-0000-000000000003'

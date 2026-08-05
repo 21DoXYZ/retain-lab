@@ -184,13 +184,13 @@ export const monitor: Partial<Messages> = {
 
   // ── /keys ─────────────────────────────────────────────────────────────
   "monitor.keys.genericError": "Failed to complete the operation",
-  "monitor.keys.title": "Integration keys",
+  "monitor.keys.title": "Connect your data",
   "monitor.keys.accent": "· super_admin",
   "monitor.keys.lead":
-    "HTTP event-ingest tokens and IP allowlist · secrets are never shown - only the mask and length; a new token is visible once, right after it's regenerated",
+    "Two sources power everything here: the site snippet (product events) and Stripe (billing). Three steps, about 15 minutes: 1 - get your API token, 2 - put the snippet on your site, 3 - point a Stripe webhook at us.",
   "monitor.keys.pill.sensitive": "sensitive",
   "monitor.keys.errorPrefix": "Error:",
-  "monitor.keys.eyebrow.tokens": "HTTP tokens (Bearer)",
+  "monitor.keys.eyebrow.tokens": "Step 1 · Your API token",
   "monitor.keys.badge.set": "set",
   "monitor.keys.badge.unset": "not set",
   "monitor.keys.field.mask": "Mask",
@@ -201,17 +201,38 @@ export const monitor: Partial<Messages> = {
   "monitor.keys.confirm.regenerate":
     "Regenerate \"{label}\"? The old token stops working immediately - don't forget to update the integration with the new one.",
   "monitor.keys.confirm.removeIp": "Remove {ip} from the allowlist?",
-  "monitor.keys.eyebrow.ipAllowlist": "Event-ingest IP allowlist",
+  "monitor.keys.eyebrow.ipAllowlist": "Advanced · IP allowlist",
   "monitor.keys.ipField.label": "Add IP or CIDR",
   "monitor.keys.ipField.hint": "e.g. 57.129.125.90 or 10.0.0.0/24",
   "monitor.keys.ipAdd": "Add",
   "monitor.keys.ipEmpty": "The list is empty - ingest is open to the token with no IP restriction.",
   "monitor.keys.ipRemoveAria": "Remove {ip}",
   "monitor.keys.ipRemoveTitle": "Remove from allowlist",
-  "monitor.keys.eyebrow.ingest": "Event ingest",
+  "monitor.keys.eyebrow.ingest": "Step 2 · Install the snippet",
   "monitor.keys.field.ingestUrl": "Ingest URL",
   "monitor.keys.note":
     "The list returns only token metadata (mask + length). The raw secret is available exactly once - in the modal right after \"Regenerate\". It cannot be recovered once the modal is closed.",
+  "monitor.keys.tokensHint":
+    "The token authorizes events from your site. Press Regenerate, copy the token from the popup (shown exactly once) and paste it into the snippet's data-token below.",
+  "monitor.keys.snippetHint":
+    "Paste this line into your site's HTML (before </head>), replacing <token> with your token. After login call ra.identify(userId, email) - that is what links product activity to billing. Backend events can also be sent server-side with the same token (curl below).",
+  "monitor.keys.snippetCheck":
+    "How to check: open your site, then look at Users here - the snippet status on the Home screen flips to \"events flowing\" within a minute.",
+  "monitor.keys.eyebrow.stripe": "Step 3 · Connect Stripe",
+  "monitor.keys.stripeHint":
+    "Stripe is the billing source: subscriptions, failed payments, refunds. One webhook - no code on your side.",
+  "monitor.keys.stripe.title": "Stripe webhook",
+  "monitor.keys.stripe.on": "webhook secret installed",
+  "monitor.keys.stripe.off": "waiting for secret",
+  "monitor.keys.stripe.urlLabel": "Endpoint URL",
+  "monitor.keys.stripe.step1":
+    "In Stripe Dashboard open Developers - Webhooks - Add endpoint, paste the URL above and select these events:",
+  "monitor.keys.stripe.step2":
+    "Then send us the signing secret (whsec_...) and a restricted API key (read-only is enough) - we install them server-side and run the historical backfill. Until then the screens show the demo dataset.",
+  "monitor.keys.ipHint":
+    "Optional hardening: restrict event ingest to your servers' IPs. Leave empty if the snippet sends from browsers.",
+  "monitor.keys.modal.nextStep":
+    "Next: paste it into data-token of the snippet in step 2 below.",
   "monitor.keys.modal.title": "New token - copy it now",
   "monitor.keys.modal.done": "Done",
   "monitor.keys.modal.warning":
