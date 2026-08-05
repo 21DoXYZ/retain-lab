@@ -40,6 +40,18 @@ ra.187-77-157-6.sslip.io {
 		file_server
 	}
 
+	# Корень для ГОСТЯ - продуктовый лендинг; залогиненный (auth-кука Supabase)
+	# на том же URL попадает в приложение. Вход: /login.
+	@guest_root {
+		path /
+		not header_regexp Cookie "sb-[^=]*-auth-token"
+	}
+	handle @guest_root {
+		root * /srv/ra/site
+		rewrite * /index.html
+		file_server
+	}
+
 	# Всё остальное - SPA (Next.js standalone на loopback).
 	handle {
 		reverse_proxy 127.0.0.1:3000

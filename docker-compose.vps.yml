@@ -61,6 +61,7 @@ services:
       - ./Caddyfile.saas:/etc/caddy/Caddyfile:ro
       - ./demo-site:/srv/ra/demo-site:ro
       - ./snippet:/srv/ra/snippet:ro
+      - ./site:/srv/ra/site:ro
       - caddy_saas_data:/data
       - caddy_saas_config:/config
     restart: unless-stopped
