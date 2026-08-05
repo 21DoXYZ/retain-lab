@@ -162,6 +162,7 @@ def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], lis
             continue
         if role:
             clean["role"] = role
+        clean["title"] = _sanitize(clean["title"])
         seatish = str(clean["params"].get("unit", "")).lower()
         if (clean["executor"] == "client_callback" and clean["params"].get("amount")
                 and seatish in ("seat", "seats", "member", "members", "user", "users",
@@ -244,6 +245,13 @@ Hard rules:
 """
 
 
+def _sanitize(txt: str) -> str:
+    """Правила бренда жёстко в коде, а не на доверии к модели: длинные тире
+    (em/en) -> обычный дефис. Промпт просит - код гарантирует."""
+    return (txt.replace("\u2014", " - ").replace("\u2013", "-")
+               .replace("  ", " ").strip())
+
+
 def parse_ai_copy(text: str) -> dict:
     """JSON модели -> {campaign_id: {int_idx: {subject, body}}} с обрезкой длин.
     Кривой JSON -> {} (вызывающий остаётся на детерминированных шаблонах)."""
@@ -264,8 +272,8 @@ def parse_ai_copy(text: str) -> dict:
                 continue
             if not isinstance(txt, dict):
                 continue
-            subject = str(txt.get("subject", "")).strip()[:200]
-            body = str(txt.get("body", "")).strip()[:2000]
+            subject = _sanitize(str(txt.get("subject", "")))[:200]
+            body = _sanitize(str(txt.get("body", "")))[:2000]
             if not body:
                 continue
             # дуннинг-письма обязаны нести ссылку обновления карты - иначе

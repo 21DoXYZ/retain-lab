@@ -135,3 +135,15 @@ def test_compose_covers_all_campaign_roles():
     offers = compose_offers(FULL, avg_price=49.0)
     roles = {o.get("role") for o in offers}
     assert {"activation", "conversion", "save", "upgrade", "winback"} <= roles
+
+
+def test_ai_copy_strips_em_dash():
+    """Длинное тире запрещено правилами бренда - режем в коде, не в промпте."""
+    import json as _json
+    from ai_compose import parse_ai_copy
+    out = parse_ai_copy(_json.dumps({"K1_activation": {"0": {
+        "subject": "Don't lose your work—upgrade now",
+        "body": "Your trial ends soon–act now: {{app_url}}"}}}))
+    assert "—" not in out["K1_activation"][0]["subject"]
+    assert "–" not in out["K1_activation"][0]["body"]
+    assert " - " in out["K1_activation"][0]["subject"]
