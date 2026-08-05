@@ -138,7 +138,7 @@ export const saas: Partial<Messages> = {
 
   "nav.group.start": "Start",
   "nav.onboarding": "Get started",
-  "saas.ob.title": "Get started in 4 steps",
+  "saas.ob.title": "Get started",
   "saas.ob.lead": "Everything is pre-generated - copy and paste. Statuses come from live data: finish a step, hit refresh.",
   "saas.ob.refresh": "refresh",
   "saas.ob.done": "done",
