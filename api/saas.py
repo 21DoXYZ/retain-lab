@@ -345,7 +345,9 @@ def saas_offers():
     tenant = request.args.get('tenant') or DEFAULT_TENANT
     path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
                          'stripe_sync', 'offers_catalog.json')
-    catalog = _json.load(open(path)).get(tenant, {})
+    from stripe_sync import overrides as ovr
+    catalog = ovr.merge_catalog(_json.load(open(path)).get(tenant, {}),
+                                ovr.load_tenant(tenant))
 
     stats = {r[0]: {'issued': int(r[1]), 'dry_run': int(r[2]),
                     'holdout': int(r[3]), 'rejected': int(r[4])}
@@ -361,6 +363,8 @@ def saas_offers():
         'monetary': bool(o.get('monetary')),
         'cost_estimate': _flt(o.get('cost_estimate')),
         'max_per_user_30d': int(o.get('max_per_user_30d') or 0),
+        'params': o.get('params') or {},
+        'edited': bool(o.get('_edited')),
         'stats': stats.get(o['offer_id'],
                            {'issued': 0, 'dry_run': 0, 'holdout': 0, 'rejected': 0}),
     } for o in catalog.get('offers', [])]
@@ -456,8 +460,10 @@ def channels():
 def _campaigns_conf(tenant: str) -> dict:
     import json as _json
     from pathlib import Path
+    from stripe_sync import overrides as ovr
     p = Path(__file__).resolve().parent.parent / 'stripe_sync' / 'saas_campaigns.json'
-    return (_json.loads(p.read_text()).get(tenant) or {}) if p.exists() else {}
+    conf = (_json.loads(p.read_text()).get(tenant) or {}) if p.exists() else {}
+    return ovr.merge_campaign_conf(conf, ovr.load_tenant(tenant))
 
 
 def _autopilot_resolved(conf: dict, tenant: str) -> bool:
@@ -496,7 +502,9 @@ def _campaigns_payload(tenant: str) -> dict:
                    'channel': s.get('channel', 'email' if s.get('action') == 'email' else ''),
                    'subject': s.get('subject', ''), 'body': s.get('body', ''),
                    'offer_id': s.get('offer_id', ''),
-                   'cta_label': s.get('cta_label', '')} for s in c.get('steps', [])],
+                   'cta_label': s.get('cta_label', ''),
+                   'cta_url': s.get('cta_url', ''),
+                   'edited': bool(s.get('_edited'))} for s in c.get('steps', [])],
         'stats': {**enr.get(c['campaign_id'], empty),
                   'touches': touches.get(c['campaign_id'], 0)},
     } for c in conf.get('campaigns', [])]
@@ -509,6 +517,122 @@ def _campaigns_payload(tenant: str) -> dict:
 @require_auth(roles=LEAK_ROLES)
 def saas_campaigns():
     return api_json(_campaigns_payload(_tenant_arg()))
+
+
+@bp.post('/saas/campaigns/step')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_campaign_step_edit():
+    """Правка текста/тайминга шага кампании из CRM. reset=true - вернуть базу.
+    Структуру (добавить/удалить шаг, сменить канал) правит платформа."""
+    from stripe_sync import overrides as ovr
+
+    tenant = _tenant_arg()
+    body = request.get_json(silent=True) or {}
+    cid = str(body.get('campaign_id', ''))
+    try:
+        idx = int(body.get('step_idx'))
+    except (TypeError, ValueError):
+        return _bad('invalid_step')
+
+    base = _campaigns_conf(tenant)
+    camp = next((c for c in base.get('campaigns', []) if c['campaign_id'] == cid), None)
+    if camp is None or not (0 <= idx < len(camp.get('steps', []))):
+        return _bad('unknown_step')
+
+    if body.get('reset'):
+        ovr.set_campaign_step(tenant, cid, idx, None)
+        print(f'[edit] {tenant}: {cid} step {idx} сброшен к базе', flush=True)
+        return api_json(_campaigns_payload(tenant))
+
+    patch = {}
+    subject = body.get('subject')
+    if subject is not None:
+        patch['subject'] = str(subject).strip()[:200]
+    text = body.get('body')
+    if text is not None:
+        text = str(text).strip()
+        if not text or len(text) > 2000:
+            return _bad('invalid_body')
+        patch['body'] = text
+    for f in ('cta_label', 'cta_url'):
+        if body.get(f) is not None:
+            patch[f] = str(body[f]).strip()[:300]
+    if body.get('delay_h') is not None:
+        try:
+            dh = float(body['delay_h'])
+        except (TypeError, ValueError):
+            return _bad('invalid_delay')
+        if not 0 <= dh <= 720:
+            return _bad('invalid_delay')
+        patch['delay_h'] = dh
+    if not patch:
+        return _bad('nothing_to_update')
+
+    ovr.set_campaign_step(tenant, cid, idx, patch)
+    print(f'[edit] {tenant}: {cid} step {idx} обновлён {sorted(patch)}', flush=True)
+    return api_json(_campaigns_payload(tenant))
+
+
+@bp.post('/saas/offers/update')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_offer_edit():
+    """Правка щедрости/лимитов оффера. params - только существующие числовые
+    ключи оффера (контракт исполнителя не расширяем). reset=true - база."""
+    import json as _json
+    import os as _os2
+    from stripe_sync import overrides as ovr
+
+    tenant = _tenant_arg()
+    body = request.get_json(silent=True) or {}
+    oid = str(body.get('offer_id', ''))
+
+    path = _os2.path.join(_os2.path.dirname(_os2.path.dirname(_os2.path.abspath(__file__))),
+                          'stripe_sync', 'offers_catalog.json')
+    base = _json.load(open(path)).get(tenant, {})
+    offer = next((o for o in base.get('offers', []) if o['offer_id'] == oid), None)
+    if offer is None:
+        return _bad('unknown_offer')
+
+    if body.get('reset'):
+        ovr.set_offer(tenant, oid, None)
+        return api_json({'ok': True})
+
+    patch = {}
+    if body.get('title') is not None:
+        title = str(body['title']).strip()[:120]
+        if title:
+            patch['title'] = title
+    if body.get('max_per_user_30d') is not None:
+        try:
+            cap = int(body['max_per_user_30d'])
+        except (TypeError, ValueError):
+            return _bad('invalid_cap')
+        if not 0 <= cap <= 100:
+            return _bad('invalid_cap')
+        patch['max_per_user_30d'] = cap
+    p_in = body.get('params') or {}
+    p_out = {}
+    for k, v in p_in.items():
+        if k not in (offer.get('params') or {}):
+            return _bad(f'unknown_param:{k}')
+        cur = offer['params'][k]
+        if isinstance(cur, bool) or not isinstance(cur, (int, float)):
+            return _bad(f'param_not_editable:{k}')
+        try:
+            num = float(v)
+        except (TypeError, ValueError):
+            return _bad(f'invalid_param:{k}')
+        if not 0 <= num <= 1_000_000:
+            return _bad(f'invalid_param:{k}')
+        p_out[k] = int(num) if float(num).is_integer() else num
+    if p_out:
+        patch['params'] = p_out
+    if not patch:
+        return _bad('nothing_to_update')
+
+    ovr.set_offer(tenant, oid, patch)
+    print(f'[edit] {tenant}: оффер {oid} обновлён {sorted(patch)}', flush=True)
+    return api_json({'ok': True})
 
 
 @bp.post('/saas/campaigns/autopilot')

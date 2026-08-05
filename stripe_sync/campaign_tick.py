@@ -147,6 +147,9 @@ def tick(client, tenant: str) -> dict[str, int]:
         raise SystemExit(f"нет кампаний для тенанта {tenant}")
     control_pct = int(conf.get("control_pct", 10))
     conf = {**conf, "autopilot": resolve_autopilot(conf, load_tenant_channels(tenant))}
+    # правки текстов/таймингов из CRM (runtime, без деплоя)
+    from overrides import load_tenant as load_overrides, merge_campaign_conf
+    conf = merge_campaign_conf(conf, load_overrides(tenant))
     email_cfg, exec_cfg = effective_configs(conf, EmailConfig.from_env(),
                                             ExecConfig.from_env())
     msg_cfg = MessagingConfig.from_env()

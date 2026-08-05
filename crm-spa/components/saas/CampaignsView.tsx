@@ -19,6 +19,8 @@ interface Step {
   body: string;
   offer_id: string;
   cta_label: string;
+  cta_url: string;
+  edited: boolean;
 }
 
 interface Campaign {
@@ -49,6 +51,152 @@ function delayLabel(h: number): string {
   if (h === 0) return "0h";
   if (h % 24 === 0) return `${h / 24}d`;
   return `${h}h`;
+}
+
+const inputCls =
+  "h-[38px] w-full rounded-ctl border border-hair2 bg-canvas px-3 text-[13px] " +
+  "text-ink outline-none transition-[border-color] duration-150 focus:border-primary";
+
+function StepRow({
+  campaignId,
+  index,
+  step,
+  refresh,
+}: {
+  campaignId: string;
+  index: number;
+  step: Step;
+  refresh: (p: Payload) => void;
+}) {
+  const t = useT();
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [subject, setSubject] = useState(step.subject);
+  const [body, setBody] = useState(step.body);
+  const [ctaLabel, setCtaLabel] = useState(step.cta_label);
+  const [ctaUrl, setCtaUrl] = useState(step.cta_url);
+  const [delay, setDelay] = useState(String(step.delay_h));
+
+  const isOffer = step.action === "offer";
+  const isInapp = step.action === "inapp";
+
+  const post = (payload: Record<string, unknown>) => {
+    setBusy(true);
+    setErr("");
+    flaskFetch<Payload>("/api/v1/saas/campaigns/step", {
+      method: "POST",
+      body: { campaign_id: campaignId, step_idx: index, ...payload },
+    })
+      .then((p) => {
+        refresh(p);
+        setEditing(false);
+      })
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : t("saas.channels.err.generic")))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <li className="flex gap-3 border-l-2 border-hair pl-4 pb-4 last:pb-0">
+      <span className="mt-0.5 w-9 flex-none font-mono text-[12px] text-steel">
+        {delayLabel(step.delay_h)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-[13px] font-medium text-ink">
+            <span className="mr-2 inline-block rounded-md border border-hair2 bg-surface px-1.5 py-0.5 font-mono text-[11px] text-slate">
+              {step.action === "email" || step.action === "message" ? step.channel || "email" : step.action}
+            </span>
+            {step.subject || (step.offer_id ? `${t("saas.camp.offer")}: ${step.offer_id}` : "")}
+            {step.edited && (
+              <span className="ml-2 inline-block rounded-full border border-[#b2ddff] bg-[#eff8ff] px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                {t("saas.camp.edited")}
+              </span>
+            )}
+          </div>
+          {!editing && (
+            <button
+              type="button"
+              className="flex-none cursor-pointer rounded-md border border-hair2 px-2 py-0.5 text-[11.5px] text-steel transition-[color,border-color] duration-150 hover:border-primary hover:text-primary"
+              onClick={() => {
+                setSubject(step.subject);
+                setBody(step.body);
+                setCtaLabel(step.cta_label);
+                setCtaUrl(step.cta_url);
+                setDelay(String(step.delay_h));
+                setEditing(true);
+              }}
+            >
+              {t("saas.camp.edit")}
+            </button>
+          )}
+        </div>
+
+        {!editing && step.body && (
+          <p className="mt-0.5 text-[12.5px] leading-relaxed text-steel">{step.body}</p>
+        )}
+
+        {editing && (
+          <div className="mt-2 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <label className="w-20 flex-none text-[12px] text-steel">{t("saas.camp.f.delay")}</label>
+              <input className={inputCls + " max-w-[110px]"} value={delay}
+                     onChange={(e) => setDelay(e.target.value)} inputMode="decimal" />
+              <span className="text-[12px] text-steel">{t("saas.camp.f.hours")}</span>
+            </div>
+            {!isOffer && (
+              <>
+                <input className={inputCls} placeholder={t("saas.camp.f.subject")}
+                       value={subject} onChange={(e) => setSubject(e.target.value)} />
+                <textarea
+                  className="min-h-[84px] w-full rounded-ctl border border-hair2 bg-canvas p-3 text-[13px] leading-relaxed text-ink outline-none transition-[border-color] duration-150 focus:border-primary"
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                />
+                <p className="text-[11.5px] text-steel">{t("saas.camp.f.placeholders")}</p>
+              </>
+            )}
+            {isInapp && (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input className={inputCls} placeholder={t("saas.camp.f.ctaLabel")}
+                       value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} />
+                <input className={inputCls} placeholder={t("saas.camp.f.ctaUrl")}
+                       value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} />
+              </div>
+            )}
+            {err && <p className="text-[12px] text-neg">{err}</p>}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="brand" size="sm" loading={busy}
+                onClick={() => {
+                  const payload: Record<string, unknown> = { delay_h: Number(delay) };
+                  if (!isOffer) {
+                    payload.subject = subject;
+                    payload.body = body;
+                  }
+                  if (isInapp) {
+                    payload.cta_label = ctaLabel;
+                    payload.cta_url = ctaUrl;
+                  }
+                  post(payload);
+                }}
+              >
+                {t("saas.camp.save")}
+              </Button>
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(false)}>
+                {t("saas.camp.cancel")}
+              </Button>
+              {step.edited && (
+                <Button variant="ghost" size="sm" loading={busy} onClick={() => post({ reset: true })}>
+                  {t("saas.camp.resetDefault")}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </li>
+  );
 }
 
 export function CampaignsView() {
@@ -196,20 +344,13 @@ export function CampaignsView() {
 
               <ol className="flex flex-col">
                 {c.steps.map((s, i) => (
-                  <li key={i} className="flex gap-3 border-l-2 border-hair pl-4 pb-4 last:pb-0">
-                    <span className="mt-0.5 w-9 flex-none font-mono text-[12px] text-steel">
-                      {delayLabel(s.delay_h)}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-medium text-ink">
-                        <span className="mr-2 inline-block rounded-md border border-hair2 bg-surface px-1.5 py-0.5 font-mono text-[11px] text-slate">
-                          {s.action === "email" || s.action === "message" ? s.channel || "email" : s.action}
-                        </span>
-                        {s.subject || (s.offer_id ? `${t("saas.camp.offer")}: ${s.offer_id}` : "")}
-                      </div>
-                      {s.body && <p className="mt-0.5 text-[12.5px] leading-relaxed text-steel">{s.body}</p>}
-                    </div>
-                  </li>
+                  <StepRow
+                    key={`${c.campaign_id}:${i}:${s.edited ? "e" : "b"}`}
+                    campaignId={c.campaign_id}
+                    index={i}
+                    step={s}
+                    refresh={setData}
+                  />
                 ))}
               </ol>
 

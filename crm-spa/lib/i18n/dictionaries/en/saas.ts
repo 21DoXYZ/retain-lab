@@ -163,6 +163,21 @@ export const saas: Partial<Messages> = {
   "saas.ob.autopilot.desc": "Read the copy of every touch. Until you enable it nothing reaches users - log only. One button to enable, same to disable.",
   "saas.ob.autopilot.cta": "Open campaigns",
 
+  "saas.camp.edit": "Edit",
+  "saas.camp.edited": "edited",
+  "saas.camp.save": "Save",
+  "saas.camp.cancel": "Cancel",
+  "saas.camp.resetDefault": "Reset to default",
+  "saas.camp.f.delay": "Delay",
+  "saas.camp.f.hours": "hours after entering the campaign",
+  "saas.camp.f.subject": "Subject / title",
+  "saas.camp.f.placeholders": "Write placeholders card_update_url (card update page) and app_url (your product) in double curly braces - they resolve at send time.",
+  "saas.camp.f.ctaLabel": "Button label",
+  "saas.camp.f.ctaUrl": "Button link",
+  "saas.offers.editTitle": "Edit offer",
+  "saas.offers.f.title": "Title",
+  "saas.offers.f.note": "Numbers control generosity and caps (tokens, percent, days). Executor and offer structure are platform-managed.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

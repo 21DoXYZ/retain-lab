@@ -25,7 +25,9 @@ def load_catalog(tenant_id: str) -> dict:
     data = json.loads(CATALOG_PATH.read_text())
     if tenant_id not in data:
         raise SystemExit(f"нет каталога офферов для тенанта {tenant_id}")
-    return data[tenant_id]
+    # правки щедрости/лимитов из CRM (runtime-файл, мерж без деплоя)
+    from overrides import load_tenant as load_overrides, merge_catalog
+    return merge_catalog(data[tenant_id], load_overrides(tenant_id))
 
 
 def _now() -> str:

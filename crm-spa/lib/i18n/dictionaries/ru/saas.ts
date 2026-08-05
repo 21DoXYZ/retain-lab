@@ -162,6 +162,21 @@ export const saas = {
   "saas.ob.autopilot.desc": "Прочитай тексты каждого касания. До включения ничего никому не уходит - только лог. Включается одной кнопкой, выключается так же.",
   "saas.ob.autopilot.cta": "Открыть кампании",
 
+  "saas.camp.edit": "Править",
+  "saas.camp.edited": "правлено",
+  "saas.camp.save": "Сохранить",
+  "saas.camp.cancel": "Отмена",
+  "saas.camp.resetDefault": "Вернуть базу",
+  "saas.camp.f.delay": "Задержка",
+  "saas.camp.f.hours": "часов от входа в кампанию",
+  "saas.camp.f.subject": "Тема / заголовок",
+  "saas.camp.f.placeholders": "Плейсхолдеры card_update_url (обновление карты) и app_url (твой продукт) пиши в двойных фигурных скобках - они подставятся при отправке.",
+  "saas.camp.f.ctaLabel": "Текст кнопки",
+  "saas.camp.f.ctaUrl": "Ссылка кнопки",
+  "saas.offers.editTitle": "Правка оффера",
+  "saas.offers.f.title": "Название",
+  "saas.offers.f.note": "Числа - щедрость и лимиты (токены, проценты, дни). Способ исполнения и структуру оффера меняет платформа.",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",
