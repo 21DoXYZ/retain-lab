@@ -487,3 +487,29 @@ CREATE TABLE IF NOT EXISTS retention.uplift_reports
 )
 ENGINE = MergeTree
 ORDER BY (tenant_id, campaign_id, computed_at);
+
+-- ============================================================================
+-- Каналы: контакты юзеров с согласиями (consent-модель ТЗ §6). Email живёт в
+-- identities (из Stripe); здесь - sms/viber/whatsapp/telegram, которые тенант
+-- поставляет событием contact_update (см. INTEGRATION-SAAS.md §Каналы).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS retention.contacts
+(
+    `tenant_id`      LowCardinality(String),
+    `client_user_id` String,
+    `channel`        LowCardinality(String),  -- sms | viber | whatsapp | telegram
+    `address`        String,                   -- номер / chat_id
+    `consent`        UInt8,                    -- 1 = явное согласие на канал
+    `consent_ts`     DateTime64(3),
+    `updated_at`     DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, client_user_id, channel);
+
+CREATE OR REPLACE VIEW retention.contacts_current AS
+SELECT tenant_id, client_user_id, channel,
+       argMax(address, updated_at)    AS address,
+       argMax(consent, updated_at)    AS consent,
+       argMax(consent_ts, updated_at) AS consent_ts
+FROM retention.contacts
+GROUP BY tenant_id, client_user_id, channel;

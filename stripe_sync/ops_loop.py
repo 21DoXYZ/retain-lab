@@ -24,6 +24,8 @@ JOBS = [
      lambda t: t.minute % 15 == 0),
     ("stitch", ["python", "stitch.py"],
      lambda t: t.minute == 5),
+    ("contacts", ["python", "contacts_sync.py"],
+     lambda t: t.minute == 5),
     ("scoring", ["python", "scoring.py"],
      lambda t: t.hour == 3 and t.minute == 10),
     ("uplift_report", ["python", "uplift_report.py"],

@@ -92,4 +92,18 @@ export const saas = {
   "saas.offers.col.rejected": "Отбито",
   "saas.offers.yes": "да",
   "saas.offers.no": "нет",
+
+  "nav.channelsSetup": "Каналы",
+
+  "saas.channels.title": "Каналы",
+  "saas.channels.lead":
+    "Провайдеры - платформенные (ключи наши): клиент каналы не подключает, он поставляет контакты и согласия событием contact_update. Здесь - статус ключей и покрытие базы.",
+  "saas.channels.col.channel": "Канал",
+  "saas.channels.col.provider": "Провайдер",
+  "saas.channels.col.status": "Статус",
+  "saas.channels.col.detail": "Отправитель",
+  "saas.channels.col.contacts": "Контакты",
+  "saas.channels.col.consented": "С согласием",
+  "saas.channels.on": "настроен",
+  "saas.channels.off": "нет ключа",
 };

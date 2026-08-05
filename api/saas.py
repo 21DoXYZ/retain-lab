@@ -284,3 +284,49 @@ def saas_offers():
 
     return api_json({'tenant': tenant, 'control_pct': catalog.get('control_pct', 10),
                      'offers': offers})
+
+
+@bp.get('/saas/channels')
+@require_auth(roles=LEAK_ROLES)
+def channels():
+    """Статус каналов: провайдеры платформы (настроен ли ключ) + покрытие
+    контактами/согласиями. Ключи живут в env сервера - клиент каналы не
+    подключает, он поставляет контакты (contact_update) и согласия."""
+    import os as _os
+
+    tenant = request.args.get('tenant') or DEFAULT_TENANT
+
+    email_users = int(q(
+        "SELECT countIf(email_norm != '') FROM user_actions WHERE tenant_id = {t:String}",
+        {'t': tenant})[1][0][0])
+
+    cov = {r[0]: {'contacts': int(r[1]), 'consented': int(r[2])} for r in q(
+        """
+        SELECT channel, count(), countIf(consent = 1)
+        FROM contacts_current WHERE tenant_id = {t:String} GROUP BY channel
+        """, {'t': tenant})[1]}
+
+    def _set(name):
+        return bool(_os.environ.get(name, '').strip())
+
+    providers = [
+        {'channel': 'email', 'provider': 'Resend',
+         'configured': _set('RESEND_API_KEY') and _set('EMAIL_FROM'),
+         'detail': _os.environ.get('EMAIL_FROM', ''),
+         'contacts': email_users, 'consented': email_users},
+        {'channel': 'sms', 'provider': 'DecisionTelecom',
+         'configured': _set('DECISION_API_KEY') and _set('DECISION_SMS_SENDER'),
+         'detail': _os.environ.get('DECISION_SMS_SENDER', ''),
+         **cov.get('sms', {'contacts': 0, 'consented': 0})},
+        {'channel': 'viber', 'provider': 'DecisionTelecom',
+         'configured': _set('DECISION_API_KEY') and _set('DECISION_VIBER_SENDER'),
+         'detail': _os.environ.get('DECISION_VIBER_SENDER', ''),
+         **cov.get('viber', {'contacts': 0, 'consented': 0})},
+        {'channel': 'whatsapp', 'provider': 'DecisionTelecom',
+         'configured': False, 'detail': 'WABA onboarding pending',
+         **cov.get('whatsapp', {'contacts': 0, 'consented': 0})},
+        {'channel': 'telegram', 'provider': 'Bot API',
+         'configured': _set('TELEGRAM_BOT_TOKEN'), 'detail': '',
+         **cov.get('telegram', {'contacts': 0, 'consented': 0})},
+    ]
+    return api_json({'tenant': tenant, 'providers': providers})

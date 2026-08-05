@@ -19,6 +19,13 @@ services:
       CORS_ORIGINS: "https://${SAAS_HOST:-ra.187-77-157-6.sslip.io},http://localhost:3000,http://127.0.0.1:3000"
       # Локальный Supabase (CLI) подписывает JWT HS256 — legacy-путь api/core.py
       SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      # Статусы каналов для /api/v1/saas/channels (ключи как у saas-ops)
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      DECISION_API_KEY: ${DECISION_API_KEY:-}
+      DECISION_SMS_SENDER: ${DECISION_SMS_SENDER:-}
+      DECISION_VIBER_SENDER: ${DECISION_VIBER_SENDER:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
   ingest:
     ports:
       - "127.0.0.1:8081:8081"

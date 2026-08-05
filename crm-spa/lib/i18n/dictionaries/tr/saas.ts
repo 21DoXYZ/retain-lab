@@ -86,4 +86,16 @@ export const saas: Partial<Messages> = {
   "saas.offers.col.rejected": "",
   "saas.offers.yes": "",
   "saas.offers.no": "",
+
+  "nav.channelsSetup": "",
+  "saas.channels.title": "",
+  "saas.channels.lead": "",
+  "saas.channels.col.channel": "",
+  "saas.channels.col.provider": "",
+  "saas.channels.col.status": "",
+  "saas.channels.col.detail": "",
+  "saas.channels.col.contacts": "",
+  "saas.channels.col.consented": "",
+  "saas.channels.on": "",
+  "saas.channels.off": "",
 };

@@ -237,6 +237,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { key: "formulas", href: "/formulas", emoji: "📐", label: "nav.formulas", roles: ["super_admin", "head_retention", "director", "analyst", "finance", "marketing_manager", "affiliate_manager"] },
       { key: "glossary", href: "/glossary", emoji: "📖", label: "nav.glossary", roles: INTERNAL },
       { key: "signals", href: "/signals", emoji: "🧠", label: "nav.signals", roles: ["super_admin", "head_retention", "director", "risk_officer", "marketing_manager", "analyst"] },
+      // SaaS-пресет: статус каналов и покрытие контактов (провайдеры платформы)
+      { key: "channel-settings", href: "/channel-settings", emoji: "📡", label: "nav.channelsSetup", roles: [...ANALYSTS, "finance"] },
       { key: "keys", href: "/keys", emoji: "🔑", label: "nav.keys", roles: ["super_admin"] },
       { key: "extensions", href: "/extensions", emoji: "☎️", label: "nav.extensions", roles: ["super_admin", "head_retention", "head_department"] },
       { key: "users", href: "/admin/users", emoji: "👤", label: "nav.users", roles: ["super_admin", "head_retention", "head_department"] },

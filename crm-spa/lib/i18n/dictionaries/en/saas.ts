@@ -93,4 +93,18 @@ export const saas: Partial<Messages> = {
   "saas.offers.col.rejected": "Rejected",
   "saas.offers.yes": "yes",
   "saas.offers.no": "no",
+
+  "nav.channelsSetup": "Channels",
+
+  "saas.channels.title": "Channels",
+  "saas.channels.lead":
+    "Providers are platform-level (our keys): the client does not connect channels - they supply contacts and consents via the contact_update event. This screen shows key status and base coverage.",
+  "saas.channels.col.channel": "Channel",
+  "saas.channels.col.provider": "Provider",
+  "saas.channels.col.status": "Status",
+  "saas.channels.col.detail": "Sender",
+  "saas.channels.col.contacts": "Contacts",
+  "saas.channels.col.consented": "Consented",
+  "saas.channels.on": "configured",
+  "saas.channels.off": "no key",
 };

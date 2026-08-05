@@ -29,7 +29,7 @@ from pathlib import Path
 from executors import ExecConfig
 from hygiene import holdout_split
 from issue import issue_offer
-from saas_senders import EmailConfig, send_email
+from saas_senders import EmailConfig, MessagingConfig, route_message, send_email
 
 CAMPAIGNS_PATH = Path(__file__).parent / "saas_campaigns.json"
 REENTRY_DAYS = 30
@@ -120,12 +120,22 @@ def tick(client, tenant: str) -> dict[str, int]:
     control_pct = int(conf.get("control_pct", 10))
     email_cfg, exec_cfg = effective_configs(conf, EmailConfig.from_env(),
                                             ExecConfig.from_env())
+    msg_cfg = MessagingConfig.from_env()
+    if not conf.get("autopilot"):
+        from dataclasses import replace as _replace
+        msg_cfg = _replace(msg_cfg, dry_run=True)
     now = _now_dt()
     stats = {"enrolled": 0, "control": 0, "steps": 0, "done": 0, "exited": 0}
 
-    stages = {r[0]: (r[1], r[2]) for r in client.query(
-        "SELECT identity_id, stage, email_norm FROM retention.user_actions "
+    stages = {r[0]: (r[1], r[2], r[3]) for r in client.query(
+        "SELECT identity_id, stage, email_norm, client_user_id FROM retention.user_actions "
         "WHERE tenant_id = %(t)s", parameters={"t": tenant}).result_rows}
+
+    # контакты не-email каналов: (client_user_id, channel) -> (address, consent)
+    contacts = {(r[0], r[1]): (r[2], int(r[3])) for r in client.query(
+        "SELECT client_user_id, channel, address, consent "
+        "FROM retention.contacts_current WHERE tenant_id = %(t)s",
+        parameters={"t": tenant}).result_rows}
 
     for camp in conf["campaigns"]:
         cid, steps = camp["campaign_id"], camp["steps"]
@@ -143,7 +153,7 @@ def tick(client, tenant: str) -> dict[str, int]:
         ).result_rows}
 
         # 1. ENROLL
-        for identity, (stage, _email) in stages.items():
+        for identity, (stage, _email, _cuid) in stages.items():
             if stage != camp["entry_stage"] or identity in enrolled:
                 continue
             control = holdout_split(tenant, cid, identity, control_pct)
@@ -162,20 +172,30 @@ def tick(client, tenant: str) -> dict[str, int]:
                 continue
             enrolled_at = row["enrolled_at"] if isinstance(row["enrolled_at"], datetime) \
                 else datetime.fromisoformat(str(row["enrolled_at"]))
-            stage_now, email = stages.get(identity, ("", ""))
+            stage_now, email, cuid = stages.get(identity, ("", "", ""))
 
             for i in due_steps(steps, enrolled_at, int(row["step_idx"]), now):
                 step = steps[i]
                 if not row["control"]:
-                    if step["action"] == "email":
-                        if email:
-                            ok, detail = send_email(email, step["subject"], step["body"], email_cfg)
-                            _log_send(client, tenant, cid, identity, i, "email",
-                                      step["subject"], detail if ok else "rejected",
-                                      "" if ok else detail)
+                    if step["action"] in ("email", "message"):
+                        channel = step.get("channel", "email")
+                        if channel == "email":
+                            address, consent = email, 1
                         else:
-                            _log_send(client, tenant, cid, identity, i, "email",
-                                      step["subject"], "rejected", "no_email")
+                            address, consent = contacts.get((cuid, channel), ("", 0))
+                        if not address:
+                            _log_send(client, tenant, cid, identity, i, channel,
+                                      step.get("subject", ""), "rejected", "no_contact")
+                        elif not consent:
+                            _log_send(client, tenant, cid, identity, i, channel,
+                                      step.get("subject", ""), "rejected", "no_consent")
+                        else:
+                            ok, detail = route_message(
+                                channel, address, step.get("subject", ""),
+                                step["body"], email_cfg, msg_cfg)
+                            _log_send(client, tenant, cid, identity, i, channel,
+                                      step.get("subject", ""), detail if ok else "rejected",
+                                      "" if ok else detail)
                     elif step["action"] == "offer":
                         status, reason = issue_offer(
                             client, tenant, identity, step["offer_id"],
