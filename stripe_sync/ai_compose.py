@@ -15,7 +15,12 @@ import os
 import urllib.error
 import urllib.request
 
-from compose import AUTO_PREFIX, EXECUTOR_SCHEMAS, validate_offer
+try:
+    # плоский контекст (saas-ops контейнер: /app = stripe_sync)
+    from compose import AUTO_PREFIX, EXECUTOR_SCHEMAS, validate_offer
+except ImportError:
+    # пакетный контекст (board: /app = корень репо)
+    from stripe_sync.compose import AUTO_PREFIX, EXECUTOR_SCHEMAS, validate_offer
 
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
