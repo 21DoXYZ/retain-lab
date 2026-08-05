@@ -141,6 +141,37 @@ services:
       STRIPE_SIGVERIFY_OFF: ${STRIPE_SIGVERIFY_OFF:-}   # 1 = дев-моки без подписи (НЕ в проде)
     restart: unless-stopped
 
+  # Планировщик SaaS-джобов (Phase 6): campaign_tick */15м, stitch :05,
+  # scoring 03:10, uplift Пн 08:00. Тот же образ, что stripe-webhook.
+  saas-ops:
+    build: ./stripe_sync
+    command: ["python", "ops_loop.py"]
+    depends_on:
+      redpanda:
+        condition: service_started
+      clickhouse:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      SAAS_KAFKA_TOPIC: saas.events
+      SASL_USER: ${INGEST_KAFKA_USER:?set INGEST_KAFKA_USER in .env}
+      SASL_PASS: ${INGEST_KAFKA_PASS:?set INGEST_KAFKA_PASS in .env}
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      TENANT_ID: ${TENANT_ID:-hubcontent}
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      OWNER_EMAIL: ${OWNER_EMAIL:-}
+      APP_URL: ${APP_URL:-}
+      BILLING_PORTAL_URL: ${BILLING_PORTAL_URL:-}
+      CALLBACK_URL: ${CALLBACK_URL:-}
+      CALLBACK_TOKEN: ${CALLBACK_TOKEN:-}
+      SIGNALS_DRY_RUN: ${SIGNALS_DRY_RUN:-1}
+    restart: unless-stopped
+
   # Пушер сигналов модели -> колбэк казино. Батч-задача (profiles: не стартует с up).
   #   запуск:  docker compose run --rm pusher
   pusher:

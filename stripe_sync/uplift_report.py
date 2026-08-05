@@ -1,0 +1,144 @@
+"""Недельный uplift-отчёт (Phase 6): target vs holdout → инкремент в долларах.
+
+Формула v1 (ТЗ §4/§7): conv = доля группы с goal-событием в окне после
+зачисления; для invert-целей (K4: отмена) conv = 1 - доля. Инкремент =
+(conv_target - conv_control) × N_target × средний чек (MRR зачисленных).
+Честность: при пустом контроле инкремент не считается (NULL-семантика — n/a),
+отрицательный инкремент показывается как есть.
+
+Запуск: python uplift_report.py [--days 7] — печать + строка в uplift_reports
++ письмо владельцу (OWNER_EMAIL; dry-run по умолчанию, как все отправки).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from saas_senders import EmailConfig, send_email
+
+CAMPAIGNS_PATH = Path(__file__).parent / "saas_campaigns.json"
+
+
+def uplift_math(n_target: int, n_control: int, conv_target_cnt: int,
+                conv_control_cnt: int, avg_check: float,
+                invert: bool = False) -> dict:
+    """Чистая математика одной кампании. incremental_usd=None при пустом контроле."""
+    conv_t = conv_target_cnt / n_target if n_target else 0.0
+    conv_c = conv_control_cnt / n_control if n_control else 0.0
+    if invert:
+        conv_t, conv_c = 1.0 - conv_t, 1.0 - conv_c
+    incremental = None
+    if n_target and n_control:
+        incremental = round((conv_t - conv_c) * n_target * avg_check, 2)
+    return {"conv_target": round(conv_t, 4), "conv_control": round(conv_c, 4),
+            "incremental_usd": incremental}
+
+
+def campaign_report(client, tenant: str, camp: dict, days: int) -> dict | None:
+    goal = camp.get("goal")
+    if not goal:
+        return None
+    rows = client.query(
+        """
+        WITH goals AS (
+            SELECT identity_id, min(ts) AS goal_ts
+            FROM retention.saas_events_resolved
+            WHERE tenant_id = %(t)s AND event_type = %(g)s
+            GROUP BY identity_id
+        )
+        SELECT e.control,
+               count() AS n,
+               countIf(g.goal_ts > e.enrolled_at
+                       AND g.goal_ts <= e.enrolled_at + INTERVAL %(w)s DAY) AS converted
+        FROM retention.campaign_enrollments_current e
+        LEFT JOIN goals g ON g.identity_id = e.identity_id
+        WHERE e.tenant_id = %(t)s AND e.campaign_id = %(c)s
+          AND e.enrolled_at >= now() - INTERVAL %(d)s DAY
+        GROUP BY e.control
+        """,
+        parameters={"t": tenant, "c": camp["campaign_id"],
+                    "g": goal["event_type"], "w": int(goal["window_days"]),
+                    "d": days},
+    ).result_rows
+    groups = {int(r[0]): (int(r[1]), int(r[2])) for r in rows}
+    n_t, cv_t = groups.get(0, (0, 0))
+    n_c, cv_c = groups.get(1, (0, 0))
+    if n_t == 0 and n_c == 0:
+        return None
+
+    avg_check = float(client.query(
+        """
+        SELECT coalesce(avg(if(ua.mrr > 0, toFloat64(ua.mrr), NULL)), 0)
+        FROM retention.campaign_enrollments_current e
+        JOIN retention.user_actions ua
+          ON ua.tenant_id = e.tenant_id AND ua.identity_id = e.identity_id
+        WHERE e.tenant_id = %(t)s AND e.campaign_id = %(c)s
+          AND e.enrolled_at >= now() - INTERVAL %(d)s DAY
+        """,
+        parameters={"t": tenant, "c": camp["campaign_id"], "d": days},
+    ).result_rows[0][0] or 0.0)
+
+    m = uplift_math(n_t, n_c, cv_t, cv_c, avg_check, bool(goal.get("invert")))
+    return {"campaign_id": camp["campaign_id"], "n_target": n_t, "n_control": n_c,
+            "avg_check": round(avg_check, 2), "goal_event": goal["event_type"], **m}
+
+
+def main() -> None:
+    import clickhouse_connect
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--days", type=int, default=7)
+    args = ap.parse_args()
+
+    tenant = os.environ.get("TENANT_ID", "hubcontent")
+    client = clickhouse_connect.get_client(
+        host=os.environ.get("CH_HOST", "clickhouse"),
+        port=int(os.environ.get("CH_PORT", "8123")),
+        username=os.environ.get("CH_USER", "default"),
+        password=os.environ.get("CH_PASSWORD", ""),
+        database=os.environ.get("CH_DB", "retention"),
+    )
+    conf = json.loads(CAMPAIGNS_PATH.read_text())[tenant]
+    now = datetime.now(tz=timezone.utc)
+    period_start = (now - timedelta(days=args.days)).date()
+    lines, rows = [], []
+
+    for camp in conf["campaigns"]:
+        rep = campaign_report(client, tenant, camp, args.days)
+        if rep is None:
+            continue
+        incr = rep["incremental_usd"]
+        lines.append(
+            f"{rep['campaign_id']:<22} target {rep['conv_target']:>6.1%} (n={rep['n_target']})"
+            f" | holdout {rep['conv_control']:>6.1%} (n={rep['n_control']})"
+            f" | check ${rep['avg_check']:.2f}"
+            f" | incremental " + (f"${incr:+.2f}" if incr is not None else "n/a (empty holdout)"))
+        rows.append([tenant, rep["campaign_id"], period_start, now.date(),
+                     rep["n_target"], rep["n_control"], rep["conv_target"],
+                     rep["conv_control"], rep["avg_check"],
+                     incr if incr is not None else 0.0, rep["goal_event"],
+                     now.strftime("%Y-%m-%d %H:%M:%S.000")])
+
+    report = f"Revenue Autopilot · uplift {period_start} → {now.date()} ({tenant})\n" + \
+             ("\n".join(lines) if lines else "no enrolled cohorts in period")
+    print(report)
+
+    if rows:
+        client.insert(
+            "retention.uplift_reports", rows,
+            column_names=["tenant_id", "campaign_id", "period_start", "period_end",
+                          "n_target", "n_control", "conv_target", "conv_control",
+                          "avg_check", "incremental_usd", "goal_event", "computed_at"])
+
+    owner = os.environ.get("OWNER_EMAIL", "").strip()
+    if owner and lines:
+        send_email(owner, f"Uplift report {now.date()} - {tenant}", report,
+                   EmailConfig.from_env())
+
+
+if __name__ == "__main__":
+    main()

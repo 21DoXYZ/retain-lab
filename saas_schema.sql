@@ -466,3 +466,24 @@ CREATE TABLE IF NOT EXISTS retention.campaign_send_log
 )
 ENGINE = MergeTree
 ORDER BY (tenant_id, campaign_id, identity_id, ts);
+
+-- ============================================================================
+-- Phase 6 — Замер: недельный uplift-отчёт по кампаниям (target vs holdout).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS retention.uplift_reports
+(
+    `tenant_id`      LowCardinality(String),
+    `campaign_id`    LowCardinality(String),
+    `period_start`   Date,
+    `period_end`     Date,
+    `n_target`       UInt32,
+    `n_control`      UInt32,
+    `conv_target`    Float64,
+    `conv_control`   Float64,
+    `avg_check`      Float64,
+    `incremental_usd` Float64,
+    `goal_event`     LowCardinality(String),
+    `computed_at`    DateTime64(3)
+)
+ENGINE = MergeTree
+ORDER BY (tenant_id, campaign_id, computed_at);

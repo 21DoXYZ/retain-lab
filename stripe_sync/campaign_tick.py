@@ -73,6 +73,19 @@ def exit_status(current_stage: str, entry_stage: str, step_idx: int,
     return None
 
 
+def effective_configs(conf: dict, email_cfg: "EmailConfig",
+                      exec_cfg: "ExecConfig") -> tuple["EmailConfig", "ExecConfig"]:
+    """Draft-approval гейт (REBUILD §Phase 6): пока autopilot=false в конфиге
+    тенанта, отправки принудительно dry-run — даже если env включил боевой режим.
+    Двойной fail-closed: снять можно только явным autopilot=true в конфиге."""
+    if conf.get("autopilot"):
+        return email_cfg, exec_cfg
+    from dataclasses import replace
+    if not email_cfg.dry_run or not exec_cfg.dry_run:
+        print("[campaigns] autopilot=false -> forced dry-run", flush=True)
+    return replace(email_cfg, dry_run=True), replace(exec_cfg, dry_run=True)
+
+
 # ── I/O ──────────────────────────────────────────────────────────────────────
 
 def _save(client, tenant: str, camp_id: str, row: dict) -> None:
@@ -105,8 +118,8 @@ def tick(client, tenant: str) -> dict[str, int]:
     if not conf:
         raise SystemExit(f"нет кампаний для тенанта {tenant}")
     control_pct = int(conf.get("control_pct", 10))
-    email_cfg = EmailConfig.from_env()
-    exec_cfg = ExecConfig.from_env()
+    email_cfg, exec_cfg = effective_configs(conf, EmailConfig.from_env(),
+                                            ExecConfig.from_env())
     now = _now_dt()
     stats = {"enrolled": 0, "control": 0, "steps": 0, "done": 0, "exited": 0}
 

@@ -7,62 +7,144 @@
         "title": "Activation: signed up, no video in 48h",
         "entry_stage": "ACTIVATE",
         "steps": [
-          {"delay_h": 0, "action": "email", "subject": "Your first video is 3 minutes away",
-           "body": "Hi! Pick a template and generate your first video - it takes ~3 minutes. We added {{tokens}} bonus tokens to get you started: {{app_url}}"},
-          {"delay_h": 0, "action": "offer", "offer_id": "O1_tokens_100"},
-          {"delay_h": 48, "action": "email", "subject": "A template picked for you",
-           "body": "Creators like you start with these 3 templates: {{app_url}}/templates"}
-        ]
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "Your first video is 3 minutes away",
+            "body": "Hi! Pick a template and generate your first video - it takes ~3 minutes. We added {{tokens}} bonus tokens to get you started: {{app_url}}"
+          },
+          {
+            "delay_h": 0,
+            "action": "offer",
+            "offer_id": "O1_tokens_100"
+          },
+          {
+            "delay_h": 48,
+            "action": "email",
+            "subject": "A template picked for you",
+            "body": "Creators like you start with these 3 templates: {{app_url}}/templates"
+          }
+        ],
+        "goal": {
+          "event_type": "generation_completed",
+          "window_days": 14
+        }
       },
       {
         "campaign_id": "K2_trial_conversion",
         "title": "Trial ends in <=3 days, not paid",
         "entry_stage": "CONVERT",
         "steps": [
-          {"delay_h": 0, "action": "email", "subject": "Your trial ends soon - keep your videos",
-           "body": "Your trial ends in a few days. Upgrade to keep generating: {{app_url}}/pricing"},
-          {"delay_h": 24, "action": "offer", "offer_id": "O3_trial_plus7"},
-          {"delay_h": 24, "action": "email", "subject": "We added 7 more days to your trial",
-           "body": "Need more time to decide? Your trial got +7 days. Try the Pro templates meanwhile: {{app_url}}/templates?tier=pro"}
-        ]
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "Your trial ends soon - keep your videos",
+            "body": "Your trial ends in a few days. Upgrade to keep generating: {{app_url}}/pricing"
+          },
+          {
+            "delay_h": 24,
+            "action": "offer",
+            "offer_id": "O3_trial_plus7"
+          },
+          {
+            "delay_h": 24,
+            "action": "email",
+            "subject": "We added 7 more days to your trial",
+            "body": "Need more time to decide? Your trial got +7 days. Try the Pro templates meanwhile: {{app_url}}/templates?tier=pro"
+          }
+        ],
+        "goal": {
+          "event_type": "billing.invoice_paid",
+          "window_days": 14
+        }
       },
       {
         "campaign_id": "K3_payment_recovery",
         "title": "Dunning: payment failed",
         "entry_stage": "DUNNING",
         "steps": [
-          {"delay_h": 0, "action": "email", "subject": "Payment issue - your account is safe",
-           "body": "Your last payment did not go through (this is usually a card issue, not you). Update your card in 30 seconds: {{card_update_url}}. Your videos and tokens are safe."},
-          {"delay_h": 24, "action": "email", "subject": "Reminder: update your card to keep Pro",
-           "body": "Quick reminder to update your payment method: {{card_update_url}}. We retry automatically once it is updated."},
-          {"delay_h": 72, "action": "email", "subject": "Last call before your plan pauses",
-           "body": "We could not charge your card for 3 days. Update it now to avoid losing Pro features: {{card_update_url}}"}
-        ]
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "Payment issue - your account is safe",
+            "body": "Your last payment did not go through (this is usually a card issue, not you). Update your card in 30 seconds: {{card_update_url}}. Your videos and tokens are safe."
+          },
+          {
+            "delay_h": 24,
+            "action": "email",
+            "subject": "Reminder: update your card to keep Pro",
+            "body": "Quick reminder to update your payment method: {{card_update_url}}. We retry automatically once it is updated."
+          },
+          {
+            "delay_h": 72,
+            "action": "email",
+            "subject": "Last call before your plan pauses",
+            "body": "We could not charge your card for 3 days. Update it now to avoid losing Pro features: {{card_update_url}}"
+          }
+        ],
+        "goal": {
+          "event_type": "billing.invoice_paid",
+          "window_days": 7
+        }
       },
       {
         "campaign_id": "K4_save",
         "title": "Save: activity dropped or cancel flow started",
         "entry_stage": "SAVE",
         "steps": [
-          {"delay_h": 0, "action": "offer", "offer_id": "O8_pause_1m"},
-          {"delay_h": 0, "action": "email", "subject": "Need a break? Pause instead of cancel",
-           "body": "You can pause your subscription for a month - keep your tokens and history, pay nothing: {{app_url}}/account/pause"},
-          {"delay_h": 72, "action": "email", "subject": "What you created this month",
-           "body": "Your stats: {{videos_month}} videos generated. Here is what is new since you last visited: {{app_url}}/whats-new"}
-        ]
+          {
+            "delay_h": 0,
+            "action": "offer",
+            "offer_id": "O8_pause_1m"
+          },
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "Need a break? Pause instead of cancel",
+            "body": "You can pause your subscription for a month - keep your tokens and history, pay nothing: {{app_url}}/account/pause"
+          },
+          {
+            "delay_h": 72,
+            "action": "email",
+            "subject": "What you created this month",
+            "body": "Your stats: {{videos_month}} videos generated. Here is what is new since you last visited: {{app_url}}/whats-new"
+          }
+        ],
+        "goal": {
+          "event_type": "billing.subscription_canceled",
+          "window_days": 30,
+          "invert": true
+        }
       },
       {
         "campaign_id": "K5_upgrade",
         "title": "Upgrade: power user at plan limit",
         "entry_stage": "UPGRADE",
         "steps": [
-          {"delay_h": 0, "action": "email", "subject": "You are hitting your plan limit",
-           "body": "You used most of your tokens this month. On Pro your cost per token is lower and renders are faster: {{app_url}}/pricing"},
-          {"delay_h": 48, "action": "offer", "offer_id": "O7_annual25"},
-          {"delay_h": 48, "action": "email", "subject": "25% off if you switch to annual",
-           "body": "Lock in 25% off with the annual plan - for heavy months like this one: {{app_url}}/pricing?annual=1"}
-        ]
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "You are hitting your plan limit",
+            "body": "You used most of your tokens this month. On Pro your cost per token is lower and renders are faster: {{app_url}}/pricing"
+          },
+          {
+            "delay_h": 48,
+            "action": "offer",
+            "offer_id": "O7_annual25"
+          },
+          {
+            "delay_h": 48,
+            "action": "email",
+            "subject": "25% off if you switch to annual",
+            "body": "Lock in 25% off with the annual plan - for heavy months like this one: {{app_url}}/pricing?annual=1"
+          }
+        ],
+        "goal": {
+          "event_type": "billing.subscription_updated",
+          "window_days": 30
+        }
       }
-    ]
+    ],
+    "autopilot": false
   }
 }
