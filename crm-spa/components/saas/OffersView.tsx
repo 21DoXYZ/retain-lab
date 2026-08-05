@@ -25,29 +25,27 @@ interface OfferRow {
   stats: { issued: number; dry_run: number; holdout: number; rejected: number };
 }
 
-/** Поля исполнителей (зеркало EXECUTOR_SCHEMAS в api/saas.py). */
-const EXECUTOR_FIELDS: Record<string, { key: string; kind: "str" | "num" | "enum"; req: boolean; options?: string[] }[]> = {
-  client_callback: [
-    { key: "command", kind: "str", req: true },
-    { key: "tokens", kind: "num", req: false },
-    { key: "days", kind: "num", req: false },
-    { key: "expires_days", kind: "num", req: false },
-    { key: "feature", kind: "str", req: false },
-  ],
-  stripe_coupon: [
-    { key: "percent_off", kind: "num", req: true },
-    { key: "duration", kind: "enum", req: true, options: ["once", "repeating", "forever"] },
-    { key: "duration_in_months", kind: "num", req: false },
-  ],
-  trial_extend: [{ key: "days", kind: "num", req: true }],
-  pause_collection: [{ key: "months", kind: "num", req: true }],
-  balance_credit: [{ key: "amount_usd", kind: "num", req: true }],
-};
-
 interface OffersData {
   control_pct: number;
   offers: OfferRow[];
 }
+
+/** Типы подарков - человеческий язык; исполнитель и command под капотом.
+ * Поля = ключи params (лейблы в i18n saas.offers.p.*). */
+const GIFT_TYPES: { key: string; executor: string; fields: { key: string; kind: "str" | "num"; req: boolean }[] }[] = [
+  { key: "units", executor: "client_callback", fields: [
+    { key: "amount", kind: "num", req: true },
+    { key: "unit", kind: "str", req: true },
+    { key: "expires_days", kind: "num", req: false },
+  ]},
+  { key: "discount", executor: "stripe_coupon", fields: [
+    { key: "percent_off", kind: "num", req: true },
+    { key: "duration_in_months", kind: "num", req: true },
+  ]},
+  { key: "trial", executor: "trial_extend", fields: [{ key: "days", kind: "num", req: true }]},
+  { key: "pause", executor: "pause_collection", fields: [{ key: "months", kind: "num", req: true }]},
+  { key: "credit", executor: "balance_credit", fields: [{ key: "amount_usd", kind: "num", req: true }]},
+];
 
 const inputCls =
   "h-[38px] w-full rounded-ctl border border-hair2 bg-canvas px-3 text-[13px] " +
@@ -155,14 +153,15 @@ function OfferEditor({
 function NewOfferForm({ onDone }: { onDone: (reload: boolean) => void }) {
   const t = useT();
   const [title, setTitle] = useState("");
-  const [executor, setExecutor] = useState("client_callback");
+  const [gift, setGift] = useState("units");
   const [cap, setCap] = useState("1");
   const [cost, setCost] = useState("0");
   const [params, setParams] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  const fields = EXECUTOR_FIELDS[executor] ?? [];
+  const giftType = GIFT_TYPES.find((g) => g.key === gift) ?? GIFT_TYPES[0];
+  const fields = giftType.fields;
 
   return (
     <Card className="flex flex-col gap-3 p-5">
@@ -176,17 +175,17 @@ function NewOfferForm({ onDone }: { onDone: (reload: boolean) => void }) {
                  value={title} onChange={(e) => setTitle(e.target.value)} />
         </label>
         <label className="flex flex-col gap-1 text-[12px] text-steel">
-          {t("saas.offers.new.executor")}
+          {t("saas.offers.new.giftType")}
           <select
             className={inputCls + " cursor-pointer"}
-            value={executor}
+            value={gift}
             onChange={(e) => {
-              setExecutor(e.target.value);
+              setGift(e.target.value);
               setParams({});
             }}
           >
-            {Object.keys(EXECUTOR_FIELDS).map((ex) => (
-              <option key={ex} value={ex}>{t(`saas.offers.exec.${ex}` as Parameters<typeof t>[0])}</option>
+            {GIFT_TYPES.map((g) => (
+              <option key={g.key} value={g.key}>{t(`saas.offers.gift.${g.key}` as Parameters<typeof t>[0])}</option>
             ))}
           </select>
         </label>
@@ -197,21 +196,13 @@ function NewOfferForm({ onDone }: { onDone: (reload: boolean) => void }) {
         </label>
         {fields.map((f) => (
           <label key={f.key} className="flex flex-col gap-1 text-[12px] text-steel">
-            <span className="font-mono">
-              {f.key}
+            <span>
+              {t(`saas.offers.p.${f.key}` as Parameters<typeof t>[0])}
               {f.req ? " *" : ""}
             </span>
-            {f.kind === "enum" ? (
-              <select className={inputCls + " cursor-pointer"} value={params[f.key] ?? ""}
-                      onChange={(e) => setParams((p) => ({ ...p, [f.key]: e.target.value }))}>
-                <option value="" disabled>-</option>
-                {f.options?.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            ) : (
-              <input className={inputCls} value={params[f.key] ?? ""}
-                     inputMode={f.kind === "num" ? "decimal" : "text"}
-                     onChange={(e) => setParams((p) => ({ ...p, [f.key]: e.target.value }))} />
-            )}
+            <input className={inputCls} value={params[f.key] ?? ""}
+                   inputMode={f.kind === "num" ? "decimal" : "text"}
+                   onChange={(e) => setParams((p) => ({ ...p, [f.key]: e.target.value }))} />
           </label>
         ))}
         <label className="flex flex-col gap-1 text-[12px] text-steel">
@@ -229,15 +220,22 @@ function NewOfferForm({ onDone }: { onDone: (reload: boolean) => void }) {
           onClick={() => {
             setBusy(true);
             setErr("");
+            const extra: Record<string, unknown> = {};
+            if (gift === "discount") {
+              extra.duration = "repeating";   // купон на N месяцев
+            }
             const body: Record<string, unknown> = {
-              title: title.trim(), executor,
+              title: title.trim(), executor: giftType.executor,
               max_per_user_30d: Number(cap), cost_estimate: Number(cost),
-              params: Object.fromEntries(
-                Object.entries(params).filter(([, v]) => v !== "").map(([k, v]) => {
-                  const f = fields.find((x) => x.key === k);
-                  return [k, f?.kind === "num" ? Number(v) : v];
-                }),
-              ),
+              params: {
+                ...Object.fromEntries(
+                  Object.entries(params).filter(([, v]) => v !== "").map(([k, v]) => {
+                    const f = fields.find((x) => x.key === k);
+                    return [k, f?.kind === "num" ? Number(v) : v];
+                  }),
+                ),
+                ...extra,
+              },
             };
             flaskFetch("/api/v1/saas/offers/create", { method: "POST", body })
               .then(() => onDone(true))

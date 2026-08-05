@@ -142,7 +142,8 @@ def _log_send(client, tenant: str, camp_id: str, identity: str, step_idx: int,
 
 def tick(client, tenant: str) -> dict[str, int]:
     cfgs = json.loads(CAMPAIGNS_PATH.read_text())
-    conf = cfgs.get(tenant)
+    # тенант без git-блока живёт на универсальном каркасе _default
+    conf = cfgs.get(tenant) or cfgs.get("_default")
     if not conf:
         raise SystemExit(f"нет кампаний для тенанта {tenant}")
     control_pct = int(conf.get("control_pct", 10))
@@ -250,6 +251,10 @@ def tick(client, tenant: str) -> dict[str, int]:
                                 column_names=INAPP_COLUMNS)
                             _log_send(client, tenant, cid, identity, i, "inapp",
                                       step.get("subject", ""), "queued", "")
+                    elif step["action"] == "offer" and not step.get("offer_id"):
+                        # оффер не привязан (свежий тенант до опросника)
+                        _log_send(client, tenant, cid, identity, i, "offer",
+                                  "", "rejected", "no_offer_bound")
                     elif step["action"] == "offer":
                         status, reason = issue_offer(
                             client, tenant, identity, step["offer_id"],

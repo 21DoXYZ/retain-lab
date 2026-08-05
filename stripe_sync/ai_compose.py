@@ -137,6 +137,73 @@ def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], lis
     return out, rejected
 
 
+COPY_SYSTEM = """You write retention email/banner copy for a SaaS product. Output ONLY valid JSON:
+{"K1_activation": {"0": {"subject": "...", "body": "..."}, "2": {...}},
+ "K2_trial_conversion": {...}, "K3_payment_recovery": {...}, "K4_save": {...}, "K5_upgrade": {...}}
+
+The campaign skeleton (fixed, do not change structure - only write copy for the
+step indexes you are given): K1 activation (steps 0,2 email), K2 trial ending
+(steps 0,2 email), K3 payment failed (step 0 in-app banner, steps 1,2,3 email),
+K4 save/churn risk (steps 1,2 email), K5 upgrade (steps 0,2 email).
+
+Rules:
+- Write in the product's own voice for ITS users. Use the product name and the
+  value unit naturally. Short subjects (under 60 chars), bodies 1-3 sentences.
+- Keep the placeholders {{card_update_url}} (card update page) and {{app_url}}
+  (the product) where a link belongs - write them EXACTLY like that.
+- K3 tone: reassuring, card issue not user's fault, work is safe.
+- No emoji, no em-dash, no ALL CAPS, no false urgency, no invented discounts
+  or numbers - offers are attached separately by the platform.
+"""
+
+
+def parse_ai_copy(text: str) -> dict:
+    """JSON модели -> {campaign_id: {int_idx: {subject, body}}} с обрезкой длин.
+    Кривой JSON -> {} (вызывающий остаётся на детерминированных шаблонах)."""
+    try:
+        start, end = text.index("{"), text.rindex("}") + 1
+        doc = json.loads(text[start:end])
+    except (ValueError, json.JSONDecodeError):
+        return {}
+    out = {}
+    for cid, steps in (doc or {}).items():
+        if not isinstance(steps, dict):
+            continue
+        clean = {}
+        for idx, txt in steps.items():
+            try:
+                i = int(idx)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(txt, dict):
+                continue
+            subject = str(txt.get("subject", "")).strip()[:200]
+            body = str(txt.get("body", "")).strip()[:2000]
+            if body:
+                clean[i] = {"subject": subject, "body": body}
+        if clean:
+            out[str(cid)] = clean
+    return out
+
+
+def ai_compose_copy(answers: dict) -> tuple[dict, str]:
+    """Тексты кампаний под продукт. ({}, note) при сбое - остаёмся на шаблонах."""
+    provider, api_key = resolve_provider()
+    if not provider:
+        return {}, "ai_not_configured"
+    call = _call_anthropic if provider == "anthropic" else _call_openai
+    user = ("Product profile:\n" + json.dumps(answers, ensure_ascii=False)
+            + "\nWrite the copy now.")
+    try:
+        text = call(api_key, COPY_SYSTEM, user)
+    except urllib.error.HTTPError as exc:
+        return {}, f"ai_http_{exc.code}"
+    except Exception as exc:
+        return {}, f"ai_{type(exc).__name__}"
+    out = parse_ai_copy(text)
+    return out, "" if out else "ai_empty"
+
+
 def ai_compose(answers: dict, avg_price: float) -> tuple[list[dict], str]:
     """(офферы, note). Пустой список + note при любом сбое - вызывающий
     остаётся на детерминированной сборке."""

@@ -26,6 +26,9 @@ const STEP_ORDER = ["snippet", "stripe", "channels", "offers", "autopilot"] as c
 
 /** Поля опросника (зеркало compose.QUESTIONS): порядок = порядок в форме. */
 const Q_FIELDS: { key: string; kind: "str" | "num" | "bool"; showIf?: (a: Record<string, string>) => boolean }[] = [
+  { key: "product_name", kind: "str" },
+  { key: "product_desc", kind: "str" },
+  { key: "app_url", kind: "str" },
   { key: "client_api", kind: "bool" },
   { key: "value_unit", kind: "str", showIf: (a) => a.client_api === "yes" },
   { key: "monthly_units", kind: "num", showIf: (a) => a.client_api === "yes" },
@@ -88,7 +91,7 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
           variant="brand"
           size="sm"
           loading={busy}
-          disabled={!a.client_api || !a.has_trial || !a.can_pause || a.max_discount_pct === undefined || a.max_discount_pct === ""}
+          disabled={!a.product_name || !a.client_api || !a.has_trial || !a.can_pause || a.max_discount_pct === undefined || a.max_discount_pct === ""}
           onClick={() => {
             setBusy(true);
             setErr("");

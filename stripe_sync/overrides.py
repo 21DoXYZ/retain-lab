@@ -110,6 +110,8 @@ def merge_campaign_conf(conf: dict, ov: dict) -> dict:
                     step[f] = str(patch[f])
             if patch.get("delay_h") is not None:
                 step["delay_h"] = float(patch["delay_h"])
+            if patch.get("offer_id") is not None and step.get("action") == "offer":
+                step["offer_id"] = str(patch["offer_id"])
             step["_edited"] = True
     return out
 

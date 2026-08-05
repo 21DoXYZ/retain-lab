@@ -38,8 +38,12 @@ from __future__ import annotations
 
 # Схемы исполнителей - ЕДИНЫЙ источник (api/saas.py и ai_compose валидируют
 # по ним; num? = необязательное число, enum: - выбор).
+# client_callback УНИВЕРСАЛЕН: amount + unit - «сколько чего» дарим в валюте
+# ЛЮБОГО продукта (tokens/videos/credits/seats...); command выводится сам
+# (unit_credit), tokens - легаси-синоним amount у старых офферов.
 EXECUTOR_SCHEMAS = {
-    'client_callback': {'command': 'str', 'tokens': 'num?', 'days': 'num?',
+    'client_callback': {'command': 'str?', 'amount': 'num?', 'unit': 'str?',
+                        'tokens': 'num?', 'days': 'num?',
                         'expires_days': 'num?', 'feature': 'str?'},
     'stripe_coupon': {'percent_off': 'num', 'duration': 'enum:once,repeating,forever',
                       'duration_in_months': 'num?'},
@@ -86,6 +90,12 @@ def validate_offer(offer: dict) -> tuple[dict, str]:
     extra = set(params_in) - set(schema)
     if extra:
         return {}, f'unknown_param:{sorted(extra)[0]}'
+    if executor == 'client_callback':
+        # универсальный подарок: должно быть ЧТО дарить; command выводим сами
+        if not any(k in params for k in ('amount', 'tokens', 'days', 'feature')):
+            return {}, 'param_required:amount'
+        if not params.get('command'):
+            params['command'] = f"{_slug(str(params.get('unit') or 'bonus'))}_credit"
     try:
         cap = int(offer.get('max_per_user_30d', 1))
         cost = float(offer.get('cost_estimate', 0))
@@ -101,6 +111,9 @@ def validate_offer(offer: dict) -> tuple[dict, str]:
 
 
 QUESTIONS = [
+    {"key": "product_name", "type": "str", "required": True},
+    {"key": "product_desc", "type": "str", "required": False},
+    {"key": "app_url", "type": "str", "required": False},
     {"key": "value_unit", "type": "str", "required": False,
      "example": "tokens / credits / exports"},
     {"key": "monthly_units", "type": "num", "required": False, "min": 1},
@@ -162,8 +175,8 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
             "executor": "client_callback", "monetary": True,
             "cost_estimate": round(bonus * unit_cost, 2),
             "max_per_user_30d": 2,
-            "params": {"command": f"{_slug(unit)}_credit", "tokens": bonus,
-                       "expires_days": 14},
+            "params": {"command": f"{_slug(unit)}_credit", "amount": bonus,
+                       "unit": unit, "expires_days": 14},
         })
 
     if ceiling > 0:
@@ -209,6 +222,66 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
             })
 
     return out
+
+
+def compose_campaign_copy(answers: dict) -> dict:
+    """Ответы -> тексты шагов K1-K5 под ЛЮБОЙ продукт (нейтральные шаблоны
+    с подстановкой имени/юнита/URL). Структура цепочек - каркас платформы,
+    здесь только КОПИРАЙТ. Формат: {campaign_id: {step_idx: {subject, body}}}.
+    Плейсхолдеры {{card_update_url}}/{{app_url}} остаются живыми - их рендерит
+    отправка."""
+    name = str(answers.get("product_name") or "your product").strip()
+    unit = str(answers.get("value_unit") or "").strip()
+    units = f" and your {unit}" if unit else ""
+    app = str(answers.get("app_url") or "").strip() or "{{app_url}}"
+
+    return {
+        "K1_activation": {
+            0: {"subject": "Your first result is minutes away",
+                "body": f"Hi! You signed up for {name} but have not tried it yet - "
+                        f"the first result takes just a few minutes: {app}"},
+            2: {"subject": "A quick way to start",
+                "body": f"Most people start with the basics - open {app} and make "
+                        "your first one. Reply to this email if anything is unclear."},
+        },
+        "K2_trial_conversion": {
+            0: {"subject": "Your trial ends soon - keep your work",
+                "body": f"Your trial ends in a few days. Upgrade to keep access{units}: {app}"},
+            2: {"subject": "We added extra trial days",
+                "body": f"Need more time to decide? Your trial got extended. "
+                        f"Meanwhile, try the advanced features: {app}"},
+        },
+        "K3_payment_recovery": {
+            0: {"subject": "Payment issue - action needed",
+                "body": "Your last payment did not go through. Update your card - "
+                        "it takes 30 seconds, your work is safe."},
+            1: {"subject": f"Payment issue - your {name} account is safe",
+                "body": "Your last payment did not go through (this is usually a "
+                        "card issue, not you). Update your card in 30 seconds: "
+                        f"{{{{card_update_url}}}}. Your account{units} are safe."},
+            2: {"subject": "Reminder: update your card",
+                "body": "Quick reminder to update your payment method: "
+                        "{{card_update_url}}. We retry automatically once it is updated."},
+            3: {"subject": "Last call before your plan pauses",
+                "body": "We could not charge your card for 3 days. Update it now "
+                        "to keep full access: {{card_update_url}}"},
+        },
+        "K4_save": {
+            1: {"subject": "Need a break? Pause instead of cancel",
+                "body": f"You can pause your subscription for a month - keep your "
+                        f"history{units}, pay nothing: {app}"},
+            2: {"subject": f"What is new in {name}",
+                "body": f"Here is what changed since you last visited: {app}"},
+        },
+        "K5_upgrade": {
+            0: {"subject": "You are hitting your plan limit",
+                "body": f"You used most of your plan this month. On the higher tier "
+                        f"the unit economics are better: {app}"},
+            2: {"subject": "Lock in a discount on annual",
+                "body": f"Heavy months like this one are cheaper on annual - "
+                        f"see the numbers: {app}"},
+        },
+    }
 
 
 def _slug(s: str) -> str:

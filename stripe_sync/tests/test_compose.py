@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from ai_compose import parse_ai_offers  # noqa: E402
 
 
-FULL = {"value_unit": "tokens", "monthly_units": 500, "client_api": True,
+FULL = {"product_name": "Hub Content", "value_unit": "tokens",
+        "monthly_units": 500, "client_api": True,
         "has_trial": True, "trial_days": 14, "max_discount_pct": 25,
         "can_pause": True}
 
@@ -19,6 +20,8 @@ def test_validate_answers_types_and_required():
     a, r = validate_answers({**FULL, "client_api": "yes", "trial_days": "14"})
     assert r == "" and a["client_api"] is True and a["trial_days"] == 14
     _, r = validate_answers({"has_trial": True, "can_pause": False})
+    assert r == "answer_required:product_name"
+    _, r = validate_answers({"product_name": "X", "has_trial": True, "can_pause": False})
     assert r == "answer_required:client_api"
     _, r = validate_answers({**FULL, "max_discount_pct": 90})
     assert r == "invalid_answer:max_discount_pct"
@@ -28,7 +31,8 @@ def test_compose_full_answers_price():
     offers = compose_offers(FULL, avg_price=50.0)
     ids = {o["offer_id"]: o for o in offers}
     # бонус: 20% от 500 = 100 юнитов, себестоимость 100 * (50/500) = $10
-    assert ids["A_bonus_tokens"]["params"]["tokens"] == 100
+    assert ids["A_bonus_tokens"]["params"]["amount"] == 100
+    assert ids["A_bonus_tokens"]["params"]["unit"] == "tokens"
     assert ids["A_bonus_tokens"]["cost_estimate"] == 10.0
     # скидка: потолок 25 -> берём 20; 50 * 20% * 2 мес = $20
     assert ids["A_discount20"]["params"]["percent_off"] == 20
@@ -75,3 +79,33 @@ def test_parse_ai_offers_validates_and_caps():
 def test_parse_ai_offers_bad_json():
     offers, rejected = parse_ai_offers("sorry, no json here", 20)
     assert offers == [] and rejected == ["ai_json_parse_failed"]
+
+
+def test_validate_offer_universal_units_derives_command():
+    clean, r = validate_offer({"title": "+50 bonus exports", "executor": "client_callback",
+                               "params": {"amount": 50, "unit": "exports"}})
+    assert r == "" and clean["params"]["command"] == "exports_credit"
+    _, r = validate_offer({"title": "x", "executor": "client_callback",
+                           "params": {"unit": "exports"}})
+    assert r == "param_required:amount"
+
+
+def test_compose_campaign_copy_any_product():
+    from stripe_sync.compose import compose_campaign_copy
+    c = compose_campaign_copy({"product_name": "PicSeat", "value_unit": "seats",
+                               "app_url": "https://app.picseat.io"})
+    assert "PicSeat" in c["K1_activation"][0]["body"]
+    assert "https://app.picseat.io" in c["K2_trial_conversion"][0]["body"]
+    assert "{{card_update_url}}" in c["K3_payment_recovery"][1]["body"]
+    assert "seats" in c["K3_payment_recovery"][1]["body"]
+
+
+def test_default_campaigns_block_is_neutral():
+    import json
+    from pathlib import Path
+    data = json.loads((Path("stripe_sync") / "saas_campaigns.json").read_text())
+    d = data["_default"]
+    txt = json.dumps(d)
+    assert "video" not in txt and "token" not in txt.replace("tokens_credit", "")
+    offer_steps = [s for c in d["campaigns"] for s in c["steps"] if s["action"] == "offer"]
+    assert offer_steps and all(s["offer_id"] == "" for s in offer_steps)

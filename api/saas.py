@@ -375,10 +375,63 @@ def saas_questionnaire_submit():
     ca.update_tenant(tenant, {'onboarding_answers': answers,
                               'offers_reviewed': True,
                               'callback_url': answers.get('callback_url') or None})
+
+    # Тексты кампаний под продукт: AI либо детерминированные шаблоны -
+    # пишутся как overrides шагов (движок подхватит на следующем тике).
+    from stripe_sync.compose import compose_campaign_copy
+    copy_note = 'deterministic'
+    copy_map = {}
+    if _ai_enabled():
+        from stripe_sync.ai_compose import ai_compose_copy
+        copy_map, note = ai_compose_copy(answers)
+        copy_note = 'ai' if copy_map else note
+    if not copy_map:
+        copy_map = compose_campaign_copy(answers)
+
+    conf = _campaigns_conf(tenant)
+    by_id = {c['campaign_id']: c for c in conf.get('campaigns', [])}
+    written = 0
+    for cid, steps in copy_map.items():
+        camp = by_id.get(cid)
+        if not camp:
+            continue
+        for idx, txt in steps.items():
+            i = int(idx)
+            if not (0 <= i < len(camp['steps'])) or camp['steps'][i].get('action') == 'offer':
+                continue
+            ovr.set_campaign_step(tenant, cid, i,
+                                  {'subject': txt.get('subject', ''),
+                                   'body': txt.get('body', '')})
+            written += 1
+
+    # Привязка авто-офферов к offer-шагам каркаса (роль -> шаг).
+    bind_roles = {'K1_activation': 'bonus', 'K2_trial_conversion': 'trial',
+                  'K4_save': 'pause', 'K5_upgrade': 'discount'}
+    by_role = {}
+    for o in final:
+        oid = o['offer_id']
+        for role in ('bonus', 'discount', 'trial', 'pause', 'credit'):
+            if role in oid.lower() and role not in by_role:
+                by_role[role] = oid
+    bound = 0
+    for cid, role in bind_roles.items():
+        camp = by_id.get(cid)
+        oid = by_role.get(role)
+        if not camp or not oid:
+            continue
+        for i, st in enumerate(camp['steps']):
+            if st.get('action') == 'offer':
+                ovr.set_campaign_step(tenant, cid, i, {'offer_id': oid})
+                bound += 1
+                break
+
     print(f'[onboarding] {tenant}: опросник -> {len(final)} офферов '
-          f'(ai={"yes" if ai_offers else ai_note})', flush=True)
+          f'(ai={"yes" if ai_offers else ai_note}), тексты={copy_note} '
+          f'({written} шагов), офферы привязаны к {bound} шагам', flush=True)
     return api_json({'created': [o['offer_id'] for o in final],
-                     'ai': bool(ai_offers), 'ai_note': ai_note})
+                     'ai': bool(ai_offers), 'ai_note': ai_note,
+                     'copy': copy_note, 'copy_steps': written,
+                     'offers_bound': bound})
 
 
 @bp.post('/saas/onboarding/offers-reviewed')
@@ -570,7 +623,8 @@ def _campaigns_conf(tenant: str) -> dict:
     from pathlib import Path
     from stripe_sync import overrides as ovr
     p = Path(__file__).resolve().parent.parent / 'stripe_sync' / 'saas_campaigns.json'
-    conf = (_json.loads(p.read_text()).get(tenant) or {}) if p.exists() else {}
+    data = _json.loads(p.read_text()) if p.exists() else {}
+    conf = data.get(tenant) or data.get('_default') or {}
     return ovr.merge_campaign_conf(conf, ovr.load_tenant(tenant))
 
 
