@@ -93,6 +93,23 @@ export const saas = {
   "saas.offers.yes": "да",
   "saas.offers.no": "нет",
 
+  "saas.camp.title": "Кампании",
+  "saas.camp.lead": "Что автопилот шлёт вашим юзерам: цепочки по стадиям, тексты каждого касания, цель и честный контроль.",
+  "saas.camp.autopilot": "Автопилот",
+  "saas.camp.autopilot.on": "включён",
+  "saas.camp.autopilot.off": "dry-run (безопасно)",
+  "saas.camp.autopilot.onDesc": "Касания уходят юзерам по-настоящему. Контрольная группа молчит для замера инкремента.",
+  "saas.camp.autopilot.offDesc": "Безопасный режим: цепочки крутятся, но ни одно касание не уходит - только лог. Контроль {pct}%.",
+  "saas.camp.autopilot.enable": "Включить",
+  "saas.camp.autopilot.confirm": "Точно включить?",
+  "saas.camp.autopilot.disable": "Выключить",
+  "saas.camp.goal": "Цель",
+  "saas.camp.offer": "Оффер",
+  "saas.camp.enrolled": "В кампании",
+  "saas.camp.active": "Активны",
+  "saas.camp.holdout": "Контроль",
+  "saas.camp.touches": "Касаний",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

@@ -51,7 +51,7 @@ export const nav: Partial<Messages> = {
   "nav.actions": "Actions / Offers",
   "nav.bonus": "Offers: impact",
   "nav.bonuses": "Offers: catalog",
-  "nav.campaigns": "Offer campaigns",
+  "nav.campaigns": "Campaigns",
   "nav.ggr": "MRR & revenue",
   "nav.cash": "Money",
   "nav.risk": "Refund audit",

@@ -40,7 +40,6 @@ const STATIC_DISABLED: readonly string[] = [
   "players",
   "bonus",
   "bonuses",
-  "campaigns",
   "analytics",
   "funnel",
   "ltv",

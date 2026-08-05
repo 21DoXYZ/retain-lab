@@ -94,6 +94,23 @@ export const saas: Partial<Messages> = {
   "saas.offers.yes": "yes",
   "saas.offers.no": "no",
 
+  "saas.camp.title": "Campaigns",
+  "saas.camp.lead": "What the autopilot sends your users: stage-driven chains, the exact copy of every touch, the goal and an honest holdout.",
+  "saas.camp.autopilot": "Autopilot",
+  "saas.camp.autopilot.on": "enabled",
+  "saas.camp.autopilot.off": "dry-run",
+  "saas.camp.autopilot.onDesc": "Touches actually reach users. The holdout group stays silent to measure incremental revenue.",
+  "saas.camp.autopilot.offDesc": "Safe mode: chains run, but no touch leaves - log only. Holdout {pct}%.",
+  "saas.camp.autopilot.enable": "Enable",
+  "saas.camp.autopilot.confirm": "Confirm enable?",
+  "saas.camp.autopilot.disable": "Disable",
+  "saas.camp.goal": "Goal",
+  "saas.camp.offer": "Offer",
+  "saas.camp.enrolled": "Enrolled",
+  "saas.camp.active": "Active",
+  "saas.camp.holdout": "Holdout",
+  "saas.camp.touches": "Touches",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

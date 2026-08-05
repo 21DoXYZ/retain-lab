@@ -55,7 +55,7 @@ export const nav = {
   "nav.actions": "Действия / Офферы",
   "nav.bonus": "Бонусы: эффект",
   "nav.bonuses": "Бонусы: каталог",
-  "nav.campaigns": "Бонус-кампании",
+  "nav.campaigns": "Кампании",
   "nav.ggr": "GGR и доход",
   "nav.cash": "Деньги",
   "nav.risk": "Аудит выводов",

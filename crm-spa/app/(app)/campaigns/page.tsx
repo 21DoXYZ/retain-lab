@@ -1,14 +1,14 @@
-import { requireRole, MARKETING_ROLES } from "@/components/marketing/guard";
-import { CampaignsScreen } from "@/components/marketing/CampaignsScreen";
+import { requireSegmentationRole } from "@/components/segmentation/guard";
+import { CampaignsView } from "@/components/saas/CampaignsView";
 
 /**
- * /campaigns — «Бонус-кампании» (agent C4/F3). Role-gated (MARKETING_ROLES);
- * the 8 look-alike segments for bonus blasts flow from /api/v1/campaigns via
- * flaskFetch.
+ * /campaigns — SaaS-кампании автопилота (K1-K5): шаги, тексты, каналы, цель,
+ * статистика + рубильник. Казино-экран бонус-кампаний (CampaignsScreen)
+ * заменён SaaS-пресетом.
  */
 export const dynamic = "force-dynamic";
 
 export default async function CampaignsPage() {
-  await requireRole(MARKETING_ROLES);
-  return <CampaignsScreen />;
+  await requireSegmentationRole();
+  return <CampaignsView />;
 }

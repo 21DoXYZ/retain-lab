@@ -29,8 +29,8 @@ from pathlib import Path
 from executors import ExecConfig
 from hygiene import holdout_split
 from issue import issue_offer
-from saas_senders import (EmailConfig, MessagingConfig, render, route_message,
-                          send_email, tenant_configs)
+from saas_senders import (EmailConfig, MessagingConfig, load_tenant_channels,
+                          render, route_message, send_email, tenant_configs)
 
 CAMPAIGNS_PATH = Path(__file__).parent / "saas_campaigns.json"
 REENTRY_DAYS = 30
@@ -92,6 +92,15 @@ def inapp_row(tenant: str, camp: dict, step: dict, step_idx: int, identity: str,
             camp["entry_stage"], now + ttl, now]
 
 
+def resolve_autopilot(conf: dict, tenant_overrides: dict) -> bool:
+    """Выключатель автопилота. Явный ключ autopilot в tenants.json (пишет UI,
+    POST /saas/campaigns/autopilot) важнее захардкоженного в saas_campaigns.json:
+    контент кампаний живёт в git, а рубильник - в рантайме."""
+    if "autopilot" in tenant_overrides:
+        return bool(tenant_overrides["autopilot"])
+    return bool(conf.get("autopilot"))
+
+
 def effective_configs(conf: dict, email_cfg: "EmailConfig",
                       exec_cfg: "ExecConfig") -> tuple["EmailConfig", "ExecConfig"]:
     """Draft-approval гейт (REBUILD §Phase 6): пока autopilot=false в конфиге
@@ -137,6 +146,7 @@ def tick(client, tenant: str) -> dict[str, int]:
     if not conf:
         raise SystemExit(f"нет кампаний для тенанта {tenant}")
     control_pct = int(conf.get("control_pct", 10))
+    conf = {**conf, "autopilot": resolve_autopilot(conf, load_tenant_channels(tenant))}
     email_cfg, exec_cfg = effective_configs(conf, EmailConfig.from_env(),
                                             ExecConfig.from_env())
     msg_cfg = MessagingConfig.from_env()

@@ -370,6 +370,79 @@ def channels():
     return api_json(_channels_payload(_tenant_arg()))
 
 
+# ── Кампании: что автопилот шлёт юзерам + рубильник ──────────────────────────
+
+def _campaigns_conf(tenant: str) -> dict:
+    import json as _json
+    from pathlib import Path
+    p = Path(__file__).resolve().parent.parent / 'stripe_sync' / 'saas_campaigns.json'
+    return (_json.loads(p.read_text()).get(tenant) or {}) if p.exists() else {}
+
+
+def _autopilot_resolved(conf: dict, tenant: str) -> bool:
+    tc = ca.load_tenants().get(tenant, {}) or {}
+    if 'autopilot' in tc:
+        return bool(tc['autopilot'])
+    return bool(conf.get('autopilot'))
+
+
+def _campaigns_payload(tenant: str) -> dict:
+    conf = _campaigns_conf(tenant)
+
+    enr = {r[0]: {'enrolled': int(r[1]), 'active': int(r[2]), 'holdout': int(r[3]),
+                  'done': int(r[4]), 'exited': int(r[5])} for r in q(
+        """
+        SELECT campaign_id, count(), countIf(status = 'active'),
+               countIf(control = 1), countIf(status = 'done'),
+               countIf(status = 'exited')
+        FROM campaign_enrollments_current WHERE tenant_id = {t:String}
+        GROUP BY campaign_id
+        """, {'t': tenant})[1]}
+
+    touches = {r[0]: int(r[1]) for r in q(
+        """
+        SELECT campaign_id, countIf(status NOT IN ('rejected', 'holdout'))
+        FROM campaign_send_log WHERE tenant_id = {t:String} GROUP BY campaign_id
+        """, {'t': tenant})[1]}
+
+    empty = {'enrolled': 0, 'active': 0, 'holdout': 0, 'done': 0, 'exited': 0}
+    campaigns = [{
+        'campaign_id': c['campaign_id'],
+        'title': c.get('title', c['campaign_id']),
+        'entry_stage': c.get('entry_stage', ''),
+        'goal': c.get('goal', {}),
+        'steps': [{'delay_h': s.get('delay_h', 0), 'action': s.get('action', ''),
+                   'channel': s.get('channel', 'email' if s.get('action') == 'email' else ''),
+                   'subject': s.get('subject', ''), 'body': s.get('body', ''),
+                   'offer_id': s.get('offer_id', ''),
+                   'cta_label': s.get('cta_label', '')} for s in c.get('steps', [])],
+        'stats': {**enr.get(c['campaign_id'], empty),
+                  'touches': touches.get(c['campaign_id'], 0)},
+    } for c in conf.get('campaigns', [])]
+
+    return {'tenant': tenant, 'autopilot': _autopilot_resolved(conf, tenant),
+            'control_pct': int(conf.get('control_pct', 10)), 'campaigns': campaigns}
+
+
+@bp.get('/saas/campaigns')
+@require_auth(roles=LEAK_ROLES)
+def saas_campaigns():
+    return api_json(_campaigns_payload(_tenant_arg()))
+
+
+@bp.post('/saas/campaigns/autopilot')
+@require_auth(roles=('super_admin', 'director'))
+def saas_campaigns_autopilot():
+    """Рубильник автопилота: false = все касания принудительно dry-run.
+    Пишется в tenants.json (рантайм) - контент кампаний остаётся в git."""
+    tenant = _tenant_arg()
+    body = request.get_json(silent=True) or {}
+    enabled = bool(body.get('enabled'))
+    ca.update_tenant(tenant, {'autopilot': enabled})
+    print(f'[campaigns] {tenant}: autopilot -> {enabled}', flush=True)
+    return api_json(_campaigns_payload(tenant))
+
+
 def _bad(reason: str, code: int = 400):
     return api_json(None, code, reason)
 

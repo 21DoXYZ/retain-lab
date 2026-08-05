@@ -94,3 +94,14 @@ def test_inapp_row_defaults():
                            2, "id-9", "u_9", T0, {"app_url": "https://a.pp"})))
     assert d["cta_label"] == "Open" and d["cta_url"] == "https://a.pp"
     assert d["title"] == ""
+
+
+def test_resolve_autopilot_override_wins():
+    from stripe_sync.campaign_tick import resolve_autopilot
+
+    assert resolve_autopilot({"autopilot": False}, {}) is False
+    assert resolve_autopilot({"autopilot": True}, {}) is True
+    # рантайм-рубильник из tenants.json важнее захардкоженного в конфиге
+    assert resolve_autopilot({"autopilot": False}, {"autopilot": True}) is True
+    assert resolve_autopilot({"autopilot": True}, {"autopilot": False}) is False
+    assert resolve_autopilot({}, {}) is False
