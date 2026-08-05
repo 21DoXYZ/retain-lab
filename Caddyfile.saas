@@ -20,6 +20,12 @@
 		reverse_proxy 127.0.0.1:8081
 	}
 
+	# Stripe-вебхуки тенантов. Без STRIPE_WEBHOOK_SECRET приём fail-closed (400),
+	# так что публичный маршрут безопасен до подключения ключей клиента.
+	handle /stripe/* {
+		reverse_proxy 127.0.0.1:8082
+	}
+
 	# Демо-сайт тенанта + сниппет (статика, пути как в репо).
 	handle /demo-site/* {
 		root * /srv/ra

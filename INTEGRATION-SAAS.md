@@ -1,0 +1,162 @@
+# Revenue Autopilot - подключение данных (гайд для клиента)
+
+Версия 1.0 · для первого тенанта (Hub Content). Домен платформы ниже обозначен
+`<DOMAIN>` - сейчас это `ra.187-77-157-6.sslip.io`, после переезда подставится
+боевой домен (интеграция не меняется, только хост).
+
+Данные приходят тремя каналами. Для запуска достаточно двух (Stripe + сниппет),
+серверный API добавляет точность там, где браузеру верить нельзя.
+
+| Канал | Что даёт | Усилия клиента |
+|---|---|---|
+| 1. Stripe (ключ + вебхук) | Деньги: подписки, инвойсы, неоплаты, отмены, MRR | 10 минут, без кода |
+| 2. Сниппет ra.js | Поведение в браузере: сессии, страницы цен, чекаут, отмена | 1 строка + 1 вызов |
+| 3. Server Events API | Продуктовые факты: генерации, расход токенов, low-balance | 1 HTTP-вызов из бэкенда |
+
+Склейка: юзер собирается в одну identity по sha256(email) - Stripe-кастомер,
+браузерный посетитель и серверные события сходятся автоматически (правило
+≥95% авто-склейки, остаток виден в очереди unmatched).
+
+---
+
+## 1. Stripe - деньги (10 минут, без кода)
+
+**1a. Restricted key** (только чтение) - для первичной загрузки истории:
+Stripe Dashboard → Developers → API keys → Create restricted key:
+`Customers: Read · Subscriptions: Read · Invoices: Read · Charges: Read`.
+Передать нам ключ `rk_live_...` безопасным каналом.
+
+**1b. Webhook** - для живых событий:
+Developers → Webhooks → Add endpoint:
+
+- URL: `https://<DOMAIN>/stripe/webhook`
+- События: `invoice.payment_failed`, `invoice.paid`,
+  `customer.subscription.created`, `customer.subscription.updated`,
+  `customer.subscription.deleted`, `checkout.session.completed`,
+  `checkout.session.expired`, `charge.refunded`
+- Передать нам Signing secret `whsec_...`
+
+Подпись проверяется всегда (fail-closed: без секрета endpoint отвечает 400).
+Повторная доставка безопасна: `event_id` детерминирован, дубликаты схлопываются.
+
+**Важно про чекаут**: в Checkout Session передавайте
+`client_reference_id = <ваш user_id>` - это мост, который склеивает
+Stripe-кастомера с юзером продукта в момент оплаты.
+
+---
+
+## 2. Сниппет ra.js - поведение в браузере (1 строка)
+
+Перед `</body>` на всех страницах продукта:
+
+```html
+<script src="https://<DOMAIN>/snippet/ra.js"
+        data-endpoint="https://<DOMAIN>/ingest/saas/events"
+        data-token="<INGEST_TOKEN>"
+        data-tenant="hubcontent"></script>
+```
+
+`<INGEST_TOKEN>` выдаём мы (регенерируется в CRM: Data/API → Integration keys).
+Токен браузерного класса - как ключ аналитики: разрешает только запись событий.
+
+После логина юзера - один вызов:
+
+```js
+ra.identify(user.id, user.email);   // email хэшируется ЛОКАЛЬНО (sha256),
+                                    // сырой адрес страницу не покидает
+```
+
+Дальше сниппет сам шлёт: `session_start` (раз в 30 минут тишины),
+`page_view` для страниц /pricing и /cancel, `login` при первом identify.
+
+Произвольные события из фронта:
+
+```js
+ra.track("checkout_started");
+ra.track("cancel_flow_started");
+```
+
+Альтернатива data-атрибутам (SPA): задать `window.RA_CONFIG = {endpoint,
+token, tenant}` до подключения скрипта.
+
+---
+
+## 3. Server Events API - продуктовые факты из бэкенда
+
+Для событий, где источник истины - ваш сервер (расход токенов, статус
+генерации). Тот же endpoint и токен, что у сниппета:
+
+```
+POST https://<DOMAIN>/ingest/saas/events
+Authorization: Bearer <INGEST_TOKEN>
+Content-Type: application/json
+```
+
+Тело - объект или массив (до 1000 событий за запрос):
+
+```json
+{
+  "event_id":       "gen-8f2c1a-2026-08-05",
+  "tenant_id":      "hubcontent",
+  "event_type":     "generation_completed",
+  "ts":             "2026-08-05 12:34:56.000",
+  "client_user_id": "u_18342",
+  "tokens_spent":   12,
+  "tokens_balance": 388
+}
+```
+
+Контракт:
+- обязательные поля: `event_id`, `tenant_id`, `event_type`, `ts`;
+- идентификация: `client_user_id` (ваш id юзера) - обязательно для серверных
+  событий; `email_hash` (sha256 от lower(trim(email))) - если id ещё нет;
+- `event_id` уникален на событие: повторная отправка того же id безопасна
+  (at-least-once, дубликаты схлопываются) - шлите смело с ретраями;
+- `ts` - UTC, `YYYY-MM-DD HH:MM:SS.mmm` (ISO 8601 тоже принимается);
+- ответ `200 {"accepted": N}`; `401` - плохой токен; `503` - повторите батч.
+
+### Словарь событий (что шлём и когда)
+
+| event_type | Когда | Доп. поля |
+|---|---|---|
+| `signup` | регистрация | - |
+| `onboarding_step` | шаг онбординга | `meta` |
+| `project_created` | создан проект | - |
+| `generation_started` | генерация запущена | - |
+| `generation_completed` | генерация готова | `tokens_spent`, `tokens_balance` |
+| `generation_failed` | генерация упала | - |
+| `video_downloaded` / `video_shared` | скачал / пошарил | - |
+| `paywall_viewed` | увидел пейволл | `page` |
+| `checkout_started` / `checkout_abandoned` | начал / бросил оплату | - |
+| `plan_page_viewed` | смотрел страницу плана | `page` |
+| `cancel_flow_started` | зашёл в отмену | - |
+| `cancel_reason` | причина отмены | `meta` |
+| `tokens_low` | баланс < 15% лимита | `tokens_balance` |
+| `tokens_exhausted` | токены кончились | - |
+| `login` / `session_start` | активность | (сниппет шлёт сам) |
+
+Минимальный полезный набор для старта: `generation_completed` (+ токены),
+`tokens_low`, `cancel_flow_started` - на них стоят стадии UPGRADE/SAVE и
+кампании K4/K5.
+
+---
+
+## 4. Что происходит с данными дальше
+
+Событие → шина (Kafka) → ClickHouse → склейка identity (почасово) → стадия
+юзера (7 стадий, DUNNING/SAVE/UPGRADE переключаются мгновенно по событию) →
+кампании K1-K5 (тик каждые 15 минут) → отчёты Leak audit / Campaign uplift.
+
+Безопасность запуска: платформа стартует в dry-run - ни одно письмо и ни один
+оффер не уходит юзерам, пока владелец явно не включит автопилот; первые
+14 дней - режим согласования. Каждая кампания несёт 10% контрольную группу:
+эффект меряется в долларах инкремента, не «на глаз».
+
+## 5. Чек-лист онбординга
+
+- [ ] Restricted Stripe key передан → мы включаем backfill (история за всё время)
+- [ ] Webhook в Stripe создан, `whsec_` передан → живые события идут
+- [ ] Сниппет на сайте, `ra.identify` после логина → события в CRM (Home → Setup загорается)
+- [ ] `client_reference_id` в Checkout Session → склейка юзер-кастомер
+- [ ] Серверные события: минимум `generation_completed` с токенами
+- [ ] Учётка клиента в CRM (роль director) → смотрит Leak audit со своими цифрами
