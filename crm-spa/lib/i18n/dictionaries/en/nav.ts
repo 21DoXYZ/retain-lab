@@ -4,18 +4,18 @@
 import type { Messages } from "../ru";
 
 export const nav: Partial<Messages> = {
-  "nav.section.entry": "Entry",
-  "nav.section.expand": "Expansion",
-  "nav.section.core": "Core",
-  "nav.section.layer": "Layer / foundation",
+  "nav.section.entry": "Acquisition",
+  "nav.section.expand": "Revenue autopilot",
+  "nav.section.core": "Your users",
+  "nav.section.layer": "Measurement & data",
 
   "nav.group.traffic": "Traffic & affiliates",
   "nav.group.vip": "Power users",
-  "nav.group.bonuseco": "Offer economics",
+  "nav.group.bonuseco": "Campaigns & offers",
   "nav.group.risk": "Risk & fraud",
-  "nav.group.core": "Retention automation",
-  "nav.group.analytics": "Analytics",
-  "nav.group.data": "Data / API",
+  "nav.group.core": "Users & stages",
+  "nav.group.analytics": "Reports",
+  "nav.group.data": "Setup",
 
   "nav.group.work": "My work",
   "nav.group.cabinet": "Cabinet",

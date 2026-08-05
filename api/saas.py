@@ -219,6 +219,68 @@ def _any_channel_active(tenant: str) -> bool:
     return email_ok or bool(tch.get('telegram_bot_token'))
 
 
+def _snippet_token() -> str:
+    """Сниппет-токен тенанта. Класс токена ПУБЛИЧНЫЙ (он лежит в открытом HTML
+    сайта клиента, как write-key у Segment/Amplitude) - показывать его в UI
+    онбординга можно и нужно; маски - для казино-легаси /keys."""
+    import json as _json
+    try:
+        with open(_os.environ.get('TOKENS_FILE', '/secrets/tokens.json')) as fh:
+            data = _json.load(fh)
+        vals = list(data.values()) if isinstance(data, dict) else list(data)
+        return str(vals[0]) if vals else ''
+    except Exception:
+        return _os.environ.get('INGEST_TOKEN', '').split(',')[0].strip()
+
+
+@bp.get('/saas/onboarding')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_onboarding():
+    """Всё для визарда «Get started» одним вызовом: статусы 4 шагов, ГОТОВЫЙ
+    сниппет с живым токеном, Stripe-блок, сводка каналов."""
+    tenant = _tenant_arg()
+    host = _os.environ.get('SAAS_HOST', '').strip()
+    token = _snippet_token()
+
+    snippet_html = (
+        f'<script src="https://{host}/snippet/ra.js"\n'
+        f'        data-endpoint="https://{host}/ingest/saas/events"\n'
+        f'        data-token="{token}" data-tenant="{tenant}"></script>'
+    ) if host and token else ''
+
+    live_customers = int(q(
+        "SELECT count() FROM stripe_customers WHERE tenant_id = {t:String} "
+        "AND customer_id NOT LIKE 'cus_mock%' AND customer_id NOT LIKE 'cus_demo%'",
+        {'t': tenant})[1][0][0])
+    snippet_events = int(q(
+        "SELECT count() FROM saas_events WHERE tenant_id = {t:String} AND source = 'snippet'",
+        {'t': tenant})[1][0][0])
+
+    ch = _channels_payload(tenant)['channels']
+    camp_conf = _campaigns_conf(tenant)
+
+    return api_json({
+        'tenant': tenant,
+        'steps': {
+            'snippet': snippet_events > 0,
+            'stripe': live_customers > 0,
+            'channels': _any_channel_active(tenant),
+            'autopilot': _autopilot_resolved(camp_conf, tenant),
+        },
+        'snippet': {'token': token, 'html': snippet_html,
+                    'ingest_url': f'https://{host}/ingest/saas/events' if host else ''},
+        'stripe': {
+            'webhook_url': f'https://{host}/stripe/webhook' if host else '',
+            'events': ['checkout.session.completed', 'customer.subscription.created',
+                       'customer.subscription.updated', 'customer.subscription.deleted',
+                       'invoice.paid', 'invoice.payment_failed',
+                       'charge.refunded', 'charge.dispute.created'],
+            'secret_set': bool(_os.environ.get('STRIPE_WEBHOOK_SECRET', '').strip()),
+        },
+        'channels': [{'channel': c['channel'], 'state': c['state']} for c in ch],
+    })
+
+
 @bp.get('/saas/users')
 @require_auth(roles=LEAK_ROLES)
 def saas_users():

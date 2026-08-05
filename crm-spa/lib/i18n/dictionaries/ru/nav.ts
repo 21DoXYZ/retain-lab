@@ -5,19 +5,19 @@
  */
 export const nav = {
   // Section super-headings (components/ui/nav.ts NAV_GROUPS[].section) — полосы модулей
-  "nav.section.entry": "Вход",
-  "nav.section.expand": "Расширение",
-  "nav.section.core": "Ядро",
-  "nav.section.layer": "Слой / фундамент",
+  "nav.section.entry": "Привлечение",
+  "nav.section.expand": "Автопилот выручки",
+  "nav.section.core": "Твои юзеры",
+  "nav.section.layer": "Замер и данные",
 
   // Group titles — 7 модулей (components/ui/nav.ts NAV_GROUPS[].title)
   "nav.group.traffic": "Трафик и аффилиаты",
   "nav.group.vip": "VIP-радар",
-  "nav.group.bonuseco": "Бонус-экономика",
+  "nav.group.bonuseco": "Кампании и офферы",
   "nav.group.risk": "Риск и фрод",
-  "nav.group.core": "Retention-автоматизация",
-  "nav.group.analytics": "Аналитика",
-  "nav.group.data": "Данные / API",
+  "nav.group.core": "Юзеры и стадии",
+  "nav.group.analytics": "Отчёты",
+  "nav.group.data": "Настройка",
 
   // Legacy group titles — сохранены для обратной совместимости словаря (не используются в NAV_GROUPS)
   "nav.group.work": "Моя работа",

@@ -123,6 +123,14 @@ const INTERNAL: UserRole[] = [
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
+    // SaaS-пресет: визард подключения - первый пункт меню (онбординг владельца).
+    title: "nav.group.start",
+    items: [
+      { key: "onboarding", href: "/onboarding", emoji: "🚀", label: "nav.onboarding",
+        roles: ["super_admin", "director", "head_retention"] },
+    ],
+  },
+  {
     // Модуль 1 — Трафик и аффилиаты. Открывает секцию «Вход».
     section: "nav.section.entry",
     title: "nav.group.traffic",

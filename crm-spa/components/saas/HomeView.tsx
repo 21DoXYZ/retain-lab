@@ -57,8 +57,8 @@ export function HomeView() {
 
   // Go-live чеклист: 4 шага онбординга, статусы из живых данных.
   const golive = [
-    { key: "stripe", ok: data?.setup.stripe_connected ?? false, href: "/keys" },
-    { key: "snippet", ok: data?.setup.snippet_connected ?? false, href: "/keys" },
+    { key: "stripe", ok: data?.setup.stripe_connected ?? false, href: "/onboarding" },
+    { key: "snippet", ok: data?.setup.snippet_connected ?? false, href: "/onboarding" },
     { key: "channels", ok: data?.setup.channels_connected ?? false, href: "/channel-settings" },
     { key: "autopilot", ok: data?.setup.autopilot ?? false, href: "/campaigns" },
   ] as const;
