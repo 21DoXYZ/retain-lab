@@ -255,7 +255,7 @@ export function canSee(item: NavItem, role?: string): boolean {
 export function activeKeyForPath(pathname: string): string | undefined {
   const items = NAV_GROUPS.flatMap((g) => g.items);
 
-  if (pathname === "/") return "players";
+  if (pathname === "/") return undefined;   // главная = дашборд, не подсвечиваем пункты
 
   // exact match on the path portion of href (ignore hash)
   const exact = items.find((it) => it.href.split("#")[0] === pathname);
