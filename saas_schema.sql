@@ -377,7 +377,7 @@ SELECT
         stage_calc = 'DUNNING',  'K3_payment_recovery',
         stage_calc = 'SAVE',     'K4_save',
         stage_calc = 'UPGRADE',  'K5_upgrade',
-        stage_calc = 'WINBACK',  'winback_campaign',
+        stage_calc = 'WINBACK',  'K6_winback',
         'none')         AS recommended_action,
     multiIf(
         stage_calc IN ('DUNNING', 'SAVE'), toFloat64(sub_mrr),
