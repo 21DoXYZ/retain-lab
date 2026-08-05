@@ -22,15 +22,23 @@
   ::selection{background:var(--red);color:var(--white)}
   .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
   .wrap{max-width:1240px;margin-inline:auto;padding-inline:28px}
-  .display{font-weight:500;letter-spacing:-.045em;line-height:.96}
+  .display{font-weight:500;letter-spacing:-.045em;line-height:.96;text-wrap:balance}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .rise{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+  .rise-2{animation-delay:.07s}.rise-3{animation-delay:.14s}.rise-4{animation-delay:.21s}
+  @media(prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+  }
   .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:.18em;
            text-transform:uppercase;opacity:.65}
   a{color:inherit;text-decoration:none}
   p{line-height:1.5}
   .btn{display:inline-flex;align-items:center;gap:10px;border-radius:100px;
        padding:16px 30px;font-weight:600;font-size:16px;border:0;cursor:pointer;
-       transition:transform .12s ease}
+       transition:transform .2s cubic-bezier(.2,.8,.2,1)}
   .btn:hover{transform:translateY(-2px)}
+  .btn:active{transform:scale(.97)}
+  :focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:4px}
   section{position:relative;overflow:hidden}
   .ast{position:absolute;pointer-events:none}
   .grid{display:grid;gap:14px}
@@ -39,11 +47,14 @@
   .nav-in{display:flex;align-items:center;justify-content:space-between;height:66px}
   .nav-links{display:flex;gap:26px;font-size:14.5px;align-items:center}
   @media(max-width:820px){.nav-links a:not(.btn):not(.keep){display:none}}
-  .nav-links a{opacity:.85}.nav-links a:hover{opacity:1;color:var(--pink)}
+  .nav-links a{opacity:.85;transition:color .15s ease-out,opacity .15s ease-out}
+  .nav-links a:hover{opacity:1;color:var(--pink)}
   .logo{display:flex;align-items:center;gap:11px;font-weight:700;font-size:17px;letter-spacing:-.02em}
   .card-b{background:rgba(250,250,250,.06);border:1px solid rgba(250,250,250,.14);
           border-radius:18px;padding:26px}
-  .card-w{background:var(--white);border-radius:18px;padding:26px}
+  .card-w{background:var(--white);border-radius:18px;padding:26px;
+          transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+  .card-w:hover{transform:translateY(-3px)}
   .num{font-family:'JetBrains Mono',monospace}
   footer{background:var(--black);color:rgba(250,250,250,.7);padding:44px 0;font-size:14px}
 </style>
@@ -76,19 +87,19 @@
   <svg class="ast" viewBox="-60 -60 120 120" style="width:min(58vw,780px);right:-14%;top:-18%;opacity:.92"><use href="#ast" fill="var(--pink)"/></svg>
   <svg class="ast" viewBox="-60 -60 120 120" style="width:200px;left:-60px;bottom:-70px;opacity:.35"><use href="#ast" fill="#1b1b1c"/></svg>
   <div class="wrap" style="position:relative">
-    <div class="eyebrow">revenue autopilot for subscription saas</div>
-    <h1 class="display" style="font-size:clamp(52px,8.6vw,120px);margin-top:26px;max-width:11ch">
+    <div class="eyebrow rise">revenue autopilot for subscription saas</div>
+    <h1 class="display rise rise-2" style="font-size:clamp(52px,8.6vw,120px);margin-top:26px;max-width:11ch">
       Your revenue is leak&#8209;ing.
     </h1>
-    <h1 class="display" style="font-size:clamp(52px,8.6vw,120px);color:var(--black)">
+    <h1 class="display rise rise-2" style="font-size:clamp(52px,8.6vw,120px);color:var(--black)">
       We put it back.
     </h1>
-    <p style="max-width:560px;font-size:19px;margin-top:30px;opacity:.94">
+    <p class="rise rise-3" style="max-width:560px;font-size:19px;margin-top:30px;opacity:.94">
       Retivo watches every user, scores churn and upgrade odds, and sends the right
       touch at the right moment - from your brand, not ours. Every recovered dollar
       is proven against a control group.
     </p>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:38px">
+    <div class="rise rise-4" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:38px">
       <a class="btn" style="background:var(--black);color:var(--white)"
          href="mailto:dolemitedo@gmail.com?subject=Revenue%20Autopilot%20-%20strategy%20call&body=Hi%2C%20I%27d%20like%20a%2030-min%20call.%20Our%20product%3A%20">
         book a 30&#8209;min strategy call
