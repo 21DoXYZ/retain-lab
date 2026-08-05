@@ -312,6 +312,8 @@ def saas_onboarding():
             'secret_set': bool(_os.environ.get('STRIPE_WEBHOOK_SECRET', '').strip()),
         },
         'channels': [{'channel': c['channel'], 'state': c['state']} for c in ch],
+        'answers': (ca.load_tenants().get(tenant, {}) or {}).get('onboarding_answers') or {},
+        'ai_enabled': _platform('ANTHROPIC_API_KEY'),
     })
 
 
