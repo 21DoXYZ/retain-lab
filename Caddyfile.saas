@@ -1,0 +1,37 @@
+# Публичный вход Revenue Autopilot (SaaS-пресет). Caddy в host-network:
+# все апстримы - loopback хоста, наружу только 80/443 (ufw allow), LE-серт
+# автоматом. Хост задаётся env SAAS_HOST (sslip.io до покупки домена;
+# переключение на свой домен = поменять SAAS_HOST в .env + пересобрать SPA).
+{$SAAS_HOST} {
+	encode gzip
+
+	# Supabase (kong): auth/rest для SPA. Префикс срезается.
+	handle_path /supabase/* {
+		reverse_proxy 127.0.0.1:54321
+	}
+
+	# Board API (только /api/* - HTML-страницы легаси-борда наружу не отдаём).
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8050
+	}
+
+	# Ingest: сниппеты тенантов постят события сюда.
+	handle /ingest/* {
+		reverse_proxy 127.0.0.1:8081
+	}
+
+	# Демо-сайт тенанта + сниппет (статика, пути как в репо).
+	handle /demo-site/* {
+		root * /srv/ra
+		file_server
+	}
+	handle /snippet/* {
+		root * /srv/ra
+		file_server
+	}
+
+	# Всё остальное - SPA (Next.js standalone на loopback).
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}

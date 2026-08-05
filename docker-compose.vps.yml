@@ -15,8 +15,8 @@ services:
     ports:
       - "127.0.0.1:8050:8050"
     environment:
-      # SPA открывается через SSH-туннель как localhost:3000 — иначе браузер режет CORS
-      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      # Домен публикации + туннель для отладки — иначе браузер режет CORS
+      CORS_ORIGINS: "https://${SAAS_HOST:-ra.187-77-157-6.sslip.io},http://localhost:3000,http://127.0.0.1:3000"
       # Локальный Supabase (CLI) подписывает JWT HS256 — legacy-путь api/core.py
       SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
   ingest:
@@ -34,10 +34,28 @@ services:
     network_mode: host
     build:
       args:
-        NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+        NEXT_PUBLIC_SUPABASE_URL: https://${SAAS_HOST:-ra.187-77-157-6.sslip.io}/supabase
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
-        NEXT_PUBLIC_FLASK_API_URL: http://127.0.0.1:8050
+        NEXT_PUBLIC_FLASK_API_URL: https://${SAAS_HOST:-ra.187-77-157-6.sslip.io}
     environment:
-      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
-      NEXT_PUBLIC_FLASK_API_URL: http://127.0.0.1:8050
+      NEXT_PUBLIC_SUPABASE_URL: https://${SAAS_HOST:-ra.187-77-157-6.sslip.io}/supabase
+      NEXT_PUBLIC_FLASK_API_URL: https://${SAAS_HOST:-ra.187-77-157-6.sslip.io}
       HOSTNAME: "127.0.0.1"
+
+  # Публичный HTTPS-вход (host-network: апстримы на loopback, LE-серт автоматом).
+  caddy-saas:
+    image: caddy:2-alpine
+    network_mode: host
+    environment:
+      SAAS_HOST: ${SAAS_HOST:-ra.187-77-157-6.sslip.io}
+    volumes:
+      - ./Caddyfile.saas:/etc/caddy/Caddyfile:ro
+      - ./demo-site:/srv/ra/demo-site:ro
+      - ./snippet:/srv/ra/snippet:ro
+      - caddy_saas_data:/data
+      - caddy_saas_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_saas_data:
+  caddy_saas_config:
