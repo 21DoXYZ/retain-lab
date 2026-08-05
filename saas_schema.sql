@@ -396,3 +396,26 @@ LEFT JOIN retention.tenant_plans_current p
     ON i.tenant_id = p.tenant_id AND s.plan_id = p.plan_id
 LEFT JOIN retention.user_scores_current sc
     ON i.tenant_id = sc.tenant_id AND i.identity_id = sc.identity_id;
+
+-- ============================================================================
+-- Phase 3 — Offers: лог выдач (holdout/hygiene/dry-run — всё в одной таблице).
+-- Каждое РЕШЕНИЕ логируется: issued | dry_run | holdout | rejected. Гигиена
+-- (14-дневный кэп) и uplift-отчёты (Phase 6) читают отсюда.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS retention.offers_issued
+(
+    `tenant_id`     LowCardinality(String),
+    `offer_id`      LowCardinality(String),
+    `identity_id`   String,
+    `campaign_id`   LowCardinality(String),
+    `holdout`       UInt8,
+    `monetary`      UInt8,
+    `executor`      LowCardinality(String),
+    `params`        String,
+    `status`        LowCardinality(String),   -- issued | dry_run | holdout | rejected
+    `reason`        String,                    -- машинный код при rejected
+    `cost_estimate` Float64,
+    `issued_at`     DateTime64(3)
+)
+ENGINE = MergeTree
+ORDER BY (tenant_id, identity_id, issued_at);
