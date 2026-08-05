@@ -40,13 +40,22 @@
       page: location.pathname,
     };
     if (props) for (var k in props) if (!(k in e)) e[k] = props[k];
+    post(e, 1);
+  }
+
+  // Один ретрай через 2с при сетевой ошибке или 5xx (шлюз пережидает Kafka).
+  function post(e, retries) {
     try {
       fetch(cfg.endpoint, {
         method: "POST",
         keepalive: true,
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.token },
         body: JSON.stringify(e),
-      }).catch(function () {});
+      }).then(function (r) {
+        if (r.status >= 500 && retries > 0) setTimeout(function () { post(e, retries - 1); }, 2000);
+      }).catch(function () {
+        if (retries > 0) setTimeout(function () { post(e, retries - 1); }, 2000);
+      });
     } catch (_) {}
   }
 

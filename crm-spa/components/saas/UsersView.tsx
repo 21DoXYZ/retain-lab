@@ -97,7 +97,9 @@ export function UsersView() {
     { key: "ltv", header: t("saas.users.col.ltv"), align: "right", mono: true, render: (r) => usd(r.ltv) },
     {
       key: "last_seen", header: t("saas.users.col.lastSeen"), mono: true,
-      render: (r) => (r.last_seen ? r.last_seen.slice(0, 10) : "-"),
+      render: (r) => (r.last_seen ? (
+        <span title={r.last_seen + " UTC"}>{r.last_seen.slice(0, 10)}</span>
+      ) : "-"),
     },
   ];
 

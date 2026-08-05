@@ -14,6 +14,8 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 -- ---- хелпер: завести auth.users + auth.identities + crm.crm_users одним вызовом ----
+ALTER TABLE crm.crm_users ADD COLUMN IF NOT EXISTS tenant_id text NOT NULL DEFAULT '*';
+
 CREATE OR REPLACE FUNCTION crm._seed_user(
   p_id uuid, p_email text, p_password text, p_full_name text,
   p_role crm.user_role, p_department crm.department DEFAULT NULL, p_affiliate_code text DEFAULT NULL
@@ -148,3 +150,6 @@ INSERT INTO crm.audit_log (actor_id, action, entity, entity_id, meta) VALUES
   ('00000000-0000-0000-0000-000000000004','assign','assignment','900002', '{"operator":"operator2","mode":"split"}'::jsonb),
   ('00000000-0000-0000-0000-000000000003','export','players',    NULL,     '{"format":"xlsx","rows":20}'::jsonb),
   ('00000000-0000-0000-0000-00000000000d','login', NULL,         NULL,     '{}'::jsonb);
+
+-- Клиентский владелец видит только свой тенант; остальные - платформа ('*').
+UPDATE crm.crm_users SET tenant_id='hubcontent' WHERE id='00000000-0000-0000-0000-000000000002';

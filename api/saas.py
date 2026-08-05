@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from flask import Blueprint, request
 
-from .core import require_auth, api_json
+from .core import require_auth, api_json, current_tenant_scope
 from player_board import q
 
 bp = Blueprint('api_saas', __name__, url_prefix='/api/v1')
@@ -44,7 +44,7 @@ def _flt(x) -> float:
 @bp.get('/saas/leak-audit')
 @require_auth(roles=LEAK_ROLES)
 def leak_audit():
-    tenant = request.args.get('tenant') or DEFAULT_TENANT
+    tenant = _tenant_arg()
 
     # q() возвращает (column_names, rows) - берём первую строку данных
     dunning = q(
@@ -109,7 +109,7 @@ def uplift():
     """Последний uplift-отчёт по каждой кампании (uplift_reports пишет
     stripe_sync/uplift_report.py, расписание - Пн 08:00). Инкремент = 
     (conv_target - conv_control) x N_target x средний чек; n_control=0 -> n/a."""
-    tenant = request.args.get('tenant') or DEFAULT_TENANT
+    tenant = _tenant_arg()
 
     rows = q(
         """
@@ -164,7 +164,7 @@ def uplift():
 def home():
     """Домашний дашборд владельца: цифры + статусы онбординга. Один вызов -
     всё, что нужно главной, чтобы ответить «что происходит и что делать»."""
-    tenant = request.args.get('tenant') or DEFAULT_TENANT
+    tenant = _tenant_arg()
 
     mrr = _flt(q(
         "SELECT coalesce(sum(mrr), 0) FROM mrr_facts WHERE tenant_id = {t:String}",
@@ -458,7 +458,7 @@ def saas_onboarding_offers_reviewed():
 def saas_users():
     """Список юзеров SaaS-контура: identity + стадия + действие + скоры.
     ?stage=DUNNING - фильтр; сортировка: ценность на кону, затем MRR."""
-    tenant = request.args.get('tenant') or DEFAULT_TENANT
+    tenant = _tenant_arg()
     stage = (request.args.get('stage') or '').upper()
 
     where = "tenant_id = {t:String}"
@@ -511,7 +511,7 @@ def saas_offers():
     import json as _json
     import os as _os
 
-    tenant = request.args.get('tenant') or DEFAULT_TENANT
+    tenant = _tenant_arg()
     path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
                          'stripe_sync', 'offers_catalog.json')
     from stripe_sync import overrides as ovr
@@ -559,9 +559,33 @@ def _platform(name: str) -> bool:
     return bool(_os.environ.get(name, '').strip())
 
 
+def _requested_tenant() -> str:
+    return str(request.args.get('tenant')
+               or (request.get_json(silent=True) or {}).get('tenant') or '')
+
+
+def resolve_tenant(scope: str, requested: str, default: str) -> tuple[str, str]:
+    """(tenant, '') либо ('', reason). Скоуп '*' - платформа: любой запрошенный
+    или дефолт; клиентский скоуп - ТОЛЬКО свой тенант (чужой -> forbidden);
+    пустой скоуп (сбой/нет строки) - fail-closed."""
+    if scope == '*':
+        return (requested or default), ''
+    if not scope:
+        return '', 'tenant_scope_unresolved'
+    if requested and requested != scope:
+        return '', 'forbidden_tenant'
+    return scope, ''
+
+
 def _tenant_arg() -> str:
-    return (request.args.get('tenant') or (request.get_json(silent=True) or {}).get('tenant')
-            or DEFAULT_TENANT)
+    """Эффективный тенант ЧТЕНИЯ с изоляцией по скоупу пользователя.
+    При нарушении скоупа поднимаем 403 через flask.abort."""
+    from flask import abort, make_response
+    tenant, reason = resolve_tenant(current_tenant_scope(), _requested_tenant(),
+                                    DEFAULT_TENANT)
+    if reason:
+        abort(make_response(api_json(None, 403, reason)))
+    return tenant
 
 
 def _known_tenants() -> set:

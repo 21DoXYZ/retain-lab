@@ -261,6 +261,42 @@ def require_auth(roles=None):
     return decorator
 
 
+# ── Тенант-скоуп пользователя CRM (мульти-тенант изоляция) ───────────────────
+# crm.crm_users.tenant_id: '*' = платформа (видит всё), иначе - id тенанта.
+# Кэш 60с в процессе, fail-closed: не смогли определить -> скоуп пустой (403).
+_tenant_scope_cache: dict = {}
+
+
+def current_tenant_scope() -> str:
+    from flask import g as _g
+    import time as _time
+    user = getattr(_g, 'api_user', None)
+    if not user:
+        return ''
+    sub = str(user.get('sub') or '')
+    if sub == 'dev':
+        return '*'
+    hit = _tenant_scope_cache.get(sub)
+    if hit and hit[1] > _time.time():
+        return hit[0]
+    dsn = _pg_dsn()
+    if not dsn:
+        logger.error('current_tenant_scope: нет DSN - скоуп закрыт (fail-closed)')
+        return ''
+    try:
+        import psycopg  # noqa: PLC0415
+        with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+            cur.execute('SELECT tenant_id FROM crm.crm_users WHERE id = %(id)s',
+                        {'id': sub})
+            row = cur.fetchone()
+        scope = str(row[0]) if row and row[0] else ''
+    except Exception as e:  # noqa: BLE001
+        logger.error('current_tenant_scope: ошибка БД - скоуп закрыт: %s', e)
+        return ''
+    _tenant_scope_cache[sub] = (scope, _time.time() + 60)
+    return scope
+
+
 def current_role() -> str | None:
     user = getattr(g, 'api_user', None)
     return user.get('role') if user else None

@@ -73,8 +73,31 @@ def inbox_preflight():
     return '', 204
 
 
+# Простой токен-бакет в процессе: 60 запросов / 5 минут на (ip, user).
+# Борд - один процесс, этого достаточно; при масштабировании - Redis.
+_rl: dict = {}
+_RL_MAX, _RL_WIN = 60, 300
+
+
+def _rate_ok(key: str) -> bool:
+    import time as _t
+    now = _t.time()
+    bucket = [t for t in _rl.get(key, []) if t > now - _RL_WIN]
+    if len(bucket) >= _RL_MAX:
+        _rl[key] = bucket
+        return False
+    bucket.append(now)
+    _rl[key] = bucket
+    if len(_rl) > 10000:   # защита памяти от мусорных ключей
+        _rl.clear()
+    return True
+
+
 @bp.get('/saas/inbox')
 def inbox():
+    ip = request.headers.get('X-Real-Client-IP', request.remote_addr or '')
+    if not _rate_ok(f"{ip}|{request.args.get('user', '')}"):
+        return api_json(None, 429, 'rate_limited')
     if not _token_ok():
         return api_json(None, 401, 'unauthorized')
     tenant = (request.args.get('tenant') or '').strip()
