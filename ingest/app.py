@@ -82,6 +82,22 @@ REQUIRED = {"event_id", "event_type", "casino_player_id", "ts"}
 # SaaS-контур (Revenue Autopilot): свой топик и свой контракт (saas_schema.sql).
 SAAS_TOPIC = os.environ.get("SAAS_KAFKA_TOPIC", "saas.events")
 REQUIRED_SAAS = {"event_id", "tenant_id", "event_type", "ts"}
+# Сниппет ra.js постит с сайта тенанта (кросс-домен) — браузеру нужен CORS.
+# Токен «публичного класса» (как ключи аналитик), поэтому echo-origin допустим;
+# сузить до доменов тенантов: SAAS_CORS_ORIGINS="https://app.x.com,https://y.io".
+SAAS_CORS_ORIGINS = [o.strip() for o in
+                     os.environ.get("SAAS_CORS_ORIGINS", "*").split(",") if o.strip()]
+
+
+def _saas_cors(resp):
+    origin = request.headers.get("Origin", "")
+    allow = ("*" in SAAS_CORS_ORIGINS and "*") or (origin if origin in SAAS_CORS_ORIGINS else "")
+    if allow:
+        resp.headers["Access-Control-Allow-Origin"] = allow if allow != "*" else (origin or "*")
+        resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        resp.headers["Vary"] = "Origin"
+    return resp
 
 producer = Producer({
     "bootstrap.servers": BROKER,
@@ -164,6 +180,18 @@ def ingest():
     if errs:   # хоть одно событие не доставлено в Kafka -> 503, казино ретраит весь батч
         return jsonify(error="kafka delivery failed", detail=errs[:3]), 503
     return jsonify(status="ok", accepted=len(events)), 200
+
+
+@app.after_request
+def _saas_cors_after(resp):
+    if request.path == "/ingest/saas/events":
+        return _saas_cors(resp)
+    return resp
+
+
+@app.route("/ingest/saas/events", methods=["OPTIONS"])
+def ingest_saas_preflight():
+    return "", 204
 
 
 @app.post("/ingest/saas/events")

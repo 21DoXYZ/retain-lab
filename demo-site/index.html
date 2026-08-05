@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hub Content (demo) - Revenue Autopilot snippet testbed</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 0; background: #f6f7fb; color: #1e293b; }
+  .wrap { max-width: 720px; margin: 40px auto; padding: 0 20px; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 18px; }
+  label { font-size: 12px; font-weight: 600; color: #475569; display: block; margin-bottom: 4px; }
+  input { width: 100%; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+  button { padding: 9px 14px; border: 0; border-radius: 8px; background: #2563eb; color: #fff;
+           font-weight: 600; font-size: 13.5px; cursor: pointer; margin: 4px 6px 0 0; }
+  button.ghost { background: #eef2f7; color: #1e293b; }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; gap: 10px; align-items: end; }
+  .row > div { flex: 1; }
+  pre { background: #0f172a; color: #a5f3a5; border-radius: 10px; padding: 14px;
+        font-size: 12px; overflow-x: auto; min-height: 120px; white-space: pre-wrap; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .4px;
+          padding: 2px 8px; border-radius: 99px; background: #dbeafe; color: #1d4ed8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <span class="pill">DEMO TENANT SITE</span>
+    <h1>Hub Content - AI video generation</h1>
+    <div class="sub">Pretend product page wired with the Revenue Autopilot snippet (ra.js).
+      Every button fires a real product event into the ingest bus.</div>
+    <div class="row">
+      <div>
+        <label>Your email (identity key)</label>
+        <input id="email" type="email" placeholder="demo-user@example.test">
+      </div>
+      <div style="flex:0">
+        <button id="signup">Sign up</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Product actions (need sign-up first)</label>
+    <button id="generate" disabled>Generate video (12 tokens)</button>
+    <button id="pricing" class="ghost" disabled>View pricing</button>
+    <button id="checkout" class="ghost" disabled>Start checkout</button>
+    <button id="cancel" class="ghost" disabled>Cancel flow</button>
+  </div>
+
+  <div class="card">
+    <label>Event log (what left the browser)</label>
+    <pre id="log">waiting for actions...</pre>
+  </div>
+</div>
+
+<script>
+  // Конфиг из query (?token=&endpoint=&tenant=) - токен не хардкодим в статике.
+  var qs = new URLSearchParams(location.search);
+  window.RA_CONFIG = {
+    endpoint: qs.get("endpoint") || "http://localhost:8081/ingest/saas/events",
+    token: qs.get("token") || "",
+    tenant: qs.get("tenant") || "hubcontent",
+  };
+</script>
+<script src="/snippet/ra.js"></script>
+<script>
+  var logEl = document.getElementById("log");
+  var lines = [];
+  function log(msg) {
+    lines.push(new Date().toISOString().slice(11, 19) + "  " + msg);
+    logEl.textContent = lines.join("\n");
+  }
+  if (!window.RA_CONFIG.token) log("WARN: no ?token= in URL - ingest will reject (401)");
+
+  var USER_ID = "u_demo_1";
+  var buttons = ["generate", "pricing", "checkout", "cancel"].map(function (id) {
+    return document.getElementById(id);
+  });
+
+  document.getElementById("signup").onclick = function () {
+    var email = document.getElementById("email").value.trim();
+    if (!email) { log("enter an email first"); return; }
+    ra.identify(USER_ID, email);
+    ra.track("signup");
+    buttons.forEach(function (b) { b.disabled = false; });
+    log("identify(" + USER_ID + ", sha256(email)) + signup");
+  };
+  document.getElementById("generate").onclick = function () {
+    ra.track("generation_completed", { tokens_spent: 12 });
+    log("generation_completed (tokens_spent=12)");
+  };
+  document.getElementById("pricing").onclick = function () {
+    ra.track("paywall_viewed", { page: "/pricing" });
+    log("paywall_viewed (/pricing)");
+  };
+  document.getElementById("checkout").onclick = function () {
+    ra.track("checkout_started");
+    log("checkout_started");
+  };
+  document.getElementById("cancel").onclick = function () {
+    ra.track("cancel_flow_started");
+    log("cancel_flow_started");
+  };
+</script>
+</body>
+</html>

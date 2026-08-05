@@ -205,6 +205,26 @@ def snapshot(evt: dict[str, Any], tenant_id: str) -> tuple[str, dict[str, Any]] 
             "updated_at": now,
         }
 
+    if stripe_type == "checkout.session.completed":
+        details = obj.get("customer_details") or {}
+        email = details.get("email") or obj.get("customer_email") or ""
+        cust = _customer_id(obj)
+        if not email or not cust:
+            return None
+        # мост с ОТКРЫТЫМ email: без бэкфила это единственный источник адреса
+        # для identity (события несут только hash) — иначе письмам некуда уходить
+        return "stripe_customers", {
+            "tenant_id": tenant_id,
+            "customer_id": cust,
+            "email": email,
+            "email_norm": normalize_email(email),
+            "email_hash": email_hash(email),
+            "name": details.get("name") or "",
+            "created_ts": ts_str(evt.get("created")),
+            "meta": "{}",
+            "updated_at": now,
+        }
+
     if stripe_type == "charge.refunded":
         return "stripe_charges", {
             "tenant_id": tenant_id,

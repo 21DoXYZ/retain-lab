@@ -117,6 +117,12 @@ def build_identities(
             by_hash[k.email_hash] = ident
             if k.client_user_id:
                 ident.client_user_id = k.client_user_id
+            # событие-мост (checkout.completed) несёт и customer: без бэкфила
+            # кастомеров это единственный способ привязать billing-события
+            if k.stripe_customer_id and not ident.stripe_customer_id:
+                ident.stripe_customer_id = k.stripe_customer_id
+                by_customer[k.stripe_customer_id] = ident
+                _add_source(ident, "stripe")
             _add_source(ident, "snippet")
             continue
 

@@ -15,10 +15,11 @@
 (function () {
   "use strict";
   var s = document.currentScript || {};
+  var w = window.RA_CONFIG || {};   // альтернатива data-атрибутам (SPA/динамический конфиг)
   var cfg = {
-    endpoint: (s.dataset && s.dataset.endpoint) || "",
-    token: (s.dataset && s.dataset.token) || "",
-    tenant: (s.dataset && s.dataset.tenant) || "",
+    endpoint: (s.dataset && s.dataset.endpoint) || w.endpoint || "",
+    token: (s.dataset && s.dataset.token) || w.token || "",
+    tenant: (s.dataset && s.dataset.tenant) || w.tenant || "",
     pages: /\/(pricing|plans|cancel)/i,
   };
   var K = "ra_uid", KH = "ra_eh", KS = "ra_sess";

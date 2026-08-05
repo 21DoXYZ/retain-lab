@@ -67,3 +67,19 @@ def test_identity_id_stable_across_rebuilds():
         EventKey(client_user_id="u_1", email_hash="hash_alice", last_ts="2026-08-02"),
     ])
     assert a1[0].identity_id == _by_hash(a2)["hash_alice"].identity_id
+
+
+def test_bridge_event_binds_customer_without_backfill():
+    """checkout.completed (client+hash+customer) до бэкфила кастомеров:
+    identity получает stripe_customer_id, billing-события резолвятся."""
+    idents, unmatched = build_identities(TENANT, [], [
+        EventKey(client_user_id="u_demo_1", email_hash="hash_demo",
+                 stripe_customer_id="cus_demo_1", last_ts="2026-08-05"),
+        EventKey(stripe_customer_id="cus_demo_1", last_ts="2026-08-05"),
+    ])
+    assert len(idents) == 1
+    ident = idents[0]
+    assert ident.client_user_id == "u_demo_1"
+    assert ident.stripe_customer_id == "cus_demo_1"
+    assert set(ident.sources) == {"stripe", "snippet"}
+    assert unmatched == []

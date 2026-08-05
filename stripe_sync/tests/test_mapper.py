@@ -102,4 +102,16 @@ def test_snapshot_subscription_and_invoice():
     }), TENANT)
     assert table == "stripe_invoices" and row["amount_paid"] == 49.0
 
+    # checkout без email/customer - снапшота нет
     assert snapshot(_evt("checkout.session.completed", {"id": "cs_1"}), TENANT) is None
+
+
+def test_snapshot_checkout_bridges_open_email():
+    table, row = snapshot(_evt("checkout.session.completed", {
+        "id": "cs_1", "customer": "cus_demo_1",
+        "customer_details": {"email": " DoDemo@Example.test ", "name": "Demo"},
+    }), TENANT)
+    assert table == "stripe_customers"
+    assert row["customer_id"] == "cus_demo_1"
+    assert row["email_norm"] == "dodemo@example.test"
+    assert row["email_hash"] == email_hash("dodemo@example.test")
