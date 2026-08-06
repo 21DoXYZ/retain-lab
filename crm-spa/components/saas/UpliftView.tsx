@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { Banner, DataTable, PageHeader, type Column, type TableState } from "@/components/ui";
+import { NoTenant, isNoTenant } from "./NoTenant";
 
 /**
  * /uplift — недельный замер кампаний: target vs holdout → инкремент $
@@ -42,6 +43,7 @@ export function UpliftView() {
   const t = useT();
   const [data, setData] = useState<UpliftData | null>(null);
   const [state, setState] = useState<TableState>("loading");
+  const [noTenant, setNoTenant] = useState(false);
 
   const load = useCallback(() => {
     setState("loading");
@@ -50,7 +52,10 @@ export function UpliftView() {
         setData(d);
         setState(d.campaigns.length ? "data" : "empty");
       })
-      .catch(() => setState("error"));
+      .catch((e: unknown) => {
+        setNoTenant(isNoTenant(e));
+        setState("error");
+      });
   }, []);
 
   useEffect(load, [load]);
@@ -96,6 +101,9 @@ export function UpliftView() {
         </Banner>
       ) : null}
 
+      {noTenant ? (
+        <NoTenant />
+      ) : (
       <DataTable
         columns={columns}
         rows={data?.campaigns ?? []}
@@ -105,6 +113,7 @@ export function UpliftView() {
         emptyTitle={t("saas.uplift.empty.title")}
         emptyDescription={t("saas.uplift.empty.desc")}
       />
+      )}
     </div>
   );
 }

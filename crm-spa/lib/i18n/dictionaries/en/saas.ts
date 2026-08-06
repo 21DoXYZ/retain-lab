@@ -319,6 +319,10 @@ export const saas: Partial<Messages> = {
   "saas.channels.email.hook.missing": "No signing secret: delivery events are rejected so nobody can forge a bounce.",
   "saas.channels.err.invalid_webhook_secret": "The secret must start with whsec_ - copy it in full.",
 
+  "saas.noTenant.title": "No client workspace yet",
+  "saas.noTenant.desc": "Data, campaigns and offers all live inside a product workspace. Create the first one - the system issues an ingest token, an owner account and an empty campaign skeleton, and the Get started wizard starts working right away.",
+  "saas.noTenant.cta": "Create workspace",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

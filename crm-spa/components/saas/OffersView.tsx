@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { Button, Card, DataTable, PageHeader, type Column, type TableState } from "@/components/ui";
+import { NoTenant, isNoTenant } from "./NoTenant";
 
 /**
  * /offers — каталог офферов тенанта + статистика выдач. Щедрость и лимиты
@@ -257,6 +258,7 @@ export function OffersView() {
   const t = useT();
   const [data, setData] = useState<OffersData | null>(null);
   const [state, setState] = useState<TableState>("loading");
+  const [noTenant, setNoTenant] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -279,7 +281,10 @@ export function OffersView() {
         setData(d);
         setState(d.offers.length ? "data" : "empty");
       })
-      .catch(() => setState("error"));
+      .catch((e: unknown) => {
+        setNoTenant(isNoTenant(e));
+        setState("error");
+      });
   }, []);
 
   useEffect(load, [load]);
@@ -392,6 +397,9 @@ export function OffersView() {
           }}
         />
       )}
+      {noTenant ? (
+        <NoTenant />
+      ) : (
       <DataTable
         columns={columns}
         rows={data?.offers ?? []}
@@ -399,6 +407,7 @@ export function OffersView() {
         state={state}
         onRetry={load}
       />
+      )}
     </div>
   );
 }

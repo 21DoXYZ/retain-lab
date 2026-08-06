@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Banner, Button, Card, PageHeader } from "@/components/ui";
+import { NoTenant, isNoTenant } from "./NoTenant";
 
 /**
  * /insights — что ИИ-аналитик увидел в результатах недели и что предлагает
@@ -51,7 +52,7 @@ const KIND_TONE: Record<string, string> = {
 export function InsightsView() {
   const t = useT();
   const [data, setData] = useState<Payload | null>(null);
-  const [state, setState] = useState<"loading" | "data" | "error">("loading");
+  const [state, setState] = useState<"loading" | "data" | "error" | "no_tenant">("loading");
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -60,7 +61,7 @@ export function InsightsView() {
         setData(d);
         setState("data");
       })
-      .catch(() => setState("error"));
+      .catch((e: unknown) => setState(isNoTenant(e) ? "no_tenant" : "error"));
   }, []);
 
   useEffect(load, [load]);
@@ -192,6 +193,8 @@ export function InsightsView() {
           </div>
         </Card>
       )}
+
+      {state === "no_tenant" && <NoTenant />}
 
       {state === "error" && (
         <Banner>

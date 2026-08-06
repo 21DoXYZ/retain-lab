@@ -312,6 +312,10 @@ export const saas: Partial<Messages> = {
   "saas.channels.email.hook.missing": "",
   "saas.channels.err.invalid_webhook_secret": "",
 
+  "saas.noTenant.title": "",
+  "saas.noTenant.desc": "",
+  "saas.noTenant.cta": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

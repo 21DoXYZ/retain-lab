@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Badge, Banner, Button, Card, PageHeader } from "@/components/ui";
+import { NoTenant, isNoTenant } from "./NoTenant";
 
 /**
  * /campaigns — SaaS-кампании K1-K5: что именно автопилот шлёт юзерам (шаги,
@@ -203,7 +204,7 @@ function StepRow({
 export function CampaignsView() {
   const t = useT();
   const [data, setData] = useState<Payload | null>(null);
-  const [state, setState] = useState<"loading" | "data" | "error">("loading");
+  const [state, setState] = useState<"loading" | "data" | "error" | "no_tenant">("loading");
   const [busy, setBusy] = useState(false);
   const [arm, setArm] = useState(false);
   const armTimer = useRef<number | undefined>(undefined);
@@ -215,7 +216,7 @@ export function CampaignsView() {
         setData(d);
         setState("data");
       })
-      .catch(() => setState("error"));
+      .catch((e: unknown) => setState(isNoTenant(e) ? "no_tenant" : "error"));
   }, []);
 
   useEffect(load, [load]);
@@ -251,6 +252,8 @@ export function CampaignsView() {
           ))}
         </div>
       )}
+
+      {state === "no_tenant" && <NoTenant />}
 
       {state === "error" && (
         <Banner>

@@ -318,6 +318,10 @@ export const saas = {
   "saas.channels.email.hook.missing": "Секрет подписи не задан: события доставки отклоняются, чтобы никто не мог подделать баунс.",
   "saas.channels.err.invalid_webhook_secret": "Секрет должен начинаться с whsec_ - скопируйте его целиком.",
 
+  "saas.noTenant.title": "Пространства клиента ещё нет",
+  "saas.noTenant.desc": "Данные, кампании и офферы живут внутри пространства продукта. Создайте первое - система заведёт ingest-токен, владельца и пустой каркас кампаний, и визард Get started сразу заработает.",
+  "saas.noTenant.cta": "Создать пространство",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { Banner, DataTable, PageHeader, type Column, type TableState } from "@/components/ui";
+import { NoTenant, isNoTenant } from "./NoTenant";
 
 /**
  * /users — юзеры SaaS-контура (замена казино-экрана /players): стадия,
@@ -52,6 +53,7 @@ export function UsersView() {
   const [data, setData] = useState<UsersData | null>(null);
   const [stage, setStage] = useState<string>("");
   const [state, setState] = useState<TableState>("loading");
+  const [noTenant, setNoTenant] = useState(false);
 
   const load = useCallback((s: string) => {
     setState("loading");
@@ -60,7 +62,10 @@ export function UsersView() {
         setData(d);
         setState(d.users.length ? "data" : "empty");
       })
-      .catch(() => setState("error"));
+      .catch((e: unknown) => {
+        setNoTenant(isNoTenant(e));
+        setState("error");
+      });
   }, []);
 
   useEffect(() => load(stage), [load, stage]);
@@ -131,6 +136,9 @@ export function UsersView() {
         ))}
       </div>
 
+      {noTenant ? (
+        <NoTenant />
+      ) : (
       <DataTable
         columns={columns}
         rows={data?.users ?? []}
@@ -140,6 +148,7 @@ export function UsersView() {
         emptyTitle={t("saas.users.empty.title")}
         emptyDescription={t("saas.users.empty.desc")}
       />
+      )}
     </div>
   );
 }

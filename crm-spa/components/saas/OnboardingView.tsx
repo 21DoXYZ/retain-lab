@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Button, Card, PageHeader } from "@/components/ui";
+import { NoTenant, isNoTenant } from "./NoTenant";
 
 /**
  * /onboarding — визард «Get started»: 4 шага с живыми статусами и ГОТОВЫМИ
@@ -254,7 +255,7 @@ function StripeKeys({ data, onSaved }: { data: Payload["stripe"]; onSaved: (p: P
 export function OnboardingView() {
   const t = useT();
   const [data, setData] = useState<Payload | null>(null);
-  const [state, setState] = useState<"loading" | "data" | "error">("loading");
+  const [state, setState] = useState<"loading" | "data" | "error" | "no_tenant">("loading");
 
   const load = useCallback(() => {
     flaskFetch<Payload>("/api/v1/saas/onboarding")
@@ -262,7 +263,7 @@ export function OnboardingView() {
         setData(d);
         setState("data");
       })
-      .catch(() => setState("error"));
+      .catch((e: unknown) => setState(isNoTenant(e) ? "no_tenant" : "error"));
   }, []);
 
   useEffect(load, [load]);
@@ -464,6 +465,8 @@ export function OnboardingView() {
           </Card>
         </>
       )}
+
+      {state === "no_tenant" && <NoTenant />}
 
       {state === "error" && (
         <Card className="p-5">

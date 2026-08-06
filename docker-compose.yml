@@ -135,7 +135,7 @@ services:
       CH_PORT: "8123"
       CH_DB: retention
       CH_PASSWORD: ${CH_PASSWORD:-}
-      TENANT_ID: ${TENANT_ID:-hubcontent}
+      TENANT_ID: ${TENANT_ID:-}
       STRIPE_API_KEY: ${STRIPE_API_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_SIGVERIFY_OFF: ${STRIPE_SIGVERIFY_OFF:-}   # 1 = дев-моки без подписи (НЕ в проде)
@@ -160,7 +160,7 @@ services:
       CH_PORT: "8123"
       CH_DB: retention
       CH_PASSWORD: ${CH_PASSWORD:-}
-      TENANT_ID: ${TENANT_ID:-hubcontent}
+      TENANT_ID: ${TENANT_ID:-}
       STRIPE_API_KEY: ${STRIPE_API_KEY:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}

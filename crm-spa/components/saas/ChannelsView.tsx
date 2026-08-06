@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FlaskApiError, flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Banner, Button, Card, Field, PageHeader } from "@/components/ui";
+import { NoTenant, isNoTenant } from "./NoTenant";
 
 /**
  * /channel-settings — клиентский флоу подключения каналов. Инфраструктура
@@ -439,7 +440,7 @@ function ChannelCard({
 export function ChannelsView() {
   const t = useT();
   const [data, setData] = useState<Payload | null>(null);
-  const [state, setState] = useState<"loading" | "data" | "error">("loading");
+  const [state, setState] = useState<"loading" | "data" | "error" | "no_tenant">("loading");
 
   const load = useCallback(() => {
     setState("loading");
@@ -448,7 +449,7 @@ export function ChannelsView() {
         setData(d);
         setState("data");
       })
-      .catch(() => setState("error"));
+      .catch((e: unknown) => setState(isNoTenant(e) ? "no_tenant" : "error"));
   }, []);
 
   useEffect(load, [load]);
@@ -464,6 +465,8 @@ export function ChannelsView() {
           ))}
         </div>
       )}
+
+      {state === "no_tenant" && <NoTenant />}
 
       {state === "error" && (
         <Banner>
