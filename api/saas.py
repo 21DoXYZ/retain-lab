@@ -88,30 +88,23 @@ def leak_audit():
         """,
         {'t': tenant})[1][0]
 
-    # Потенциал апгрейда = РАЗНИЦА до следующего тарифа, а не выдуманный
-    # процент. Лестницу тарифов знаем из tenant_plans; если следующего тарифа
-    # выше нет (человек уже на топовом), потенциала нет - это честнее, чем
-    # рисовать «+50% к платежу» из воздуха.
-    upgrade_users = q(
-        "SELECT toFloat64(mrr) FROM user_actions "
-        "WHERE tenant_id = {t:String} AND stage = 'UPGRADE'",
-        {'t': tenant})[1]
-    ladder = sorted(_flt(r[0]) for r in q(
-        "SELECT toFloat64(mrr) FROM tenant_plans_current "
-        "WHERE tenant_id = {t:String} AND mrr > 0", {'t': tenant})[1])
-    upgrade_pot = 0.0
-    for row in upgrade_users:
-        cur = _flt(row[0])
-        nxt = next((m for m in ladder if m > cur), 0.0)
-        if nxt:
-            upgrade_pot += nxt - cur
-    upgrades = (len(upgrade_users), upgrade_pot)
+    # Недобор апгрейдов = РАЗНИЦА до следующего тарифа. Считает её вьюха
+    # user_actions по лестнице tenant_plan_ladder - одно определение на все
+    # экраны, чтобы «денег на кону» у юзера и сумма на этом экране сходились.
+    upgrades = q(
+        "SELECT count(), coalesce(sum(value_at_stake), 0) "
+        "FROM user_actions WHERE tenant_id = {t:String} AND stage = 'UPGRADE'",
+        {'t': tenant})[1][0]
+    upgrade_pot = _flt(upgrades[1])
+    ladder_size = int(q(
+        "SELECT count() FROM tenant_plans_current "
+        "WHERE tenant_id = {t:String} AND mrr > 0", {'t': tenant})[1][0][0])
 
     dunning_mrr = _flt(dunning[1])
     silent_mrr = _flt(silent[1])
     # известна ли лестница тарифов - от этого зависит, честно ли показывать
     # потенциал апгрейда цифрой
-    ladder_known = len(ladder) > 1
+    ladder_known = ladder_size > 1
 
     return api_json({
         'tenant': tenant,
@@ -562,7 +555,8 @@ def saas_users():
                sub_status, plan_id, toFloat64(mrr), stage, recommended_action,
                value_at_stake, coalesce(p_convert, 0), coalesce(p_churn, 0),
                coalesce(ltv_estimate, 0),
-               if(toUnixTimestamp(last_seen) = 0, '', toString(last_seen))
+               if(toUnixTimestamp(last_seen) = 0, '', toString(last_seen)),
+               stage_note
         FROM user_actions WHERE {where}
         ORDER BY value_at_stake DESC, mrr DESC
         LIMIT 500
@@ -575,6 +569,7 @@ def saas_users():
         'value_at_stake': round(_flt(r[9]), 2),
         'p_convert': round(_flt(r[10]), 2), 'p_churn': round(_flt(r[11]), 2),
         'ltv': round(_flt(r[12]), 2), 'last_seen': r[13],
+        'stage_note': r[14],
     } for r in rows]
 
     stages = {r[0]: int(r[1]) for r in q(

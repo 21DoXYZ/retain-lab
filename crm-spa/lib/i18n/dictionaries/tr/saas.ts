@@ -371,6 +371,9 @@ export const saas: Partial<Messages> = {
   "saas.leak.upgradesSubUnknown": "",
   "saas.leak.headlineNote": "",
 
+  "saas.users.stage.justCanceled": "",
+  "saas.users.note.post_cancel_cooldown": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

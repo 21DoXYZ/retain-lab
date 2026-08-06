@@ -346,6 +346,18 @@ GROUP BY tenant_id, customer_id;
 -- Приоритет: DUNNING > WINBACK > CONVERT > SAVE > UPGRADE > ACTIVATE > MONITOR.
 -- DUNNING событийный: последний payment_failed новее последнего paid, либо
 -- статус подписки past_due — вьюха видит новое событие сразу (без ночного джоба).
+-- Лестница тарифов: для каждого плана - цена СЛЕДУЮЩЕГО по величине. Нужна,
+-- чтобы «недобор апгрейдов» считался реальной разницей цен, а не выдуманным
+-- процентом от текущего платежа.
+CREATE OR REPLACE VIEW retention.tenant_plan_ladder AS
+SELECT p.tenant_id                                   AS tenant_id,
+       p.plan_id                                     AS plan_id,
+       p.mrr                                         AS plan_mrr,
+       coalesce(min(if(q.mrr > p.mrr, q.mrr, NULL)), 0) AS next_mrr
+FROM retention.tenant_plans_current p
+LEFT JOIN retention.tenant_plans_current q ON q.tenant_id = p.tenant_id
+GROUP BY p.tenant_id, p.plan_id, p.mrr;
+
 CREATE OR REPLACE VIEW retention.user_actions AS
 WITH
     if(s.bill_interval = 'year', round(s.amount / 12, 2), s.amount) AS sub_mrr,
@@ -389,7 +401,8 @@ SELECT
         'none')         AS recommended_action,
     multiIf(
         stage_calc IN ('DUNNING', 'SAVE'), toFloat64(sub_mrr),
-        stage_calc = 'UPGRADE',  toFloat64(sub_mrr) * 0.5,
+        stage_calc = 'UPGRADE',  greatest(toFloat64(coalesce(l.next_mrr, 0))
+                                          - toFloat64(sub_mrr), 0),
         stage_calc IN ('CONVERT', 'ACTIVATE', 'WINBACK'), toFloat64(coalesce(p.mrr, 0)),
         0.0)            AS value_at_stake,
     if(is_canceled AND days_since_cancel < 30, 'post_cancel_cooldown', '') AS stage_note,
@@ -402,6 +415,8 @@ LEFT JOIN retention.user_event_features f
     ON i.tenant_id = f.tenant_id AND i.identity_id = f.identity_id
 LEFT JOIN retention.tenant_plans_current p
     ON i.tenant_id = p.tenant_id AND s.plan_id = p.plan_id
+LEFT JOIN retention.tenant_plan_ladder l
+    ON i.tenant_id = l.tenant_id AND s.plan_id = l.plan_id
 LEFT JOIN retention.user_scores_current sc
     ON i.tenant_id = sc.tenant_id AND i.identity_id = sc.identity_id;
 

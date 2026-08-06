@@ -24,6 +24,7 @@ interface SaasUser {
   p_churn: number;
   ltv: number;
   last_seen: string;
+  stage_note: string;
 }
 
 interface UsersData {
@@ -85,8 +86,11 @@ export function UsersView() {
     {
       key: "stage", header: t("saas.users.col.stage"),
       render: (r) => (
-        <span className={"inline-block border rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold " + (STAGE_TONE[r.stage] ?? STAGE_TONE.MONITOR)}>
-          {r.stage}
+        <span className={"inline-block border rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold " + (STAGE_TONE[r.stage] ?? STAGE_TONE.MONITOR)}
+              title={r.stage_note ? t("saas.users.note.post_cancel_cooldown") : undefined}>
+          {/* Только что отменил - это НЕ «всё хорошо»: показываем пометку,
+              иначе ушедший клиент выглядит как спокойный. */}
+          {r.stage_note === "post_cancel_cooldown" ? t("saas.users.stage.justCanceled") : r.stage}
         </span>
       ),
     },

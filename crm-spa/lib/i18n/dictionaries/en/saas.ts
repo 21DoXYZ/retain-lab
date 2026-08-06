@@ -374,6 +374,9 @@ export const saas: Partial<Messages> = {
   "saas.leak.upgradesSubUnknown": "{count} people are at their limit. We will show the amount once the system sees your plans from billing.",
   "saas.leak.headlineNote": "This adds up three different things: money you can still recover (failed payments), money that just walked out (cancellations in the last 30 days), and money you are not collecting (people stuck at their plan limit).",
 
+  "saas.users.stage.justCanceled": "JUST CANCELLED",
+  "saas.users.note.post_cancel_cooldown": "Cancelled less than 30 days ago. Writing right away does not work - the win-back campaign starts after a month has passed.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",
