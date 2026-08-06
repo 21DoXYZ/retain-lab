@@ -14,7 +14,7 @@ export const saas: Partial<Messages> = {
   "saas.leak.silent": "Left quietly (last 30 days)",
   "saas.leak.silentSub": "{count} cancelled without anyone trying to keep them",
   "saas.leak.upgrades": "Outgrew their plan",
-  "saas.leak.upgradesSub": "{count} people are at the limit and would pay more",
+  "saas.leak.upgradesSub": "{count} people are at their limit - this is the gap to the next plan",
   "saas.leak.deadTrials": "Trials that ended without a sale",
   "saas.leak.deadTrialsSub": "{count} tried the product and never paid",
 
@@ -370,6 +370,9 @@ export const saas: Partial<Messages> = {
 
   "saas.offers.empty.title": "No offers yet",
   "saas.offers.empty.desc": "They appear after you answer the nine questions on Get started - or add your own with the button above.",
+
+  "saas.leak.upgradesSubUnknown": "{count} people are at their limit. We will show the amount once the system sees your plans from billing.",
+  "saas.leak.headlineNote": "This adds up three different things: money you can still recover (failed payments), money that just walked out (cancellations in the last 30 days), and money you are not collecting (people stuck at their plan limit).",
 
   "nav.channelsSetup": "Channels",
 

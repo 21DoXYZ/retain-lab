@@ -368,6 +368,9 @@ export const saas: Partial<Messages> = {
   "saas.offers.empty.title": "",
   "saas.offers.empty.desc": "",
 
+  "saas.leak.upgradesSubUnknown": "",
+  "saas.leak.headlineNote": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

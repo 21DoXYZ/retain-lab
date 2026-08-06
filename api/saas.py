@@ -88,18 +88,35 @@ def leak_audit():
         """,
         {'t': tenant})[1][0]
 
-    upgrades = q(
-        "SELECT count(), coalesce(sum(value_at_stake), 0) "
-        "FROM user_actions WHERE tenant_id = {t:String} AND stage = 'UPGRADE'",
-        {'t': tenant})[1][0]
+    # Потенциал апгрейда = РАЗНИЦА до следующего тарифа, а не выдуманный
+    # процент. Лестницу тарифов знаем из tenant_plans; если следующего тарифа
+    # выше нет (человек уже на топовом), потенциала нет - это честнее, чем
+    # рисовать «+50% к платежу» из воздуха.
+    upgrade_users = q(
+        "SELECT toFloat64(mrr) FROM user_actions "
+        "WHERE tenant_id = {t:String} AND stage = 'UPGRADE'",
+        {'t': tenant})[1]
+    ladder = sorted(_flt(r[0]) for r in q(
+        "SELECT toFloat64(mrr) FROM tenant_plans_current "
+        "WHERE tenant_id = {t:String} AND mrr > 0", {'t': tenant})[1])
+    upgrade_pot = 0.0
+    for row in upgrade_users:
+        cur = _flt(row[0])
+        nxt = next((m for m in ladder if m > cur), 0.0)
+        if nxt:
+            upgrade_pot += nxt - cur
+    upgrades = (len(upgrade_users), upgrade_pot)
 
     dunning_mrr = _flt(dunning[1])
     silent_mrr = _flt(silent[1])
-    upgrade_pot = _flt(upgrades[1])
+    # известна ли лестница тарифов - от этого зависит, честно ли показывать
+    # потенциал апгрейда цифрой
+    ladder_known = len(ladder) > 1
 
     return api_json({
         'tenant': tenant,
         'headline_monthly_leak': round(dunning_mrr + silent_mrr + upgrade_pot, 2),
+        'upgrade_estimate_known': ladder_known,
         'blocks': {
             'dunning': {'count': int(dunning[0]), 'mrr': round(dunning_mrr, 2)},
             'dead_trials': {'count': int(dead_trials[0]),

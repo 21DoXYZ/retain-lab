@@ -21,6 +21,7 @@ interface LeakBlock {
 interface LeakAudit {
   tenant: string;
   headline_monthly_leak: number;
+  upgrade_estimate_known: boolean;
   blocks: {
     dunning: LeakBlock;
     dead_trials: LeakBlock;
@@ -65,6 +66,11 @@ export function LeakAuditView() {
                   ? t("saas.leak.headline", { amount: usd(data.headline_monthly_leak) })
                   : t("saas.leak.noData")}
               </span>
+              {data.headline_monthly_leak > 0 && (
+                <p className="mt-1.5 text-[12.5px] leading-relaxed text-steel">
+                  {t("saas.leak.headlineNote")}
+                </p>
+              )}
             </Banner>
           ) : null}
 
@@ -87,7 +93,10 @@ export function LeakAuditView() {
               loading={loading}
               label={t("saas.leak.upgrades")}
               value={usd(data?.blocks.under_upgrades.expansion_potential)}
-              sub={t("saas.leak.upgradesSub", { count: data?.blocks.under_upgrades.count ?? 0 })}
+              sub={t(data?.upgrade_estimate_known
+                ? "saas.leak.upgradesSub"
+                : "saas.leak.upgradesSubUnknown",
+                { count: data?.blocks.under_upgrades.count ?? 0 })}
             />
             <SCard
               loading={loading}
