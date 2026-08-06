@@ -27,12 +27,13 @@ def test_p_convert_cap_ignores_paying_and_free_offers():
 
 
 def test_monetary_cap_14d():
-    hist = [{"offer_id": "O1_tokens_100", "monetary": 1, "status": "dry_run"}]
+    hist = [{"offer_id": "O1_tokens_100", "monetary": 1, "status": "issued"}]
     assert check_monetary_cap_14d(MONETARY, hist) == (False, "monetary_cap_14d")
     assert check_monetary_cap_14d(FREE, hist) == (True, "")
-    # holdout и rejected не считаются выдачей
+    # holdout, rejected и прогон вхолостую выдачей не считаются
     hist2 = [{"offer_id": "O1", "monetary": 1, "status": "holdout"},
-             {"offer_id": "O2", "monetary": 1, "status": "rejected"}]
+             {"offer_id": "O2", "monetary": 1, "status": "rejected"},
+             {"offer_id": "O3", "monetary": 1, "status": "dry_run"}]
     assert check_monetary_cap_14d(MONETARY, hist2) == (True, "")
 
 
@@ -95,3 +96,16 @@ def test_live_risk_stage_beats_yesterday_score():
     for stage in ("SAVE", "DUNNING", "WINBACK"):
         assert check_churn_floor(offer, {**calm_score, "stage": stage}, 0.25)[0], stage
     assert not check_churn_floor(offer, {**calm_score, "stage": "MONITOR"}, 0.25)[0]
+
+
+def test_safe_mode_does_not_eat_the_gift_budget():
+    """Прогон вхолостую не должен расходовать лимиты: иначе в день реального
+    запуска все подарки упрутся в «уже давали», хотя никто ничего не получал."""
+    from stripe_sync.hygiene import check_monetary_cap_14d, check_offer_limit_30d
+    offer = {"offer_id": "A_discount20", "monetary": True, "max_per_user_30d": 1}
+    dry = [{"offer_id": "A_discount20", "monetary": True, "status": "dry_run"}]
+    real = [{"offer_id": "A_discount20", "monetary": True, "status": "issued"}]
+    assert check_monetary_cap_14d(offer, dry)[0]
+    assert check_offer_limit_30d(offer, dry)[0]
+    assert not check_monetary_cap_14d(offer, real)[0]
+    assert not check_offer_limit_30d(offer, real)[0]

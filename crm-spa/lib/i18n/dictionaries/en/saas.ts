@@ -388,6 +388,8 @@ export const saas: Partial<Messages> = {
   "saas.uplift.earlyHint": "Early signal: the groups are too small to tell a real effect from chance. The number becomes reliable once each group has at least 30 people.",
   "saas.uplift.earlyNote": "A star next to the amount means an early signal: the groups are still small, so the difference may be chance.",
 
+  "saas.camp.goalOf.billing.subscription_upgraded": "the person moves to a more expensive plan",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

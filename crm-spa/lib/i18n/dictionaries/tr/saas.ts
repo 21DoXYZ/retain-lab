@@ -385,6 +385,8 @@ export const saas: Partial<Messages> = {
   "saas.uplift.earlyHint": "",
   "saas.uplift.earlyNote": "",
 
+  "saas.camp.goalOf.billing.subscription_upgraded": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

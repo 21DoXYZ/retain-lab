@@ -115,3 +115,24 @@ def test_snapshot_checkout_bridges_open_email():
     assert row["customer_id"] == "cus_demo_1"
     assert row["email_norm"] == "dodemo@example.test"
     assert row["email_hash"] == email_hash("dodemo@example.test")
+
+
+def test_upgrade_is_not_any_subscription_change():
+    """Успех кампании апгрейда - переход на тариф ДОРОЖЕ. Раньше засчитывалось
+    любое изменение подписки, включая понижение: эффект выглядел бы дутым."""
+    def evt(prev_cents, new_cents):
+        return {"id": "evt_1", "type": "customer.subscription.updated", "created": 1,
+                "data": {"object": {"id": "sub_1", "customer": "cus_1", "status": "active",
+                                    "items": {"data": [{"price": {
+                                        "id": "p2", "unit_amount": new_cents, "currency": "usd",
+                                        "recurring": {"interval": "month"}, "product": "prod_1"}}]}},
+                         "previous_attributes": {"items": {"data": [
+                             {"price": {"unit_amount": prev_cents}}]}}}}
+
+    assert map_event(evt(2900, 9900), "t")["event_type"] == "billing.subscription_upgraded"
+    assert map_event(evt(9900, 2900), "t")["event_type"] == "billing.subscription_downgraded"
+    # изменение, не касающееся цены, остаётся обычным обновлением
+    other = {"id": "e", "type": "customer.subscription.updated", "created": 1,
+             "data": {"object": {"id": "s", "customer": "c", "status": "active"},
+                      "previous_attributes": {"metadata": {"x": "y"}}}}
+    assert map_event(other, "t")["event_type"] == "billing.subscription_updated"

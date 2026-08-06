@@ -34,12 +34,19 @@ def check_p_convert_cap(offer: dict, user: dict, cap: float) -> tuple[bool, str]
     return True, ""
 
 
+# Бюджет подарков тратит только то, что РЕАЛЬНО дошло до человека. Прогон в
+# безопасном режиме (dry_run) раньше съедал лимит: клиент неделями крутил
+# автопилот вхолостую, а в день боевого запуска все офферы упирались в
+# «уже давали 14 дней назад» - хотя не давали ничего.
+SPENT_STATUSES = ("issued",)
+
+
 def check_monetary_cap_14d(offer: dict, history_14d: list[dict]) -> tuple[bool, str]:
     """history_14d: строки offers_issued этого юзера за 14 дней."""
     if not offer.get("monetary"):
         return True, ""
     for row in history_14d:
-        if row.get("monetary") and row.get("status") in ("issued", "dry_run"):
+        if row.get("monetary") and row.get("status") in SPENT_STATUSES:
             return False, "monetary_cap_14d"
     return True, ""
 
@@ -50,7 +57,7 @@ def check_offer_limit_30d(offer: dict, history_30d: list[dict]) -> tuple[bool, s
         return True, ""
     count = sum(1 for row in history_30d
                 if row.get("offer_id") == offer["offer_id"]
-                and row.get("status") in ("issued", "dry_run"))
+                and row.get("status") in SPENT_STATUSES)
     if count >= limit:
         return False, "offer_limit_30d"
     return True, ""

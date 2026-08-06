@@ -97,6 +97,21 @@ def _sub_plan(sub: dict[str, Any]) -> tuple[str, str, float, str, str]:
     )
 
 
+def _prev_amount(prev: dict[str, Any]) -> float | None:
+    """Прошлая цена подписки из previous_attributes (Stripe кладёт туда только
+    изменившиеся поля). None - цена не менялась, значит это не смена тарифа."""
+    items = (prev.get("items") or {}).get("data")
+    if isinstance(items, list) and items:
+        price = (items[0] or {}).get("price") or (items[0] or {}).get("plan") or {}
+        cents = price.get("unit_amount", price.get("amount"))
+        if cents is not None:
+            return _amount(cents)
+    plan = prev.get("plan") or {}
+    if plan.get("amount") is not None:
+        return _amount(plan["amount"])
+    return None
+
+
 def map_event(evt: dict[str, Any], tenant_id: str) -> dict[str, Any] | None:
     """Stripe Event (dict) → событие saas_events; None = тип не наш."""
     stripe_type = evt.get("type", "")
@@ -132,6 +147,16 @@ def map_event(evt: dict[str, Any], tenant_id: str) -> dict[str, Any] | None:
         # отмена в конце периода приходит как .updated — размечаем отдельным типом
         if stripe_type == "customer.subscription.updated" and obj.get("cancel_at_period_end"):
             row["event_type"] = "billing.subscription_cancel_scheduled"
+        elif stripe_type == "customer.subscription.updated":
+            # ПЕРЕХОД НА ТАРИФ ДОРОЖЕ - отдельное событие. Иначе успехом
+            # кампании апгрейда считалось ЛЮБОЕ изменение подписки, включая
+            # понижение тарифа: цифра эффекта была бы дутой.
+            prev = (evt.get("data") or {}).get("previous_attributes") or {}
+            prev_amount = _prev_amount(prev)
+            if prev_amount is not None and amount > prev_amount:
+                row["event_type"] = "billing.subscription_upgraded"
+            elif prev_amount is not None and amount < prev_amount:
+                row["event_type"] = "billing.subscription_downgraded"
         row["meta"] = json.dumps(
             {"interval": interval, "price_id": price_id,
              "trial_end": obj.get("trial_end"),

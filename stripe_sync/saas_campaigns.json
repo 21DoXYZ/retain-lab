@@ -152,7 +152,7 @@
           }
         ],
         "goal": {
-          "event_type": "billing.subscription_updated",
+          "event_type": "billing.subscription_upgraded",
           "window_days": 30
         }
       },
