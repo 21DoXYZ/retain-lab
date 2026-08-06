@@ -576,14 +576,15 @@ def saas_users():
         "SELECT stage, count() FROM user_actions WHERE tenant_id = {t:String} GROUP BY stage",
         {'t': tenant})[1]}
 
-    # Плашка «это демо-данные» уместна ТОЛЬКО когда юзеры на экране есть и они
-    # сгенерированы нами. На пустом тенанте она врала: показывала «демо-набор»
-    # там, где нет ни одной строки.
-    live_customers = int(q(
+    # Плашка «это демо-данные» появляется, только если мы РЕАЛЬНО насыпали
+    # моков. Раньше признаком было «нет живых клиентов Stripe» - и плашка врала
+    # дважды: на пустом тенанте и у клиента, который поставил сниппет раньше,
+    # чем подключил биллинг.
+    mock_customers = int(q(
         "SELECT count() FROM stripe_customers WHERE tenant_id = {t:String} "
-        "AND customer_id NOT LIKE 'cus_mock%' AND customer_id NOT LIKE 'cus_demo%'",
+        "AND (customer_id LIKE 'cus_mock%' OR customer_id LIKE 'cus_demo%')",
         {'t': tenant})[1][0][0])
-    demo = bool(users) and live_customers == 0
+    demo = mock_customers > 0
 
     return api_json({'tenant': tenant, 'stages': stages, 'users': users,
                      'demo': demo})

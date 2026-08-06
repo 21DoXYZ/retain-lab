@@ -34,6 +34,11 @@ function usd(n: number | undefined): string {
   return "$" + (n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
+/** Ноль людей в блоке - это «нечего показывать», а не «ноль долларов утечки». */
+function money(amount: number | undefined, count: number | undefined): string {
+  return count ? usd(amount) : "-";
+}
+
 export function LeakAuditView() {
   const t = useT();
   const [data, setData] = useState<LeakAudit | null>(null);
@@ -78,21 +83,21 @@ export function LeakAuditView() {
             <SCard
               loading={loading}
               label={t("saas.leak.dunning")}
-              value={usd(data?.blocks.dunning.mrr)}
+              value={money(data?.blocks.dunning.mrr, data?.blocks.dunning.count)}
               sub={t("saas.leak.dunningSub", { count: data?.blocks.dunning.count ?? 0 })}
               valueTone="neg"
             />
             <SCard
               loading={loading}
               label={t("saas.leak.silent")}
-              value={usd(data?.blocks.silent_cancels_30d.mrr)}
+              value={money(data?.blocks.silent_cancels_30d.mrr, data?.blocks.silent_cancels_30d.count)}
               sub={t("saas.leak.silentSub", { count: data?.blocks.silent_cancels_30d.count ?? 0 })}
               valueTone="neg"
             />
             <SCard
               loading={loading}
               label={t("saas.leak.upgrades")}
-              value={usd(data?.blocks.under_upgrades.expansion_potential)}
+              value={money(data?.blocks.under_upgrades.expansion_potential, data?.blocks.under_upgrades.count)}
               sub={t(data?.upgrade_estimate_known
                 ? "saas.leak.upgradesSub"
                 : "saas.leak.upgradesSubUnknown",
@@ -101,7 +106,7 @@ export function LeakAuditView() {
             <SCard
               loading={loading}
               label={t("saas.leak.deadTrials")}
-              value={usd(data?.blocks.dead_trials.potential_mrr)}
+              value={money(data?.blocks.dead_trials.potential_mrr, data?.blocks.dead_trials.count)}
               sub={t("saas.leak.deadTrialsSub", { count: data?.blocks.dead_trials.count ?? 0 })}
             />
           </SCardGrid>
