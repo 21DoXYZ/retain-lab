@@ -251,6 +251,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { key: "keys", href: "/keys", emoji: "🔑", label: "nav.keys", roles: ["super_admin"] },
       { key: "extensions", href: "/extensions", emoji: "☎️", label: "nav.extensions", roles: ["super_admin", "head_retention", "head_department"] },
       { key: "team", href: "/admin/users", emoji: "👤", label: "nav.team", roles: ["super_admin", "head_retention", "head_department"] },
+      { key: "workspaces", href: "/admin/workspaces", emoji: "🏢", label: "nav.workspaces", roles: ["super_admin"] },
     ],
   },
 ];

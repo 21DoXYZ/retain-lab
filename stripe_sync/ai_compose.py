@@ -242,6 +242,8 @@ Hard rules:
 - Never invent numbers, discounts or bonus amounts - offers are attached by
   the platform separately. Refer to them generically ("your starter bonus").
 - No emoji, no em-dash, no ALL CAPS, no fake urgency, no guilt-tripping.
+- If "site_profile" is present in the input, ground the copy in it: speak
+  to its audience, and in K1 point at the aha_moment as the first action.
 """
 
 

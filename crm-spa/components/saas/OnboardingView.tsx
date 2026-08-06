@@ -30,8 +30,8 @@ const Q_FIELDS: { key: string; kind: "str" | "num" | "bool"; showIf?: (a: Record
   { key: "product_desc", kind: "str" },
   { key: "app_url", kind: "str" },
   { key: "client_api", kind: "bool" },
-  { key: "value_unit", kind: "str", showIf: (a) => a.client_api === "yes" },
-  { key: "monthly_units", kind: "num", showIf: (a) => a.client_api === "yes" },
+  { key: "value_unit", kind: "str" },
+  { key: "monthly_units", kind: "num" },
   { key: "callback_url", kind: "str", showIf: (a) => a.client_api === "yes" },
   { key: "has_trial", kind: "bool" },
   { key: "trial_days", kind: "num", showIf: (a) => a.has_trial === "yes" },
@@ -53,6 +53,37 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState("");
+
+  const scanSite = () => {
+    setScanning(true);
+    setScanNote("");
+    flaskFetch<{ profile: Record<string, unknown>; pages: string[]; note: string }>(
+      "/api/v1/saas/scan", { method: "POST", body: { url: a.app_url } },
+    )
+      .then((d) => {
+        const p = d.profile || {};
+        const filled: string[] = [];
+        setA((prev) => {
+          const next = { ...prev };
+          for (const k of ["product_name", "product_desc", "value_unit",
+                           "monthly_units", "avg_plan_price", "trial_days"]) {
+            const v = p[k];
+            if (v === null || v === undefined || v === "") continue;
+            next[k] = String(v);
+            filled.push(k);
+          }
+          if (p.trial_days) next.has_trial = "yes";
+          return next;
+        });
+        setScanNote(filled.length
+          ? t("saas.q.scan.done", { n: filled.length, pages: (d.pages || []).length })
+          : t("saas.q.scan.empty"));
+      })
+      .catch((e: unknown) => setScanNote(e instanceof Error ? e.message : "scan failed"))
+      .finally(() => setScanning(false));
+  };
 
   const inputCls =
     "h-[38px] w-full rounded-ctl border border-hair2 bg-canvas px-3 text-[13px] " +
@@ -74,6 +105,19 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
                 <option value="yes">{t("saas.q.yes")}</option>
                 <option value="no">{t("saas.q.no")}</option>
               </select>
+            ) : f.key === "app_url" ? (
+              <div className="flex gap-2">
+                <input
+                  className={inputCls}
+                  placeholder={t("saas.q.app_url.ph")}
+                  value={a[f.key] ?? ""}
+                  onChange={(e) => setA((p) => ({ ...p, [f.key]: e.target.value }))}
+                />
+                <Button variant="ghost" size="sm" loading={scanning}
+                        disabled={!(a.app_url || "").trim()} onClick={scanSite}>
+                  {t("saas.q.scan")}
+                </Button>
+              </div>
             ) : (
               <input
                 className={inputCls}
@@ -86,6 +130,7 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
           </label>
         ))}
       </div>
+      {scanNote && <p className="text-[12px] text-primary">{scanNote}</p>}
       {err && <p className="text-[12px] text-neg">{err}</p>}
       <div>
         <Button

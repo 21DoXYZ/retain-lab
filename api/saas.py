@@ -339,6 +339,30 @@ def _avg_plan_price(tenant: str) -> float:
         return 0.0
 
 
+@bp.post('/saas/scan')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_scan_site():
+    """Прочитать сайт клиента и достать профиль продукта (предзаполнение
+    опросника). Ничего не сохраняет как ответы - владелец правит и жмёт
+    «Собрать офферы» сам."""
+    from stripe_sync.site_scan import scan
+
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    url = str((request.get_json(silent=True) or {}).get('url', ''))
+    profile, visited, note = scan(url)
+    if note in ('invalid_url', 'site_unreachable'):
+        return _bad(note)
+    if profile:
+        # профиль сайта пригодится промптам офферов/копирайта
+        ca.update_tenant(tenant, {'site_profile': profile,
+                                  'site_scanned_pages': visited})
+    print(f'[scan] {tenant}: {url} -> {"ok" if profile else note} '
+          f'({len(visited)} страниц)', flush=True)
+    return api_json({'profile': profile, 'pages': visited, 'note': note})
+
+
 @bp.get('/saas/questionnaire')
 @require_auth(roles=CHANNEL_WRITE_ROLES)
 def saas_questionnaire():
@@ -370,6 +394,11 @@ def saas_questionnaire_submit():
 
     avg_price = _avg_plan_price(tenant) or float(answers.get('avg_plan_price') or 0)
     base = compose_offers(answers, avg_price)
+
+    # контекст с сайта клиента (аудитория, момент ценности, тарифы) - в промпты
+    site = (ca.load_tenants().get(tenant, {}) or {}).get('site_profile') or {}
+    if site:
+        answers = {**answers, 'site_profile': site}
 
     ai_note = 'ai_not_configured'
     ai_offers = []
