@@ -306,6 +306,12 @@ export const saas: Partial<Messages> = {
   "saas.ob.stripe.saved": "",
   "saas.ob.stripe.notSaved": "",
 
+  "saas.channels.email.hook.title": "",
+  "saas.channels.email.hook.desc": "",
+  "saas.channels.email.hook.ok": "",
+  "saas.channels.email.hook.missing": "",
+  "saas.channels.err.invalid_webhook_secret": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

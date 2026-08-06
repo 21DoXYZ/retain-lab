@@ -35,6 +35,13 @@ CHANNEL_WRITE_ROLES = ('super_admin', 'director', 'head_retention')
 # пространство (пока клиент один), иначе он обязан выбрать.
 
 
+def _host() -> str:
+    """Публичный домен платформы (SAAS_HOST): из него строятся все URL, которые
+    клиент вставляет в чужие панели - вебхуки Stripe и Resend, ingest."""
+    import os as _os
+    return _os.environ.get('SAAS_HOST', '').strip()
+
+
 def _flt(x) -> float:
     try:
         v = float(x or 0)
@@ -727,6 +734,10 @@ def _channels_payload(tenant: str) -> dict:
          'email': {'domain': tch.get('email_domain', ''),
                    'from': tch.get('email_from', ''),
                    'own_account': bool(tch.get('resend_api_key')),
+                   'webhook_secret_set': bool(tch.get('resend_webhook_secret')),
+                   # этот URL клиент вставляет в Resend - Webhooks
+                   'webhook_url': (f'https://{_host()}/public/resend/webhook?tenant={tenant}'
+                                   if _host() else ''),
                    'dns_records': tch.get('email_dns_records', [])}},
         {'channel': 'inapp', 'provider': 'Site snippet',
          'state': 'active' if snippet_alive and identified else 'not_connected',
@@ -1245,6 +1256,22 @@ def channels_email_key():
 
     ca.update_tenant(tenant, {'resend_api_key': key})
     print(f'[channels] {tenant}: подключён собственный аккаунт Resend', flush=True)
+    return api_json(_channels_payload(tenant))
+
+
+@bp.post('/saas/channels/email/webhook-secret')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def channels_email_webhook_secret():
+    """Секрет подписи вебхука Resend своего аккаунта (whsec_...). Без него
+    события доставки отклоняются - иначе кто угодно смог бы подделать баунс и
+    занести чужой адрес в подавление."""
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    sec = str((request.get_json(silent=True) or {}).get('secret', '')).strip()
+    if sec and not (sec.startswith('whsec_') and len(sec) >= 20):
+        return _bad('invalid_webhook_secret')
+    ca.update_tenant(tenant, {'resend_webhook_secret': sec or None})
     return api_json(_channels_payload(tenant))
 
 

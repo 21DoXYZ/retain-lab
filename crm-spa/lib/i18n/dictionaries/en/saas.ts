@@ -313,6 +313,12 @@ export const saas: Partial<Messages> = {
   "saas.ob.stripe.saved": "saved",
   "saas.ob.stripe.notSaved": "not set",
 
+  "saas.channels.email.hook.title": "Delivery webhook",
+  "saas.channels.email.hook.desc": "Paste this URL into Resend - Webhooks and subscribe to email.bounced, email.complained, email.delivered. That is how we permanently drop dead addresses and spam complainers: without it your domain lands on blocklists fast.",
+  "saas.channels.email.hook.ok": "Signing secret saved - events are accepted.",
+  "saas.channels.email.hook.missing": "No signing secret: delivery events are rejected so nobody can forge a bounce.",
+  "saas.channels.err.invalid_webhook_secret": "The secret must start with whsec_ - copy it in full.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

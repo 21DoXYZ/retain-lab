@@ -312,6 +312,12 @@ export const saas = {
   "saas.ob.stripe.saved": "сохранён",
   "saas.ob.stripe.notSaved": "не задан",
 
+  "saas.channels.email.hook.title": "Вебхук доставки",
+  "saas.channels.email.hook.desc": "Вставьте этот URL в Resend - Webhooks и выберите события email.bounced, email.complained, email.delivered. По ним мы навсегда убираем из рассылки несуществующие адреса и тех, кто пожаловался на спам: без этого домен быстро уходит в спам-листы.",
+  "saas.channels.email.hook.ok": "Секрет подписи сохранён - события принимаются.",
+  "saas.channels.email.hook.missing": "Секрет подписи не задан: события доставки отклоняются, чтобы никто не мог подделать баунс.",
+  "saas.channels.err.invalid_webhook_secret": "Секрет должен начинаться с whsec_ - скопируйте его целиком.",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

@@ -28,7 +28,10 @@ interface ChannelRow {
   detail: string;
   contacts: number;
   consented: number;
-  email?: { domain: string; from: string; own_account?: boolean; dns_records: DnsRecord[] };
+  email?: {
+    domain: string; from: string; own_account?: boolean;
+    webhook_secret_set?: boolean; webhook_url?: string; dns_records: DnsRecord[];
+  };
   telegram?: { bot_username: string; connect_link: string };
 }
 
@@ -48,6 +51,7 @@ const ERR_KEYS = new Set([
   "invalid_domain", "email_not_on_domain", "no_domain", "telegram_invalid_token",
   "invalid_sms_sender", "invalid_viber_sender", "resend_not_configured",
   "invalid_resend_key",
+  "invalid_webhook_secret",
 ]);
 
 const inputCls =
@@ -103,6 +107,7 @@ function ChannelCard({
   const [sender, setSender] = useState("");
   const [token, setToken] = useState("");
   const [resendKey, setResendKey] = useState("");
+  const [whSecret, setWhSecret] = useState("");
 
   const post = useCallback(
     (path: string, body: Record<string, unknown>) => {
@@ -167,6 +172,42 @@ function ChannelCard({
                 </Button>
               )}
             </div>
+
+            {/* Вебхук доставки: баунсы и жалобы -> список подавления */}
+            {row.email?.webhook_url && (
+              <div className="mt-3.5 border-t border-hair pt-3">
+                <div className="text-[13px] font-medium text-ink">
+                  {t("saas.channels.email.hook.title")}
+                </div>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-steel">
+                  {t("saas.channels.email.hook.desc")}
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded-ctl border border-hair2 bg-canvas px-[11px] py-[7px] font-mono text-[12px] text-slate">
+                    {row.email.webhook_url}
+                  </code>
+                  <CopyButton text={row.email.webhook_url} />
+                </div>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    className={inputCls + " font-mono"}
+                    placeholder="whsec_..."
+                    value={whSecret}
+                    onChange={(e) => setWhSecret(e.target.value)}
+                  />
+                  <Button variant="brand" size="sm" loading={busy}
+                          disabled={!whSecret.trim()}
+                          onClick={() => post("email/webhook-secret", { secret: whSecret.trim() })}>
+                    {t("saas.ob.stripe.save")}
+                  </Button>
+                </div>
+                <p className={"mt-1.5 text-[12px] " + (row.email.webhook_secret_set ? "text-pos" : "text-steel")}>
+                  {row.email.webhook_secret_set
+                    ? t("saas.channels.email.hook.ok")
+                    : t("saas.channels.email.hook.missing")}
+                </p>
+              </div>
+            )}
           </div>
           {st === "not_connected" && (
             <div className="flex flex-col gap-2">

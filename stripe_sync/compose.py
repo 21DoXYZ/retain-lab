@@ -241,7 +241,11 @@ def compose_campaign_copy(answers: dict) -> dict:
     здесь только КОПИРАЙТ. Формат: {campaign_id: {step_idx: {subject, body}}}.
     Плейсхолдеры {{card_update_url}}/{{app_url}} остаются живыми - их рендерит
     отправка."""
-    name = str(answers.get("product_name") or "your product").strip()
+    # Имя продукта может быть ещё не заполнено: тогда тексты обязаны читаться
+    # по-человечески («your account»), а не «your your product account».
+    raw_name = str(answers.get("product_name") or "").strip()
+    name = raw_name or "the product"
+    yours = f"your {raw_name}" if raw_name else "your"
     unit = str(answers.get("value_unit") or "").strip()
     units = f" and your {unit}" if unit else ""
     app = str(answers.get("app_url") or "").strip() or "{{app_url}}"
@@ -266,7 +270,7 @@ def compose_campaign_copy(answers: dict) -> dict:
             0: {"subject": "Payment issue - action needed",
                 "body": "Your last payment did not go through. Update your card - "
                         "it takes 30 seconds, your work is safe."},
-            1: {"subject": f"Payment issue - your {name} account is safe",
+            1: {"subject": f"Payment issue - {yours} account is safe",
                 "body": "Your last payment did not go through (this is usually a "
                         "card issue, not you). Update your card in 30 seconds: "
                         f"{{{{card_update_url}}}}. Your account{units} are safe."},

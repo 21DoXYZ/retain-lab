@@ -197,6 +197,18 @@ def unsubscribe():
                        'again. Billing and account notices may still arrive.')
 
 
+def _tenant_webhook_secret(tenant: str) -> str:
+    """Секрет подписи вебхука Resend ЭТОГО пространства: при своём аккаунте
+    клиент заводит вебхук у себя и получает свой whsec_. env - фолбэк для
+    платформенного аккаунта."""
+    try:
+        from stripe_sync.channels_admin import load_tenants
+        own = str((load_tenants().get(tenant, {}) or {}).get('resend_webhook_secret') or '')
+    except Exception:  # noqa: BLE001 - файла нет/битый: остаётся платформенный
+        own = ''
+    return own.strip() or os.environ.get('RESEND_WEBHOOK_SECRET', '').strip()
+
+
 @bp.post('/resend/webhook')
 def resend_webhook():
     """События доставки от Resend (Svix-подпись). Fail-closed: без секрета
@@ -204,7 +216,11 @@ def resend_webhook():
     Баунс и жалоба сразу кладут адрес в список подавления."""
     from stripe_sync.email_delivery import parse_webhook, verify_svix
 
-    secret = os.environ.get('RESEND_WEBHOOK_SECRET', '').strip()
+    tenant = str(request.args.get('tenant') or '').strip()
+    if not tenant:
+        # у каждого пространства свой URL вебхука: без него событие некуда класть
+        return api_json(None, 400, 'tenant_required')
+    secret = _tenant_webhook_secret(tenant)
     raw = request.get_data() or b''
     ok = verify_svix(secret,
                      request.headers.get('svix-id', ''),
@@ -223,11 +239,6 @@ def resend_webhook():
     ev = parse_webhook(doc)
     if not ev:
         return api_json({'status': 'ignored'})
-
-    tenant = str(request.args.get('tenant') or '').strip()
-    if not tenant:
-        # tenant в query вебхука (у каждого тенанта свой endpoint-URL)
-        return api_json(None, 400, 'tenant_required')
 
     from datetime import datetime, timezone
     now = datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
