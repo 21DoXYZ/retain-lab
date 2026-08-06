@@ -58,6 +58,9 @@ const ERR_KEYS = new Set([
 /** Готовая кнопка подписки: сниппет сам подставит ссылку с id юзера. */
 const TG_BUTTON = '<a data-ra-telegram>Get updates in Telegram</a>';
 
+/** Сверху то, что включается само и за минуты; внизу то, что ждёт операторов. */
+const CHANNEL_ORDER = ["inapp", "telegram", "email", "sms", "viber", "whatsapp"];
+
 const inputCls =
   "h-[42px] w-full rounded-ctl border border-hair2 bg-canvas px-[13px] text-sm " +
   "text-ink placeholder:text-steel/70 outline-none transition-[border-color] " +
@@ -92,6 +95,42 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? t("saas.channels.copied") : t("saas.channels.copy")}
     </button>
+  );
+}
+
+/**
+ * Шаг настройки. Сделанный сворачивается в одну строку с галочкой, текущий
+ * раскрыт, будущий приглушён и не кликается: нетехнический человек должен
+ * видеть ровно одно действие, а не пять полей сразу.
+ */
+function Step({
+  n, title, state, summary, children,
+}: {
+  n: number;
+  title: string;
+  state: "done" | "current" | "locked";
+  summary?: string;
+  children?: React.ReactNode;
+}) {
+  const done = state === "done";
+  return (
+    <div className={"rounded-ctl border p-3.5 " + (state === "current"
+      ? "border-hair2 bg-canvas"
+      : "border-hair bg-surface")}>
+      <div className="flex items-center gap-2">
+        <span className={"flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-semibold "
+          + (done ? "bg-[#ecfdf3] text-pos" : state === "current" ? "bg-primary text-white" : "bg-hair2 text-steel")}>
+          {done ? "✓" : n}
+        </span>
+        <span className={"text-[13px] font-medium " + (state === "locked" ? "text-steel" : "text-ink")}>
+          {title}
+        </span>
+      </div>
+      {done && summary ? (
+        <div className="mt-1.5 pl-7 font-mono text-[12.5px] text-slate">{summary}</div>
+      ) : null}
+      {state === "current" ? <div className="mt-2.5 pl-7">{children}</div> : null}
+    </div>
   );
 }
 
@@ -133,57 +172,138 @@ function ChannelCard({
 
   return (
     <Card className="flex flex-col gap-4 p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <div className="text-[15px] font-semibold text-ink">{name}</div>
-          <div className="text-[12.5px] text-steel">{row.provider}</div>
+          <p className="mt-0.5 max-w-[560px] text-[13px] leading-relaxed text-slate">
+            {t(`saas.channels.payoff.${row.channel}` as MessageKey)}
+          </p>
         </div>
-        <StateBadge state={st} />
+        <div className="flex flex-none flex-col items-end gap-1.5">
+          <StateBadge state={st} />
+          <span className="text-[11.5px] text-steel">
+            {t(`saas.channels.effort.${row.channel}` as MessageKey)}
+          </span>
+        </div>
       </div>
 
-      {/* ── Email: свой аккаунт -> домен -> DNS -> отправитель ── */}
-      {row.channel === "email" && (
-        <>
-          <div className="rounded-ctl border border-hair bg-surface p-3">
-            <div className="text-[13px] font-medium text-ink">
-              {t("saas.channels.email.acct.title")}
-            </div>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-steel">
-              {row.email?.own_account
-                ? t("saas.channels.email.acct.own")
-                : t("saas.channels.email.acct.platform")}
-            </p>
-            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-              <input
-                className={inputCls + " font-mono"}
-                placeholder="re_..."
-                value={resendKey}
-                onChange={(e) => setResendKey(e.target.value)}
-              />
-              <Button
-                variant={row.email?.own_account ? "ghost" : "brand"}
-                size="sm"
-                loading={busy}
-                disabled={!resendKey.trim()}
-                onClick={() => post("email/key", { api_key: resendKey.trim() })}
-              >
-                {t("saas.channels.email.acct.connect")}
-              </Button>
-              {row.email?.own_account && (
-                <Button variant="ghost" size="sm" loading={busy}
-                        onClick={() => post("email/key", { api_key: "" })}>
-                  {t("saas.channels.email.acct.detach")}
-                </Button>
-              )}
-            </div>
+      {/* ── Email: один шаг за раз, остальное скрыто ── */}
+      {row.channel === "email" && (() => {
+        const own = !!row.email?.own_account;
+        const hasDomain = !!row.email?.domain;
+        const verified = st === "sender_needed" || st === "active";
+        // текущий шаг = первый незакрытый: так на экране всегда ровно одно дело
+        const current = !own ? 1 : !hasDomain ? 2 : !verified ? 3 : st !== "active" ? 4 : 0;
+        const at = (n: number): "done" | "current" | "locked" =>
+          current === 0 || n < current ? "done" : n === current ? "current" : "locked";
 
-            {/* Вебхук доставки: баунсы и жалобы -> список подавления */}
-            {row.email?.webhook_url && (
-              <div className="mt-3.5 border-t border-hair pt-3">
-                <div className="text-[13px] font-medium text-ink">
+        return (
+          <div className="flex flex-col gap-2.5">
+            <Step n={1} title={t("saas.channels.email.acct.title")} state={at(1)}
+                  summary={own ? t("saas.channels.email.acct.ownShort") : undefined}>
+              <p className="text-[12.5px] leading-relaxed text-steel">
+                {t("saas.channels.email.acct.platform")}
+              </p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input className={inputCls + " font-mono"} placeholder="re_..."
+                       value={resendKey} onChange={(e) => setResendKey(e.target.value)} />
+                <Button variant="brand" size="sm" loading={busy} disabled={!resendKey.trim()}
+                        onClick={() => post("email/key", { api_key: resendKey.trim() })}>
+                  {t("saas.channels.email.acct.connect")}
+                </Button>
+              </div>
+            </Step>
+
+            <Step n={2} title={t("saas.channels.email.domainLabel")} state={at(2)}
+                  summary={row.email?.domain}>
+              <p className="text-[12.5px] leading-relaxed text-steel">
+                {t("saas.channels.email.domainHint")}
+              </p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input className={inputCls} placeholder="mail.yourbrand.com"
+                       value={domain} onChange={(e) => setDomain(e.target.value)} />
+                <Button variant="brand" size="sm" loading={busy} disabled={!domain.trim()}
+                        onClick={() => post("email/domain", { domain: domain.trim() })}>
+                  {t("saas.channels.email.connect")}
+                </Button>
+              </div>
+            </Step>
+
+            <Step n={3} title={t("saas.channels.email.dnsTitle")} state={at(3)}
+                  summary={verified ? t("saas.channels.email.dnsDone") : undefined}>
+              {st === "awaiting_provider" ? (
+                <p className="text-[12.5px] leading-relaxed text-steel">
+                  {t("saas.channels.email.awaitingNote")}
+                </p>
+              ) : (
+                <>
+                  <p className="text-[12.5px] leading-relaxed text-steel">
+                    {t("saas.channels.email.dnsLead")}
+                  </p>
+                  {(row.email?.dns_records?.length ?? 0) > 0 && (
+                    <div className="mt-2 overflow-x-auto rounded-ctl border border-hair">
+                      <table className="w-full text-[12.5px]">
+                        <thead>
+                          <tr className="border-b border-hair bg-surface text-left text-steel">
+                            <th className="px-3 py-2 font-medium">{t("saas.channels.email.dns.type")}</th>
+                            <th className="px-3 py-2 font-medium">{t("saas.channels.email.dns.name")}</th>
+                            <th className="px-3 py-2 font-medium">{t("saas.channels.email.dns.value")}</th>
+                            <th className="px-3 py-2" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {row.email?.dns_records?.map((r, i) => (
+                            <tr key={i} className="border-b border-hair last:border-0">
+                              <td className="px-3 py-2 font-mono whitespace-nowrap">
+                                {r.type}{r.priority != null ? ` ·${r.priority}` : ""}
+                              </td>
+                              <td className="max-w-[180px] truncate px-3 py-2 font-mono" title={r.name}>{r.name}</td>
+                              <td className="max-w-[220px] truncate px-3 py-2 font-mono" title={r.value}>{r.value}</td>
+                              <td className="px-3 py-2 text-right"><CopyButton text={r.value} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <div className="mt-2">
+                    <Button variant="brand" size="sm" loading={busy} onClick={() => post("email/verify", {})}>
+                      {t("saas.channels.email.check")}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </Step>
+
+            <Step n={4} title={t("saas.channels.email.fromLabel")} state={at(4)}
+                  summary={row.email?.from}>
+              <p className="text-[12.5px] leading-relaxed text-steel">
+                {t("saas.channels.email.verifiedNote")}
+              </p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input className={inputCls} placeholder={t("saas.channels.email.senderName")}
+                       value={fromName} onChange={(e) => setFromName(e.target.value)} />
+                <input className={inputCls} placeholder={`care@${row.email?.domain ?? ""}`}
+                       value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} />
+                <Button variant="brand" size="sm" loading={busy} disabled={!fromEmail.trim()}
+                        onClick={() => post("email/sender", { from_name: fromName.trim(), from_email: fromEmail.trim() })}>
+                  {t("saas.channels.email.saveSender")}
+                </Button>
+              </div>
+            </Step>
+
+            {/* Отчёты о доставке: важно, но не на первом экране - прячем в раскрывашку */}
+            {own && row.email?.webhook_url && (
+              <details className="rounded-ctl border border-hair bg-surface p-3.5">
+                <summary className="cursor-pointer list-none text-[13px] font-medium text-ink">
                   {t("saas.channels.email.hook.title")}
-                </div>
-                <p className="mt-1 text-[12.5px] leading-relaxed text-steel">
+                  <span className={"ml-2 text-[11.5px] font-normal " + (row.email.webhook_secret_set ? "text-pos" : "text-steel")}>
+                    {row.email.webhook_secret_set
+                      ? t("saas.channels.email.hook.okShort")
+                      : t("saas.channels.email.hook.missingShort")}
+                  </span>
+                </summary>
+                <p className="mt-2 text-[12.5px] leading-relaxed text-steel">
                   {t("saas.channels.email.hook.desc")}
                 </p>
                 <div className="mt-2 flex items-center gap-2">
@@ -193,135 +313,27 @@ function ChannelCard({
                   <CopyButton text={row.email.webhook_url} />
                 </div>
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    className={inputCls + " font-mono"}
-                    placeholder="whsec_..."
-                    value={whSecret}
-                    onChange={(e) => setWhSecret(e.target.value)}
-                  />
-                  <Button variant="brand" size="sm" loading={busy}
-                          disabled={!whSecret.trim()}
+                  <input className={inputCls + " font-mono"} placeholder="whsec_..."
+                         value={whSecret} onChange={(e) => setWhSecret(e.target.value)} />
+                  <Button variant="brand" size="sm" loading={busy} disabled={!whSecret.trim()}
                           onClick={() => post("email/webhook-secret", { secret: whSecret.trim() })}>
                     {t("saas.ob.stripe.save")}
                   </Button>
                 </div>
-                <p className={"mt-1.5 text-[12px] " + (row.email.webhook_secret_set ? "text-pos" : "text-steel")}>
-                  {row.email.webhook_secret_set
-                    ? t("saas.channels.email.hook.ok")
-                    : t("saas.channels.email.hook.missing")}
-                </p>
+              </details>
+            )}
+
+            {own && (
+              <div>
+                <Button variant="ghost" size="sm" loading={busy}
+                        onClick={() => post("email/key", { api_key: "" })}>
+                  {t("saas.channels.email.acct.detach")}
+                </Button>
               </div>
             )}
           </div>
-          {st === "not_connected" && (
-            <div className="flex flex-col gap-2">
-              <label className="text-[13px] text-slate">{t("saas.channels.email.domainLabel")}</label>
-              <div className="flex gap-2.5">
-                <input
-                  className={inputCls}
-                  placeholder="mail.yourbrand.com"
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
-                />
-                <Button
-                  variant="brand"
-                  loading={busy}
-                  disabled={!domain.trim()}
-                  onClick={() => post("email/domain", { domain: domain.trim() })}
-                >
-                  {t("saas.channels.email.connect")}
-                </Button>
-              </div>
-              <p className="text-[12.5px] text-steel">{t("saas.channels.email.domainHint")}</p>
-            </div>
-          )}
-
-          {st === "awaiting_provider" && (
-            <>
-              <Field label={t("saas.channels.email.domainLabel")} value={row.email?.domain ?? ""} />
-              <p className="text-[13px] text-steel">{t("saas.channels.email.awaitingNote")}</p>
-            </>
-          )}
-
-          {(st === "pending_dns" || st === "sender_needed" || st === "active") && (
-            <Field label={t("saas.channels.email.domainLabel")} value={row.email?.domain ?? ""} />
-          )}
-
-          {st === "pending_dns" && (
-            <>
-              <p className="text-[13px] text-slate">{t("saas.channels.email.dnsLead")}</p>
-              {(row.email?.dns_records?.length ?? 0) > 0 && (
-                <div className="overflow-x-auto rounded-ctl border border-hair">
-                  <table className="w-full text-[12.5px]">
-                    <thead>
-                      <tr className="border-b border-hair bg-surface text-left text-steel">
-                        <th className="px-3 py-2 font-medium">{t("saas.channels.email.dns.type")}</th>
-                        <th className="px-3 py-2 font-medium">{t("saas.channels.email.dns.name")}</th>
-                        <th className="px-3 py-2 font-medium">{t("saas.channels.email.dns.value")}</th>
-                        <th className="px-3 py-2" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {row.email?.dns_records?.map((r, i) => (
-                        <tr key={i} className="border-b border-hair last:border-0">
-                          <td className="px-3 py-2 font-mono whitespace-nowrap">
-                            {r.type}
-                            {r.priority != null ? ` ·${r.priority}` : ""}
-                          </td>
-                          <td className="max-w-[180px] truncate px-3 py-2 font-mono" title={r.name}>{r.name}</td>
-                          <td className="max-w-[220px] truncate px-3 py-2 font-mono" title={r.value}>{r.value}</td>
-                          <td className="px-3 py-2 text-right">
-                            <CopyButton text={r.value} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <div>
-                <Button variant="brand" loading={busy} onClick={() => post("email/verify", {})}>
-                  {t("saas.channels.email.check")}
-                </Button>
-              </div>
-            </>
-          )}
-
-          {(st === "sender_needed" || st === "active") && (
-            <div className="flex flex-col gap-2">
-              {st === "active" && row.email?.from ? (
-                <Field label={t("saas.channels.email.fromLabel")} value={row.email.from} />
-              ) : (
-                <p className="text-[13px] text-slate">{t("saas.channels.email.verifiedNote")}</p>
-              )}
-              <div className="flex flex-col gap-2.5 sm:flex-row">
-                <input
-                  className={inputCls}
-                  placeholder={t("saas.channels.email.senderName")}
-                  value={fromName}
-                  onChange={(e) => setFromName(e.target.value)}
-                />
-                <input
-                  className={inputCls}
-                  placeholder={`care@${row.email?.domain ?? ""}`}
-                  value={fromEmail}
-                  onChange={(e) => setFromEmail(e.target.value)}
-                />
-                <Button
-                  variant={st === "active" ? "ghost" : "brand"}
-                  loading={busy}
-                  disabled={!fromEmail.trim()}
-                  onClick={() =>
-                    post("email/sender", { from_name: fromName.trim(), from_email: fromEmail.trim() })
-                  }
-                >
-                  {t("saas.channels.email.saveSender")}
-                </Button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
+        );
+      })()}
 
       {/* ── SMS / Viber: заявка на альфа-имя ── */}
       {(row.channel === "sms" || row.channel === "viber") && (
@@ -467,13 +479,8 @@ function ChannelCard({
 
       {err && <p className="text-[13px] text-neg">{err}</p>}
 
-      <div className="mt-auto flex gap-5 border-t border-hair pt-3 text-[12.5px] text-steel">
-        <span>
-          {t("saas.channels.col.contacts")}: <span className="font-mono text-ink">{row.contacts}</span>
-        </span>
-        <span>
-          {t("saas.channels.col.consented")}: <span className="font-mono text-ink">{row.consented}</span>
-        </span>
+      <div className="mt-auto border-t border-hair pt-3 text-[12.5px] text-steel">
+        {t("saas.channels.reach", { n: row.consented })}
       </div>
     </Card>
   );
@@ -501,7 +508,7 @@ export function ChannelsView() {
       <PageHeader title={t("saas.channels.title")} lead={t("saas.channels.lead")} />
 
       {state === "loading" && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="flex max-w-[860px] flex-col gap-4">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-40 animate-pulse rounded-lg border border-hair bg-surface" />
           ))}
@@ -520,8 +527,10 @@ export function ChannelsView() {
       )}
 
       {state === "data" && data && (
-        <div className="grid items-stretch gap-4 lg:grid-cols-2">
-          {data.channels.map((row) => (
+        <div className="flex max-w-[860px] flex-col gap-4">
+          {[...data.channels]
+            .sort((a, b) => CHANNEL_ORDER.indexOf(a.channel) - CHANNEL_ORDER.indexOf(b.channel))
+            .map((row) => (
             <ChannelCard
               key={row.channel}
               row={row}

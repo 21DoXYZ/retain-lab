@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
-import { Badge, Banner, Button, Card, PageHeader } from "@/components/ui";
+import { Banner, Button, Card, PageHeader } from "@/components/ui";
 import { NoTenant, isNoTenant } from "./NoTenant";
+import Link from "next/link";
 
 /**
  * /campaigns — SaaS-кампании K1-K5: что именно автопилот шлёт юзерам (шаги,
@@ -22,6 +23,7 @@ interface Step {
   cta_label: string;
   cta_url: string;
   edited: boolean;
+  source: "template" | "generated" | "manual";
 }
 
 interface Campaign {
@@ -37,7 +39,27 @@ interface Payload {
   autopilot: boolean;
   platform_dry_run: boolean;
   control_pct: number;
+  tailored: boolean;
+  product_name: string;
+  app_url: string;
   campaigns: Campaign[];
+}
+
+/** Чей это текст: каркас платформы, сборка по опроснику или правка владельца.
+ *  Без этой метки экран выдавал заготовки за готовые тексты клиента. */
+function SourceBadge({ source }: { source: Step["source"] }) {
+  const t = useT();
+  const tone =
+    source === "manual"
+      ? "border-[#b2ddff] bg-[#eff8ff] text-primary"
+      : source === "generated"
+        ? "border-[#abefc6] bg-[#ecfdf3] text-pos"
+        : "border-hair2 bg-surface text-steel";
+  return (
+    <span className={"ml-2 inline-block rounded-full border px-1.5 py-0.5 text-[10px] font-semibold " + tone}>
+      {t(`saas.camp.src.${source}` as MessageKey)}
+    </span>
+  );
 }
 
 const STAGE_TONE: Record<string, string> = {
@@ -110,11 +132,7 @@ function StepRow({
               {step.action === "email" || step.action === "message" ? step.channel || "email" : step.action}
             </span>
             {step.subject || (step.offer_id ? `${t("saas.camp.offer")}: ${step.offer_id}` : "")}
-            {step.edited && (
-              <span className="ml-2 inline-block rounded-full border border-[#b2ddff] bg-[#eff8ff] px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                {t("saas.camp.edited")}
-              </span>
-            )}
+            <SourceBadge source={step.source} />
           </div>
           {!editing && (
             <button
@@ -266,6 +284,24 @@ export function CampaignsView() {
 
       {state === "data" && data && (
         <>
+          {/* Откуда взялись тексты. Пока опросник не заполнен, на экране лежит
+              нейтральный каркас платформы - и это должно быть сказано прямо. */}
+          {!data.tailored ? (
+            <Card className="flex flex-col gap-3 border-[#fedf89] bg-[#fffcf5] p-5">
+              <div className="text-[15px] font-semibold text-ink">{t("saas.camp.origin.draft.title")}</div>
+              <p className="max-w-[720px] text-[13.5px] leading-relaxed text-slate">
+                {t("saas.camp.origin.draft.body")}
+              </p>
+              <Link href="/onboarding" className="inline-block">
+                <Button variant="brand" size="sm">{t("saas.camp.origin.draft.cta")}</Button>
+              </Link>
+            </Card>
+          ) : (
+            <p className="text-[13px] text-steel">
+              {t("saas.camp.origin.tailored", { product: data.product_name || "-" })}
+            </p>
+          )}
+
           <Card className="p-5">
             <div className="mb-3 text-[15px] font-semibold text-ink">{t("saas.camp.how.title")}</div>
             <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-[13.5px] leading-relaxed text-slate">
@@ -273,6 +309,7 @@ export function CampaignsView() {
               <li>{t("saas.camp.how.2", { pct: data.control_pct })}</li>
               <li>{t("saas.camp.how.3")}</li>
               <li>{t("saas.camp.how.4")}</li>
+              <li>{t("saas.camp.how.5")}</li>
             </ol>
             <div className="mt-4 mb-2 text-[12px] font-semibold uppercase tracking-[0.5px] text-steel">
               {t("saas.camp.rules.title")}

@@ -471,7 +471,8 @@ def saas_questionnaire_submit():
             if txt:
                 ovr.set_campaign_step(tenant, cid, i,
                                       {'subject': txt.get('subject', ''),
-                                       'body': txt.get('body', '')})
+                                       'body': txt.get('body', ''),
+                                       'src': 'generated'})
                 written += 1
             else:
                 ovr.set_campaign_step(tenant, cid, i, None)
@@ -499,7 +500,8 @@ def saas_questionnaire_submit():
             continue
         for i, st in enumerate(camp['steps']):
             if st.get('action') == 'offer':
-                ovr.set_campaign_step(tenant, cid, i, {'offer_id': oid})
+                ovr.set_campaign_step(tenant, cid, i,
+                                      {'offer_id': oid, 'src': 'generated'})
                 bound += 1
                 break
 
@@ -852,7 +854,7 @@ def saas_insight_act():
         elif kind == 'rewrite_copy' and step_idx >= 0:
             ovr.set_campaign_step(tenant, campaign_id, step_idx,
                                   {'subject': sug.get('subject', ''),
-                                   'body': sug.get('body', '')})
+                                   'body': sug.get('body', ''), 'src': 'generated'})
             applied = 'copy'
         elif kind == 'cut_offer' and step_idx >= 0:
             ovr.set_campaign_step(tenant, campaign_id, step_idx, {'offer_id': ''})
@@ -932,15 +934,26 @@ def _campaigns_payload(tenant: str) -> dict:
                    'offer_id': s.get('offer_id', ''),
                    'cta_label': s.get('cta_label', ''),
                    'cta_url': s.get('cta_url', ''),
-                   'edited': bool(s.get('_edited'))} for s in c.get('steps', [])],
+                   'edited': bool(s.get('_edited')),
+                   # template - каркас платформы, generated - собрано по опроснику,
+                   # manual - владелец правил руками
+                   'source': (s.get('_src') or 'manual') if s.get('_edited') else 'template',
+                   } for s in c.get('steps', [])],
         'stats': {**enr.get(c['campaign_id'], empty),
                   'touches': touches.get(c['campaign_id'], 0)},
     } for c in conf.get('campaigns', [])]
 
     import os as _os3
     platform_dry = _os3.environ.get('SIGNALS_DRY_RUN', '1') not in ('0', 'false', 'False', '')
+    answers = (ca.load_tenants().get(tenant, {}) or {}).get('onboarding_answers') or {}
     return {'tenant': tenant, 'autopilot': _autopilot_resolved(conf, tenant),
             'platform_dry_run': platform_dry,
+            # пока опросник не заполнен, на экране лежит НЕЙТРАЛЬНЫЙ каркас
+            # платформы - экран обязан сказать это прямо, а не выдавать его
+            # за тексты клиента
+            'tailored': bool(answers),
+            'product_name': str(answers.get('product_name') or ''),
+            'app_url': str(answers.get('app_url') or ''),
             'control_pct': int(conf.get('control_pct', 10)), 'campaigns': campaigns}
 
 

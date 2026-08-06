@@ -59,7 +59,10 @@ def _atomic_write(data: dict, path: str) -> None:
 
 def set_campaign_step(tenant_id: str, campaign_id: str, step_idx: int,
                       patch: dict | None, path: str = "") -> dict:
-    """patch=None - сбросить правку шага к базовому тексту."""
+    """patch=None - сбросить правку шага к базовому тексту.
+
+    В patch можно передать src: "generated" (собрал опросник/ИИ) или "manual"
+    (правил владелец руками) - это видно на экране кампаний."""
     p = path or OVERRIDES_FILE
     data = load_all(p)
     t = data.setdefault(tenant_id, {})
@@ -113,6 +116,9 @@ def merge_campaign_conf(conf: dict, ov: dict) -> dict:
             if patch.get("offer_id") is not None and step.get("action") == "offer":
                 step["offer_id"] = str(patch["offer_id"])
             step["_edited"] = True
+            # откуда текст: сборка по опроснику или ручная правка владельца.
+            # Без этого экран кампаний не может честно сказать, чей это текст.
+            step["_src"] = str(patch.get("src") or "manual")
     return out
 
 
