@@ -31,7 +31,8 @@ Get started, шаг 1: Copy code -> вставить в HTML продукта д
 Полезные дополнительно: `checkout_started`, `cancel_flow_started`,
 `contact_update` (контакты+согласия каналов - §6 INTEGRATION-SAAS.md).
 Проверка: открыть свой сайт -> в визарде «refresh» -> шаг done (до минуты).
-Без сайта под рукой: /demo-site/?token=<токен из Get started>.
+Без сайта под рукой: /demo-site/?tenant=<пространство>&token=<токен из Get started>
+(там же кнопка подписки на телеграм-бота - видно, что подставляет сниппет).
 
 ## 2. Stripe (клиент, 5 минут, ключи вставляет сам)
 

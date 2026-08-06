@@ -65,12 +65,14 @@
 </div>
 
 <script>
-  // Конфиг из query (?token=&endpoint=&tenant=) - токен не хардкодим в статике.
+  // Конфиг из query (?token=&tenant=&endpoint=) - токен не хардкодим в статике.
+  // Дефолты рабочие «из коробки»: страница отдаётся тем же доменом, что и ingest,
+  // поэтому localhost тут был бы ловушкой (события молча падали в connection refused).
   var qs = new URLSearchParams(location.search);
   window.RA_CONFIG = {
-    endpoint: qs.get("endpoint") || "http://localhost:8081/ingest/saas/events",
+    endpoint: qs.get("endpoint") || (location.origin + "/ingest/saas/events"),
     token: qs.get("token") || "",
-    tenant: qs.get("tenant") || "hubcontent",
+    tenant: qs.get("tenant") || "",
   };
 </script>
 <script src="/snippet/ra.js"></script>
@@ -82,6 +84,7 @@
     logEl.textContent = lines.join("\n");
   }
   if (!window.RA_CONFIG.token) log("WARN: no ?token= in URL - ingest will reject (401)");
+  if (!window.RA_CONFIG.tenant) log("WARN: no ?tenant= in URL - ingest will reject (403)");
   // видно, что именно подставил сниппет в кнопку подписки
   setInterval(function () {
     var el = document.querySelector("[data-ra-telegram]");
