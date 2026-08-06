@@ -36,6 +36,7 @@ class EventKey:
     client_user_id: str = ""
     email_hash: str = ""
     stripe_customer_id: str = ""
+    email_norm: str = ""   # открытый адрес из СЕРВЕРНЫХ событий (не из браузера)
     last_ts: str = ""   # максимальный ts события с этой комбинацией
 
 
@@ -123,6 +124,10 @@ def build_identities(
             by_hash[k.email_hash] = ident
             if k.client_user_id:
                 ident.client_user_id = k.client_user_id
+            # открытый адрес (серверное событие) - без него письма неоплатившим
+            # юзерам невозможны: из хеша адрес не восстановить
+            if k.email_norm and not ident.email_norm:
+                ident.email_norm = k.email_norm
             # событие-мост (checkout.completed) несёт и customer: без бэкфила
             # кастомеров это единственный способ привязать billing-события
             if k.stripe_customer_id and not ident.stripe_customer_id:
@@ -178,10 +183,12 @@ def run_stitch(client, tenant_id: str, now_ts: str) -> dict[str, int]:
         ).result_rows
     ]
     event_keys = [
-        EventKey(client_user_id=r[0], email_hash=r[1], stripe_customer_id=r[2], last_ts=r[3])
+        EventKey(client_user_id=r[0], email_hash=r[1], stripe_customer_id=r[2],
+                 email_norm=r[4] if len(r) > 4 else "", last_ts=r[3])
         for r in client.query(
             """
-            SELECT client_user_id, email_hash, stripe_customer_id, toString(max(ts))
+            SELECT client_user_id, email_hash, stripe_customer_id, toString(max(ts)),
+                   argMax(email, ts) AS email_open
             FROM retention.saas_events
             WHERE tenant_id = %(t)s
               AND (client_user_id != '' OR email_hash != '' OR stripe_customer_id != '')

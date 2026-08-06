@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS retention.saas_events
     -- идентификация (любое подмножество; склейка — identity stitching)
     `client_user_id`     String,                    -- id юзера на стороне продукта
     `email_hash`         String,                    -- sha256(lower(trim(email)))
+    `email`              String,                    -- ТОЛЬКО серверные события:
+                                                    -- сниппет в браузере шлёт лишь hash.
+                                                    -- Без адреса неоплатившему юзеру
+                                                    -- невозможно написать письмо.
     `stripe_customer_id` String,
     -- биллинг-поля (события billing.*)
     `amount`             Decimal(18, 2),
@@ -53,6 +57,7 @@ CREATE TABLE retention.saas_events_queue
     `source`             LowCardinality(String),
     `client_user_id`     String,
     `email_hash`         String,
+    `email`              String,
     `stripe_customer_id` String,
     `amount`             Decimal(18, 2),
     `currency`           LowCardinality(String),
