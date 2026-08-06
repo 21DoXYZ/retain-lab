@@ -173,6 +173,11 @@ services:
       CALLBACK_URL: ${CALLBACK_URL:-}
       CALLBACK_TOKEN: ${CALLBACK_TOKEN:-}
       SIGNALS_DRY_RUN: ${SIGNALS_DRY_RUN:-1}
+      # ИИ-слой планировщика: аналитик результатов + разбор причин отмены
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
     volumes:
       - ./secrets:/secrets:ro   # tenants.json - идентичность отправителей тенантов
     restart: unless-stopped
