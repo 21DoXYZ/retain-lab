@@ -192,9 +192,12 @@ def home():
         SELECT countIf(status = 'active'), sum(control)
         FROM campaign_enrollments_current WHERE tenant_id = {t:String}
         """, {'t': tenant})[1][0]
+    # Касание = то, что ДОШЛО (или дошло бы в боевом режиме). Отбитые попытки
+    # и отложенные повторы касаниями не считаем - иначе цифра на главной врёт.
     touches_7d = int(q(
         "SELECT count() FROM campaign_send_log "
-        "WHERE tenant_id = {t:String} AND ts >= now() - INTERVAL 7 DAY",
+        "WHERE tenant_id = {t:String} AND ts >= now() - INTERVAL 7 DAY "
+        "AND status IN ('sent', 'queued', 'issued', 'dry_run')",
         {'t': tenant})[1][0][0])
 
     # Онбординг: демо-данные или живой Stripe; сниппет уже шлёт события?
@@ -913,7 +916,7 @@ def _campaigns_payload(tenant: str) -> dict:
 
     touches = {r[0]: int(r[1]) for r in q(
         """
-        SELECT campaign_id, countIf(status NOT IN ('rejected', 'holdout'))
+        SELECT campaign_id, countIf(status IN ('sent', 'queued', 'issued', 'dry_run'))
         FROM campaign_send_log WHERE tenant_id = {t:String} GROUP BY campaign_id
         """, {'t': tenant})[1]}
 

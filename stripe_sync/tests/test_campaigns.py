@@ -105,3 +105,153 @@ def test_resolve_autopilot_override_wins():
     assert resolve_autopilot({"autopilot": False}, {"autopilot": True}) is True
     assert resolve_autopilot({"autopilot": True}, {"autopilot": False}) is False
     assert resolve_autopilot({}, {}) is False
+
+
+# ── Каналы: устойчивость отправки ────────────────────────────────────────────
+
+def test_phone_with_spaces_does_not_crash_the_run():
+    """Клиенты хранят телефоны как попало. Раньше int('+38 063...') кидал
+    ValueError прямо в тик - и НИКТО из юзеров тенанта не получал касаний."""
+    from stripe_sync.saas_senders import MessagingConfig, send_sms, send_viber
+    cfg = MessagingConfig(dry_run=True)
+    for raw in ("+38 (063) 111-22-33", "380 63 111 22 33", "+380-63-111-22-33"):
+        assert send_sms(raw, "hi", cfg) == (True, "dry_run")
+    for bad in ("not-a-phone", "", "12345", "+++"):
+        assert send_sms(bad, "hi", cfg) == (False, "invalid_phone")
+        assert send_viber(bad, "hi", cfg) == (False, "invalid_phone")
+
+
+def test_us_numbers_get_no_sms():
+    """TCPA: SMS на номер +1 без письменного согласия - иски $500-1500 за штуку.
+    Правило было только в документации, теперь в коде."""
+    from stripe_sync.saas_senders import MessagingConfig, is_us_number, send_sms
+    cfg = MessagingConfig(dry_run=True)
+    assert is_us_number("14155550134")
+    assert not is_us_number("380631112233")
+    assert send_sms("+1 415 555 0134", "hi", cfg) == (False, "us_sms_blocked")
+    # виберу TCPA не писан - это OTT-мессенджер, не SMS
+    from stripe_sync.saas_senders import send_viber
+    assert send_viber("+1 415 555 0134", "hi", cfg) == (True, "dry_run")
+
+
+def test_transient_vs_permanent_failures():
+    """Повторяем только то, что имеет смысл повторить."""
+    from stripe_sync.saas_senders import transient_failure
+    for d in ("http_500", "http_503", "http_429", "URLError", "timeout",
+              "RemoteDisconnected"):
+        assert transient_failure(d), d
+    for d in ("http_401", "http_404", "http_422", "invalid_phone",
+              "us_sms_blocked", "telegram_not_configured", "unknown_channel:fax",
+              "dry_run", ""):
+        assert not transient_failure(d), d
+
+
+def test_unknown_channel_is_not_retried_forever():
+    from stripe_sync.saas_senders import (EmailConfig, MessagingConfig,
+                                          route_message, transient_failure)
+    ok, detail = route_message("fax", "1", "s", "b", EmailConfig(), MessagingConfig())
+    assert not ok and detail.startswith("unknown_channel")
+    assert not transient_failure(detail)
+
+
+# ── Прогон тика на подставном ClickHouse: проверяем, что касание не теряется ──
+
+class _Res:
+    def __init__(self, rows):
+        self.result_rows = rows
+
+
+class FakeCH:
+    """Минимальный клиент: отвечает по фрагменту запроса, копит вставки."""
+
+    def __init__(self, stages, retry_rows=0):
+        self.stages, self.retry_rows = stages, retry_rows
+        self.inserts = []
+
+    def query(self, sql, parameters=None):
+        if "user_actions" in sql:
+            return _Res(self.stages)
+        if "email_suppressions_current" in sql:
+            return _Res([])
+        if "contacts_current" in sql:
+            return _Res([])
+        if "campaign_enrollments_current" in sql:
+            return _Res([])
+        if "campaign_send_log" in sql:
+            return _Res([[self.retry_rows]])
+        raise AssertionError("неожиданный запрос: " + sql[:80])
+
+    def insert(self, table, rows, column_names=None):
+        self.inserts.append((table, rows, column_names))
+
+    def logged(self):
+        out = []
+        for table, rows, cols in self.inserts:
+            if table.endswith("campaign_send_log"):
+                out.append(dict(zip(cols, rows[0])))
+        return out
+
+    def saved(self):
+        out = []
+        for table, rows, cols in self.inserts:
+            if table.endswith("campaign_enrollments"):
+                out.append(dict(zip(cols, rows[0])))
+        return out
+
+
+def _live_tick(monkeypatch, tmp_path, sender, retry_rows=0, users=None):
+    """Тик с боевым (не dry-run) режимом и подменённой отправкой."""
+    import campaign_tick as ct
+    import overrides as ov_mod
+    import saas_senders as sn
+    # пути читаются в МОМЕНТ ИМПОРТА, env после этого уже не влияет
+    monkeypatch.setattr(ov_mod, "OVERRIDES_FILE", str(tmp_path / "ov.json"))
+    monkeypatch.setattr(sn, "TENANTS_FILE", str(tmp_path / "tenants.json"))
+    (tmp_path / "tenants.json").write_text('{"probe": {"autopilot": true}}')
+    monkeypatch.setenv("SIGNALS_DRY_RUN", "0")
+    monkeypatch.setenv("RESEND_API_KEY", "re_probe")
+    monkeypatch.setenv("EMAIL_FROM", "Probe <care@probe.test>")
+    monkeypatch.setattr(ct, "route_message", sender)
+    users = users or [["id1", "DUNNING", "user1@probe.test", "u1"]]
+    client = FakeCH(users, retry_rows=retry_rows)
+    return client, ct.tick(client, "probe")
+
+
+def test_provider_outage_does_not_burn_the_touch(monkeypatch, tmp_path):
+    """503 у провайдера: шаг помечен retry и НЕ сдвинут - следующий тик повторит.
+    Раньше письмо о несписании исчезало навсегда из-за минутного сбоя."""
+    client, _ = _live_tick(monkeypatch, tmp_path,
+                           lambda *a, **k: (False, "http_503"))
+    logs = [r for r in client.logged() if r["action"] == "email"]
+    assert logs and logs[0]["status"] == "retry" and logs[0]["reason"] == "http_503"
+    # шаг НЕ сдвинулся: сохранённый индекс указывает на несделанное касание
+    assert client.saved()[-1]["step_idx"] == logs[0]["step_idx"]
+
+
+def test_retries_are_bounded(monkeypatch, tmp_path):
+    """После MAX_SEND_RETRIES перестаём долбиться и идём дальше по цепочке."""
+    import campaign_tick as ct
+    client, _ = _live_tick(monkeypatch, tmp_path,
+                           lambda *a, **k: (False, "http_503"),
+                           retry_rows=ct.MAX_SEND_RETRIES)
+    logs = [r for r in client.logged() if r["action"] == "email"]
+    assert logs and logs[0]["status"] == "rejected"
+    assert client.saved()[-1]["step_idx"] > logs[0]["step_idx"]
+
+
+def test_one_broken_contact_does_not_stop_the_others(monkeypatch, tmp_path):
+    """Исключение на одном юзере больше не валит весь прогон тенанта."""
+    def boom(channel, address, *a, **k):
+        if address.startswith("bad"):
+            raise ValueError("invalid literal for int()")
+        return True, "msg_ok"
+
+    client, stats = _live_tick(
+        monkeypatch, tmp_path, boom,
+        users=[["id1", "DUNNING", "bad@probe.test", "u1"],
+               ["id2", "DUNNING", "good@probe.test", "u2"]])
+    logs = [r for r in client.logged() if r["action"] == "email"]
+    by_status = {r["identity_id"]: r["status"] for r in logs}
+    assert by_status["id1"] == "rejected"
+    assert by_status["id2"] == "sent"
+    assert stats["enrolled"] == 2

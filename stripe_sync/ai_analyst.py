@@ -89,12 +89,13 @@ def collect_facts(client, tenant: str, days: int = 7) -> dict:
         """, parameters={"t": tenant, "d": days}).result_rows]
 
     steps = [dict(zip(["campaign_id", "step_idx", "action", "sent", "rejected",
-                       "top_reason"], r))
+                       "retried", "top_reason"], r))
              for r in client.query(
         """
         SELECT campaign_id, step_idx, any(action) AS action,
-               countIf(status NOT IN ('rejected', 'holdout')) AS sent,
+               countIf(status IN ('sent', 'queued', 'issued', 'dry_run')) AS sent,
                countIf(status = 'rejected') AS rejected,
+               countIf(status = 'retry') AS retried,
                topK(1)(if(status = 'rejected', reason, '')) AS reasons
         FROM retention.campaign_send_log
         WHERE tenant_id = %(t)s AND ts >= now() - INTERVAL %(d)s DAY

@@ -30,7 +30,8 @@ from executors import ExecConfig
 from hygiene import holdout_split
 from issue import issue_offer
 from saas_senders import (EmailConfig, MessagingConfig, load_tenant_channels,
-                          render, route_message, send_email, tenant_configs)
+                          render, route_message, send_email, tenant_configs,
+                          transient_failure)
 
 CAMPAIGNS_PATH = Path(__file__).parent / "saas_campaigns.json"
 REENTRY_DAYS = 30
@@ -77,6 +78,21 @@ def exit_status(current_stage: str, entry_stage: str, step_idx: int,
 INAPP_COLUMNS = ["tenant_id", "message_id", "client_user_id", "identity_id",
                  "campaign_id", "step_idx", "title", "body", "cta_label",
                  "cta_url", "entry_stage", "expires_at", "created_at"]
+
+
+MAX_SEND_RETRIES = 3
+
+
+def _retry_count(client, tenant: str, campaign_id: str, identity: str,
+                 step_idx: int) -> int:
+    """Сколько раз этот шаг уже откладывали из-за сбоя провайдера."""
+    rows = client.query(
+        "SELECT count() FROM retention.campaign_send_log "
+        "WHERE tenant_id = %(t)s AND campaign_id = %(c)s AND identity_id = %(i)s "
+        "AND step_idx = %(s)s AND status = 'retry'",
+        parameters={"t": tenant, "c": campaign_id, "i": identity, "s": step_idx},
+    ).result_rows
+    return int(rows[0][0]) if rows else 0
 
 
 def inapp_row(tenant: str, camp: dict, step: dict, step_idx: int, identity: str,
@@ -224,64 +240,86 @@ def tick(client, tenant: str) -> dict[str, int]:
 
             for i in due_steps(steps, enrolled_at, int(row["step_idx"]), now):
                 step = steps[i]
-                if not row["control"]:
-                    if step["action"] in ("email", "message"):
-                        channel = step.get("channel", "email")
-                        if channel == "email":
-                            address, consent = email, 1
-                        else:
-                            address, consent = contacts.get((cuid, channel), ("", 0))
-                        if not address:
-                            _log_send(client, tenant, cid, identity, i, channel,
-                                      step.get("subject", ""), "rejected", "no_contact")
-                        elif channel == "email" and address.lower() in suppressed:
-                            _log_send(client, tenant, cid, identity, i, channel,
-                                      step.get("subject", ""), "rejected", "suppressed")
-                        elif not consent:
-                            _log_send(client, tenant, cid, identity, i, channel,
-                                      step.get("subject", ""), "rejected", "no_consent")
-                        else:
-                            ok, detail = route_message(
-                                channel, address, step.get("subject", ""),
-                                step["body"], email_cfg, msg_cfg)
-                            # detail успешной отправки = id письма у провайдера:
-                            # по нему вебхуки доставки находят это касание
-                            pid = detail if (ok and detail != "dry_run") else ""
-                            _log_send(client, tenant, cid, identity, i, channel,
-                                      step.get("subject", ""),
-                                      "dry_run" if detail == "dry_run" else ("sent" if ok else "rejected"),
-                                      "" if ok else detail, pid)
-                    elif step["action"] == "inapp":
-                        # Баннер в продукте тенанта - касание, поэтому уважает
-                        # dry-run (autopilot=false -> в очередь не пишем).
-                        if not cuid:
-                            _log_send(client, tenant, cid, identity, i, "inapp",
-                                      step.get("subject", ""), "rejected",
-                                      "no_client_user_id")
-                        elif email_cfg.dry_run:
-                            _log_send(client, tenant, cid, identity, i, "inapp",
-                                      step.get("subject", ""), "dry_run", "")
-                        else:
-                            ctx = {"app_url": email_cfg.app_url,
-                                   "card_update_url": email_cfg.card_update_url}
-                            client.insert(
-                                "retention.inapp_inbox",
-                                [inapp_row(tenant, camp, step, i, identity,
-                                           cuid, now, ctx)],
-                                column_names=INAPP_COLUMNS)
-                            _log_send(client, tenant, cid, identity, i, "inapp",
-                                      step.get("subject", ""), "queued", "")
-                    elif step["action"] == "offer" and not step.get("offer_id"):
-                        # оффер не привязан (свежий тенант до опросника)
-                        _log_send(client, tenant, cid, identity, i, "offer",
-                                  "", "rejected", "no_offer_bound")
-                    elif step["action"] == "offer":
-                        status, reason = issue_offer(
-                            client, tenant, identity, step["offer_id"],
-                            campaign_id=cid, control_pct=0, cfg=exec_cfg)
-                        _log_send(client, tenant, cid, identity, i, "offer",
-                                  step["offer_id"], status, reason)
-                    stats["steps"] += 1
+                retry_step = False
+                try:
+                    if not row["control"]:
+                        if step["action"] in ("email", "message"):
+                            channel = step.get("channel", "email")
+                            if channel == "email":
+                                address, consent = email, 1
+                            else:
+                                address, consent = contacts.get((cuid, channel), ("", 0))
+                            if not address:
+                                _log_send(client, tenant, cid, identity, i, channel,
+                                          step.get("subject", ""), "rejected", "no_contact")
+                            elif channel == "email" and address.lower() in suppressed:
+                                _log_send(client, tenant, cid, identity, i, channel,
+                                          step.get("subject", ""), "rejected", "suppressed")
+                            elif not consent:
+                                _log_send(client, tenant, cid, identity, i, channel,
+                                          step.get("subject", ""), "rejected", "no_consent")
+                            else:
+                                ok, detail = route_message(
+                                    channel, address, step.get("subject", ""),
+                                    step["body"], email_cfg, msg_cfg)
+                                # Провайдер лёг или придушил лимитом - касание НЕ
+                                # отработано: шаг остаётся созревшим, следующий тик
+                                # повторит. Иначе письмо о несписании терялось бы
+                                # навсегда из-за минутного 503.
+                                if (not ok and transient_failure(detail)
+                                        and _retry_count(client, tenant, cid,
+                                                         identity, i) < MAX_SEND_RETRIES):
+                                    _log_send(client, tenant, cid, identity, i, channel,
+                                              step.get("subject", ""), "retry", detail)
+                                    retry_step = True
+                                else:
+                                    # detail успешной отправки = id письма у провайдера:
+                                    # по нему вебхуки доставки находят это касание
+                                    pid = detail if (ok and detail != "dry_run") else ""
+                                    _log_send(client, tenant, cid, identity, i, channel,
+                                              step.get("subject", ""),
+                                              "dry_run" if detail == "dry_run" else ("sent" if ok else "rejected"),
+                                              "" if ok else detail, pid)
+                        elif step["action"] == "inapp":
+                            # Баннер в продукте тенанта - касание, поэтому уважает
+                            # dry-run (autopilot=false -> в очередь не пишем).
+                            if not cuid:
+                                _log_send(client, tenant, cid, identity, i, "inapp",
+                                          step.get("subject", ""), "rejected",
+                                          "no_client_user_id")
+                            elif email_cfg.dry_run:
+                                _log_send(client, tenant, cid, identity, i, "inapp",
+                                          step.get("subject", ""), "dry_run", "")
+                            else:
+                                ctx = {"app_url": email_cfg.app_url,
+                                       "card_update_url": email_cfg.card_update_url}
+                                client.insert(
+                                    "retention.inapp_inbox",
+                                    [inapp_row(tenant, camp, step, i, identity,
+                                               cuid, now, ctx)],
+                                    column_names=INAPP_COLUMNS)
+                                _log_send(client, tenant, cid, identity, i, "inapp",
+                                          step.get("subject", ""), "queued", "")
+                        elif step["action"] == "offer" and not step.get("offer_id"):
+                            # оффер не привязан (свежий тенант до опросника)
+                            _log_send(client, tenant, cid, identity, i, "offer",
+                                      "", "rejected", "no_offer_bound")
+                        elif step["action"] == "offer":
+                            status, reason = issue_offer(
+                                client, tenant, identity, step["offer_id"],
+                                campaign_id=cid, control_pct=0, cfg=exec_cfg)
+                            _log_send(client, tenant, cid, identity, i, "offer",
+                                      step["offer_id"], status, reason)
+                        stats["steps"] += 1
+                except Exception as exc:  # noqa: BLE001
+                    # Один кривой контакт или моргнувший провайдер не имеют
+                    # права уронить прогон остальных юзеров тенанта.
+                    _log_send(client, tenant, cid, identity, i,
+                              step.get("channel", step.get("action", "")),
+                              step.get("subject", ""), "rejected",
+                              f"error:{type(exc).__name__}")
+                if retry_step:
+                    break   # шаг остаётся созревшим - повторим на след. тике
                 row["step_idx"] = i + 1
 
             status = exit_status(stage_now, row["entry_stage"],

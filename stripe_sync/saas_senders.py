@@ -130,31 +130,64 @@ def _post_json(url: str, payload: dict, headers: dict) -> tuple[bool, str]:
         return False, type(exc).__name__
 
 
+PHONE_CHARS = re.compile(r"^\+?[\d\s().-]{6,25}$")
+
+
+def normalize_phone(raw: str) -> str:
+    """'+38 (063) 111-22-33' -> '380631112233'; '' если это вообще не номер.
+
+    Клиенты хранят телефоны как попало (пробелы, скобки, дефисы). Раньше сюда
+    приходил int(phone) и НЕОБРАБОТАННЫЙ ValueError валил весь тик тенанта:
+    один кривой контакт - и никто в этот прогон не получал касаний.
+    """
+    s = str(raw or "").strip()
+    if not PHONE_CHARS.match(s):
+        return ""
+    digits = re.sub(r"\D", "", s)
+    return digits if 8 <= len(digits) <= 15 else ""
+
+
+def is_us_number(digits: str) -> bool:
+    """Номер плана NANP (+1). TCPA: SMS без явного письменного согласия - иски
+    $500-1500 за сообщение, поэтому в US шлём только email и in-app."""
+    return len(digits) == 11 and digits.startswith("1")
+
+
 def send_sms(phone: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
+    num = normalize_phone(phone)
+    if not num:
+        return False, "invalid_phone"
+    if is_us_number(num):
+        return False, "us_sms_blocked"
     if cfg.dry_run:
-        print(f"[sms dry_run] to={phone} text={text[:60]!r}", flush=True)
+        print(f"[sms dry_run] to={num} text={text[:60]!r}", flush=True)
         return True, "dry_run"
     if not cfg.decision_api_key or not cfg.sms_sender:
         return False, "sms_not_configured"
     return _post_json(DECISION_SMS_URL,
-                      {"phone": int(phone), "sender": cfg.sms_sender, "text": text},
+                      {"phone": int(num), "sender": cfg.sms_sender, "text": text},
                       {"Authorization": f"Basic {cfg.decision_api_key}"})
 
 
 def send_viber(phone: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
+    num = normalize_phone(phone)
+    if not num:
+        return False, "invalid_phone"
     if cfg.dry_run:
-        print(f"[viber dry_run] to={phone} text={text[:60]!r}", flush=True)
+        print(f"[viber dry_run] to={num} text={text[:60]!r}", flush=True)
         return True, "dry_run"
     if not cfg.decision_api_key or not cfg.viber_sender:
         return False, "viber_not_configured"
     return _post_json(DECISION_VIBER_URL,
-                      {"source_addr": cfg.viber_sender, "destination_addr": int(phone),
+                      {"source_addr": cfg.viber_sender, "destination_addr": int(num),
                        "message_type": cfg.viber_message_type, "text": text,
                        "source_type": 1, "validity_period": 3600},
                       {"Authorization": f"Basic {cfg.decision_api_key}"})
 
 
 def send_whatsapp(phone: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
+    if not normalize_phone(phone):
+        return False, "invalid_phone"
     if cfg.dry_run:
         print(f"[whatsapp dry_run] to={phone} text={text[:60]!r}", flush=True)
         return True, "dry_run"
@@ -234,3 +267,26 @@ def tenant_configs(tenant_id: str, email_cfg: EmailConfig,
     if msg_over:
         msg_cfg = replace(msg_cfg, **msg_over)
     return email_cfg, msg_cfg
+
+
+# ── Что делать со сбоем отправки ─────────────────────────────────────────────
+# Провайдер может лечь на минуту (5xx), придушить нас лимитом (429) или сеть
+# моргнёт. Такое касание НЕЛЬЗЯ считать отработанным: письмо о несписании,
+# потерянное из-за таймаута, стоит денег. Всё остальное (4xx, кривой номер,
+# канал не настроен) повторять бессмысленно.
+PERMANENT_REASONS = frozenset({
+    "dry_run", "invalid_phone", "us_sms_blocked", "email_not_configured",
+    "sms_not_configured", "viber_not_configured", "telegram_not_configured",
+    "whatsapp_requires_waba_onboarding",
+})
+
+
+def transient_failure(detail: str) -> bool:
+    """True - сбой временный, стоит повторить на следующем тике."""
+    d = str(detail or "").strip()
+    if not d or d in PERMANENT_REASONS or d.startswith("unknown_channel"):
+        return False
+    if d.startswith("http_"):
+        code = d[5:8]
+        return code == "429" or code.startswith("5")
+    return True   # имя исключения: таймаут, DNS, обрыв соединения
