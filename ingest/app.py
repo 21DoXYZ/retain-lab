@@ -26,7 +26,7 @@ SASL_USER = os.environ.get("SASL_USER", "")
 
 IPS_FILE = os.environ.get("IPS_FILE", "/secrets/allowed_ips.json")
 
-_tok_cache = {"mtime": 0, "tokens": set()}
+_tok_cache = {"mtime": 0, "map": {}}
 _ips_cache = {"mtime": -1, "nets": None}   # nets=None -> allow all (файла нет/пуст)
 
 
@@ -62,18 +62,33 @@ def _ip_allowed():
         return False
     return any(ip in n for n in nets)
 
-def _valid_tokens():
-    """Актуальные токены из tokens.json (перечитываются при изменении файла)."""
+def _token_map():
+    """{токен: tenant_id} из tokens.json. КЛЮЧ ФАЙЛА = ID ТЕНАНТА: так токен
+    привязан к своему рабочему пространству, и чужой токен не может писать
+    события за другого клиента (см. _tenant_allowed)."""
     try:
         mt = os.path.getmtime(TOKENS_FILE)
         if mt != _tok_cache["mtime"]:
             with open(TOKENS_FILE) as fh:
                 data = json.load(fh)
-            _tok_cache["tokens"] = {str(v) for v in data.values() if v}
+            _tok_cache["map"] = {str(v): str(k) for k, v in data.items() if v}
             _tok_cache["mtime"] = mt
-        return _tok_cache["tokens"] or ENV_TOKENS
+        return _tok_cache.get("map") or {}
     except Exception:
-        return ENV_TOKENS
+        return _tok_cache.get("map") or {}
+
+
+def _valid_tokens():
+    """Актуальные токены (значения). Фолбэк - ENV_TOKENS (dev/казино)."""
+    return set(_token_map()) or ENV_TOKENS
+
+
+def _token_tenant():
+    """Тенант предъявленного токена; '' - токен из env-фолбэка (любой тенант)."""
+    h = request.headers.get("Authorization", "")
+    if not h.startswith("Bearer "):
+        return ""
+    return _token_map().get(h[7:], "")
 SASL_PASS = os.environ.get("SASL_PASS", "")
 MAX_BATCH = int(os.environ.get("MAX_BATCH", "1000"))
 
@@ -216,6 +231,14 @@ def ingest_saas():
         if not isinstance(e, dict) or not REQUIRED_SAAS.issubset(e):
             return jsonify(error="missing required fields", index=i,
                            required=sorted(REQUIRED_SAAS)), 400
+
+    # Токен привязан к тенанту: событие за чужое пространство не принимаем.
+    own = _token_tenant()
+    if own:
+        for i, e in enumerate(events):
+            if str(e.get("tenant_id")) != own:
+                return jsonify(error="tenant mismatch: token belongs to another workspace",
+                               index=i), 403
 
     errs = []
     def _cb(err, _msg):

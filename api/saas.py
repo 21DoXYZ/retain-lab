@@ -247,7 +247,7 @@ def _offers_step_done(tenant: str) -> bool:
     return bool((ca.load_tenants().get(tenant, {}) or {}).get('offers_reviewed'))
 
 
-def _snippet_token() -> str:
+def _snippet_token(tenant: str = '') -> str:
     """Сниппет-токен тенанта. Класс токена ПУБЛИЧНЫЙ (он лежит в открытом HTML
     сайта клиента, как write-key у Segment/Amplitude) - показывать его в UI
     онбординга можно и нужно; маски - для казино-легаси /keys."""
@@ -255,7 +255,14 @@ def _snippet_token() -> str:
     try:
         with open(_os.environ.get('TOKENS_FILE', '/secrets/tokens.json')) as fh:
             data = _json.load(fh)
-        vals = list(data.values()) if isinstance(data, dict) else list(data)
+        if isinstance(data, dict):
+            # ключ файла = id тенанта; берём токен ЭТОГО рабочего пространства
+            own = data.get(tenant)
+            if own:
+                return str(own)
+            vals = [v for v in data.values() if v]
+        else:
+            vals = list(data)
         return str(vals[0]) if vals else ''
     except Exception:
         return _os.environ.get('INGEST_TOKEN', '').split(',')[0].strip()
@@ -268,7 +275,7 @@ def saas_onboarding():
     сниппет с живым токеном, Stripe-блок, сводка каналов."""
     tenant = _tenant_arg()
     host = _os.environ.get('SAAS_HOST', '').strip()
-    token = _snippet_token()
+    token = _snippet_token(tenant)
 
     snippet_html = (
         f'<script src="https://{host}/snippet/ra.js"\n'
