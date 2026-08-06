@@ -75,7 +75,11 @@ def normalize_url(raw: str) -> str:
     u = str(raw or "").strip()
     if not u:
         return ""
-    if not re.match(r"^https?://", u, re.I):
+    if "://" in u:
+        # схема указана явно: пускаем только веб (ftp/file/gopher - отказ)
+        if not re.match(r"^https?://", u, re.I):
+            return ""
+    else:
         u = "https://" + u
     parts = urllib.parse.urlsplit(u)
     if parts.scheme not in ("http", "https") or not parts.netloc:
@@ -168,9 +172,38 @@ def pricing_links(raw_html: str, base_url: str, limit: int = 2) -> list:
     return out
 
 
+# Фолбэк-ридер: часть сайтов отдаёт пустой HTML (рендерят JS) или закрыта
+# бот-стеной - тогда своим запросом мы получаем ноль. r.jina.ai рендерит
+# страницу и возвращает чистый текст, ключ не нужен. Наружу уходит ТОЛЬКО
+# публичный адрес сайта клиента. Выключается: SITE_SCAN_FALLBACK=0.
+READER_URL = "https://r.jina.ai/"
+MIN_USEFUL_TEXT = 500
+
+
+def fallback_reader(url: str) -> str:
+    import os as _os
+    if _os.environ.get("SITE_SCAN_FALLBACK", "1") in ("0", "false", "False"):
+        return ""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme not in ("http", "https") or not host_is_public(parts.hostname or ""):
+        return ""
+    req = urllib.request.Request(READER_URL + url,
+                                 headers={"User-Agent": UA, "Accept": "text/plain"})
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT * 2) as resp:
+            return resp.read(_MAX_BYTES).decode("utf-8", errors="ignore")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def collect_text(url: str) -> tuple[str, list]:
-    """Текст главной + страниц тарифов. ('', []) если сайт недоступен."""
+    """Текст главной + страниц тарифов. ('', []) если сайт недоступен.
+    Если свой запрос дал пусто/мало - пробуем фолбэк-ридер."""
     home = fetch(url)
+    if len(html_to_text(home)) < MIN_USEFUL_TEXT:
+        via_reader = fallback_reader(url)
+        if len(via_reader) >= MIN_USEFUL_TEXT:
+            return via_reader[: _MAX_TEXT * 2], [url + " (reader)"]
     if not home:
         return "", []
     pages = [("home", html_to_text(home)[:_MAX_TEXT])]

@@ -147,3 +147,20 @@ def test_ai_copy_strips_em_dash():
     assert "—" not in out["K1_activation"][0]["subject"]
     assert "–" not in out["K1_activation"][0]["body"]
     assert " - " in out["K1_activation"][0]["subject"]
+
+
+def test_site_scan_guards_private_hosts():
+    """SSRF: внутренние адреса не читаем ни своим запросом, ни фолбэком."""
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from site_scan import fallback_reader, fetch, host_is_public, normalize_url
+
+    assert host_is_public("localhost") is False
+    assert host_is_public("127.0.0.1") is False
+    assert host_is_public("10.0.0.5") is False
+    assert host_is_public("169.254.169.254") is False      # облачные метаданные
+    assert fetch("http://127.0.0.1:8123") == ""
+    assert fallback_reader("http://127.0.0.1:8123") == ""
+    assert normalize_url("hubcontent.ai") == "https://hubcontent.ai/"
+    assert normalize_url("ftp://x.com") == ""
+    assert normalize_url("") == ""
