@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useT, type MessageKey } from "@/lib/i18n";
 import { Banner, Card, Icon, SCard, SCardGrid } from "@/components/ui";
 
 /**
@@ -184,7 +184,7 @@ export function HomeView() {
                 key={s}
                 className="inline-flex items-center gap-1.5 bg-surface border border-hair2 rounded-full px-3 py-1 text-[12px]"
               >
-                <span className="font-semibold text-ink">{s}</span>
+                <span className="font-semibold text-ink">{t(`saas.stage.${s}` as MessageKey)}</span>
                 <span className="text-steel">{data?.stages[s] ?? 0}</span>
               </span>
             ))}

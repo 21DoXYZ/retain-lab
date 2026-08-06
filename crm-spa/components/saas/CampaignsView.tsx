@@ -383,7 +383,7 @@ export function CampaignsView() {
                     (STAGE_TONE[c.entry_stage] ?? "bg-surface text-steel border-hair2")
                   }
                 >
-                  {c.entry_stage}
+                  {t(`saas.stage.${c.entry_stage}` as MessageKey)}
                 </span>
               </div>
 

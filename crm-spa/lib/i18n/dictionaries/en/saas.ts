@@ -377,6 +377,14 @@ export const saas: Partial<Messages> = {
   "saas.users.stage.justCanceled": "JUST CANCELLED",
   "saas.users.note.post_cancel_cooldown": "Cancelled less than 30 days ago. Writing right away does not work - the win-back campaign starts after a month has passed.",
 
+  "saas.stage.DUNNING": "payment failed",
+  "saas.stage.SAVE": "about to leave",
+  "saas.stage.CONVERT": "trial ending",
+  "saas.stage.UPGRADE": "at plan limit",
+  "saas.stage.ACTIVATE": "never started",
+  "saas.stage.WINBACK": "left a while ago",
+  "saas.stage.MONITOR": "all good",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

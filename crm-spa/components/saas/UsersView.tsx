@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useT, type MessageKey } from "@/lib/i18n";
 import { Banner, DataTable, PageHeader, type Column, type TableState } from "@/components/ui";
 import { NoTenant, isNoTenant } from "./NoTenant";
 
@@ -90,7 +90,9 @@ export function UsersView() {
               title={r.stage_note ? t("saas.users.note.post_cancel_cooldown") : undefined}>
           {/* Только что отменил - это НЕ «всё хорошо»: показываем пометку,
               иначе ушедший клиент выглядит как спокойный. */}
-          {r.stage_note === "post_cancel_cooldown" ? t("saas.users.stage.justCanceled") : r.stage}
+          {r.stage_note === "post_cancel_cooldown"
+            ? t("saas.users.stage.justCanceled")
+            : t(`saas.stage.${r.stage}` as MessageKey)}
         </span>
       ),
     },
@@ -135,7 +137,7 @@ export function UsersView() {
             className={"border rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors " +
               (stage === s ? "bg-primary text-white border-primary" : "bg-canvas text-slate border-hair2 hover:border-primary")}
           >
-            {s} {data?.stages[s] ? `· ${data.stages[s]}` : "· 0"}
+            {t(`saas.stage.${s}` as MessageKey)} {data?.stages[s] ? `· ${data.stages[s]}` : "· 0"}
           </button>
         ))}
       </div>

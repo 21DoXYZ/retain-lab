@@ -374,6 +374,14 @@ export const saas: Partial<Messages> = {
   "saas.users.stage.justCanceled": "",
   "saas.users.note.post_cancel_cooldown": "",
 
+  "saas.stage.DUNNING": "",
+  "saas.stage.SAVE": "",
+  "saas.stage.CONVERT": "",
+  "saas.stage.UPGRADE": "",
+  "saas.stage.ACTIVATE": "",
+  "saas.stage.WINBACK": "",
+  "saas.stage.MONITOR": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

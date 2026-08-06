@@ -376,6 +376,14 @@ export const saas = {
   "saas.users.stage.justCanceled": "ТОЛЬКО ЧТО ОТМЕНИЛ",
   "saas.users.note.post_cancel_cooldown": "Отменил подписку менее 30 дней назад. Сразу писать бессмысленно - кампания возврата включится, когда пройдёт месяц.",
 
+  "saas.stage.DUNNING": "платёж не прошёл",
+  "saas.stage.SAVE": "собирается уходить",
+  "saas.stage.CONVERT": "триал кончается",
+  "saas.stage.UPGRADE": "упёрся в лимит",
+  "saas.stage.ACTIVATE": "не начал пользоваться",
+  "saas.stage.WINBACK": "ушёл давно",
+  "saas.stage.MONITOR": "всё в порядке",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",
