@@ -74,3 +74,24 @@ def test_new_tenant_inherits_default_thresholds(tmp_path, monkeypatch):
     assert loaded["churn_floor"] == 0.25
     assert loaded["p_convert_cap"] == 0.7
     assert loaded["offers"] == []
+
+
+def test_missing_score_does_not_block_money():
+    """«Скора ещё не считали» - это не «риска нет». Раньше NULL превращался в 0
+    запросом (coalesce) и монетарные офферы молча резались весь первый день."""
+    from stripe_sync.hygiene import check_churn_floor
+    offer = {"monetary": True}
+    assert check_churn_floor(offer, {"sub_status": "active", "p_churn": None}, 0.25)[0]
+    assert not check_churn_floor(offer, {"sub_status": "active", "p_churn": 0.08}, 0.25)[0]
+
+
+def test_live_risk_stage_beats_yesterday_score():
+    """Юзер открыл отмену утром - стадия SAVE уже живая, а ночной скор ещё
+    считает его спокойным. Спасательный оффер обязан уйти."""
+    from stripe_sync.hygiene import check_churn_floor
+    offer = {"monetary": True}
+    calm_score = {"sub_status": "active", "p_churn": 0.08}
+    assert not check_churn_floor(offer, calm_score, 0.25)[0]
+    for stage in ("SAVE", "DUNNING", "WINBACK"):
+        assert check_churn_floor(offer, {**calm_score, "stage": stage}, 0.25)[0], stage
+    assert not check_churn_floor(offer, {**calm_score, "stage": "MONITOR"}, 0.25)[0]

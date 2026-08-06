@@ -49,20 +49,43 @@ def _fmt(dt: datetime) -> str:
 
 def due_steps(steps: list[dict], enrolled_at: datetime, step_idx: int,
               now: datetime) -> list[int]:
-    """Индексы шагов, начиная со step_idx, чей срок наступил (подряд)."""
-    out = []
+    """Индексы созревших шагов - но НЕ вся отставшая цепочка сразу.
+
+    Отдаём только группу шагов с ОДНОЙ И ТОЙ ЖЕ задержкой (их автор и задумывал
+    как одновременные: баннер + письмо в момент несписания). Если раннер стоял
+    сутки, следующая ступень уйдёт отдельным тиком, а не в ту же минуту:
+    четыре письма подряд за минуту - это спам, а не цепочка.
+    """
+    out: list[int] = []
+    first_delay = None
     for i in range(step_idx, len(steps)):
-        if enrolled_at + timedelta(hours=float(steps[i]["delay_h"])) <= now:
-            out.append(i)
-        else:
+        delay = float(steps[i]["delay_h"])
+        if enrolled_at + timedelta(hours=delay) > now:
             break
+        if first_delay is None:
+            first_delay = delay
+        elif delay != first_delay:
+            break
+        out.append(i)
     return out
 
 
-def next_step_time(steps: list[dict], enrolled_at: datetime, step_idx: int) -> datetime:
+def next_step_time(steps: list[dict], enrolled_at: datetime, step_idx: int,
+                   now: datetime | None = None) -> datetime:
+    """Когда созреет следующий шаг.
+
+    Обычно это «время входа + задержка шага». Но если предыдущий шаг ушёл с
+    опозданием (раннер стоял), считаем от ФАКТА отправки, сохраняя задуманный
+    интервал: между вторым и третьим письмом должно пройти два дня и после
+    простоя тоже, иначе пауза схлопывается в ноль.
+    """
     if step_idx >= len(steps):
         return enrolled_at
-    return enrolled_at + timedelta(hours=float(steps[step_idx]["delay_h"]))
+    planned = enrolled_at + timedelta(hours=float(steps[step_idx]["delay_h"]))
+    if now is None or step_idx == 0:
+        return planned
+    gap_h = float(steps[step_idx]["delay_h"]) - float(steps[step_idx - 1]["delay_h"])
+    return max(planned, now + timedelta(hours=max(gap_h, 0.0)))
 
 
 def exit_status(current_stage: str, entry_stage: str, step_idx: int,
@@ -327,7 +350,8 @@ def tick(client, tenant: str) -> dict[str, int]:
             if status:
                 row["status"] = status
                 stats[status if status in ("done", "exited") else "done"] += 1
-            row["next_step_at"] = next_step_time(steps, enrolled_at, int(row["step_idx"]))
+            row["next_step_at"] = next_step_time(steps, enrolled_at,
+                                                 int(row["step_idx"]), now)
             row["enrolled_at"] = enrolled_at
             _save(client, tenant, cid, row)
 

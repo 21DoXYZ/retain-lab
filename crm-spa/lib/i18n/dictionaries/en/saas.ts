@@ -385,6 +385,9 @@ export const saas: Partial<Messages> = {
   "saas.stage.WINBACK": "left a while ago",
   "saas.stage.MONITOR": "all good",
 
+  "saas.uplift.earlyHint": "Early signal: the groups are too small to tell a real effect from chance. The number becomes reliable once each group has at least 30 people.",
+  "saas.uplift.earlyNote": "A star next to the amount means an early signal: the groups are still small, so the difference may be chance.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

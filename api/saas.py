@@ -167,6 +167,9 @@ def uplift():
             'conv_control': _flt(r[6]),
             'avg_check': round(_flt(r[7]), 2),
             'incremental_usd': inc,
+            # мало людей в группах - цифра есть, но это ранний сигнал, а не
+            # измеренный результат; экран обязан это показать
+            'confident': int(r[3]) >= 30 and int(r[4]) >= 30,
             'goal_event': r[9],
             'computed_at': str(r[10]),
         })

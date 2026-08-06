@@ -23,6 +23,12 @@ from saas_senders import EmailConfig, MessagingConfig, send_email, tenant_config
 CAMPAIGNS_PATH = Path(__file__).parent / "saas_campaigns.json"
 
 
+# Ниже этого размера групп разница между target и контролем - шум: один
+# сконвертившийся человек двигает цифру на десятки процентов. Отчёт всё равно
+# показываем, но помечаем как ранний сигнал, а не как измеренный результат.
+CONFIDENT_MIN_GROUP = 30
+
+
 def uplift_math(n_target: int, n_control: int, conv_target_cnt: int,
                 conv_control_cnt: int, avg_check: float,
                 invert: bool = False) -> dict:
@@ -35,44 +41,70 @@ def uplift_math(n_target: int, n_control: int, conv_target_cnt: int,
     if n_target and n_control:
         incremental = round((conv_t - conv_c) * n_target * avg_check, 2)
     return {"conv_target": round(conv_t, 4), "conv_control": round(conv_c, 4),
-            "incremental_usd": incremental}
+            "incremental_usd": incremental,
+            "confident": bool(n_target >= CONFIDENT_MIN_GROUP
+                              and n_control >= CONFIDENT_MIN_GROUP)}
 
 
 def campaign_report(client, tenant: str, camp: dict, days: int) -> dict | None:
     goal = camp.get("goal")
     if not goal:
         return None
+    window_days = int(goal["window_days"])
+    # ЧЕСТНОЕ ОКНО: считаем только тех, у кого окно наблюдения уже ЗАКРЫЛОСЬ.
+    # Иначе вчерашний зачисленный, у которого впереди ещё 13 дней на оплату,
+    # попадал в знаменатель как «не сконвертился» и занижал результат.
     rows = client.query(
         """
-        WITH goals AS (
-            SELECT identity_id, min(ts) AS goal_ts
-            FROM retention.saas_events_resolved
-            WHERE tenant_id = %(t)s AND event_type = %(g)s
-            GROUP BY identity_id
+        SELECT control, count() AS n, countIf(conv > 0) AS converted
+        FROM (
+            SELECT e.identity_id AS identity_id,
+                   any(e.control) AS control,
+                   countIf(ev.ts > e.enrolled_at
+                           AND ev.ts <= e.enrolled_at + INTERVAL %(w)s DAY) AS conv
+            FROM retention.campaign_enrollments_current e
+            LEFT JOIN (
+                SELECT identity_id, ts FROM retention.saas_events_resolved
+                WHERE tenant_id = %(t)s AND event_type = %(g)s
+            ) ev ON ev.identity_id = e.identity_id
+            WHERE e.tenant_id = %(t)s AND e.campaign_id = %(c)s
+              AND e.enrolled_at >= now() - INTERVAL %(d)s DAY
+              AND e.enrolled_at <= now() - INTERVAL %(w)s DAY
+            GROUP BY e.identity_id
         )
-        SELECT e.control,
-               count() AS n,
-               countIf(g.goal_ts > e.enrolled_at
-                       AND g.goal_ts <= e.enrolled_at + INTERVAL %(w)s DAY) AS converted
-        FROM retention.campaign_enrollments_current e
-        LEFT JOIN goals g ON g.identity_id = e.identity_id
-        WHERE e.tenant_id = %(t)s AND e.campaign_id = %(c)s
-          AND e.enrolled_at >= now() - INTERVAL %(d)s DAY
-        GROUP BY e.control
+        GROUP BY control
         """,
         parameters={"t": tenant, "c": camp["campaign_id"],
-                    "g": goal["event_type"], "w": int(goal["window_days"]),
-                    "d": days},
+                    "g": goal["event_type"], "w": window_days, "d": days},
     ).result_rows
+
+    # сколько ещё «в полёте» - окно не закрылось, в расчёт не берём
+    in_flight = int(client.query(
+        """
+        SELECT count() FROM retention.campaign_enrollments_current
+        WHERE tenant_id = %(t)s AND campaign_id = %(c)s
+          AND enrolled_at > now() - INTERVAL %(w)s DAY
+        """,
+        parameters={"t": tenant, "c": camp["campaign_id"], "w": window_days},
+    ).result_rows[0][0])
     groups = {int(r[0]): (int(r[1]), int(r[2])) for r in rows}
     n_t, cv_t = groups.get(0, (0, 0))
     n_c, cv_c = groups.get(1, (0, 0))
     if n_t == 0 and n_c == 0:
-        return None
+        # мерить ещё нечего, но сказать «сколько зреет» - честно и полезно
+        return {"campaign_id": camp["campaign_id"], "n_target": 0, "n_control": 0,
+                "avg_check": 0.0, "goal_event": goal["event_type"],
+                "conv_target": 0.0, "conv_control": 0.0, "incremental_usd": None,
+                "confident": False, "in_flight": in_flight,
+                "window_days": window_days} if in_flight else None
 
+    # Средний чек: для платящих - их MRR, для триальных и незашедших - цена
+    # плана (она лежит в value_at_stake). Раньше у активационной кампании чек
+    # выходил нулевым, и любой её эффект оценивался в $0.
     avg_check = float(client.query(
         """
-        SELECT coalesce(avg(if(ua.mrr > 0, toFloat64(ua.mrr), NULL)), 0)
+        SELECT coalesce(avg(nullIf(greatest(toFloat64(ua.mrr),
+                                            toFloat64(ua.value_at_stake)), 0)), 0)
         FROM retention.campaign_enrollments_current e
         JOIN retention.user_actions ua
           ON ua.tenant_id = e.tenant_id AND ua.identity_id = e.identity_id
@@ -84,7 +116,8 @@ def campaign_report(client, tenant: str, camp: dict, days: int) -> dict | None:
 
     m = uplift_math(n_t, n_c, cv_t, cv_c, avg_check, bool(goal.get("invert")))
     return {"campaign_id": camp["campaign_id"], "n_target": n_t, "n_control": n_c,
-            "avg_check": round(avg_check, 2), "goal_event": goal["event_type"], **m}
+            "avg_check": round(avg_check, 2), "goal_event": goal["event_type"],
+            "in_flight": in_flight, "window_days": window_days, **m}
 
 
 def main() -> None:
@@ -117,12 +150,20 @@ def main() -> None:
         rep = campaign_report(client, tenant, camp, args.days)
         if rep is None:
             continue
+        if rep["n_target"] == 0 and rep["n_control"] == 0:
+            # окно наблюдения ещё не закрылось ни у кого - в базу не пишем,
+            # но в отчёте говорим, сколько людей «зреет»
+            lines.append(f"{rep['campaign_id']:<22} ещё зреет: {rep['in_flight']} "
+                         f"человек, результат будет через {rep['window_days']} дней "
+                         f"после зачисления")
+            continue
         incr = rep["incremental_usd"]
         lines.append(
             f"{rep['campaign_id']:<22} target {rep['conv_target']:>6.1%} (n={rep['n_target']})"
             f" | holdout {rep['conv_control']:>6.1%} (n={rep['n_control']})"
             f" | check ${rep['avg_check']:.2f}"
-            f" | incremental " + (f"${incr:+.2f}" if incr is not None else "n/a (empty holdout)"))
+            f" | incremental " + (f"${incr:+.2f}" if incr is not None else "n/a (empty holdout)")
+            + ("" if rep["confident"] else "  [ранний сигнал: групп мало]"))
         rows.append([tenant, rep["campaign_id"], period_start, now.date(),
                      rep["n_target"], rep["n_control"], rep["conv_target"],
                      rep["conv_control"], rep["avg_check"],

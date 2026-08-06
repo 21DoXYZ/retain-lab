@@ -13,10 +13,11 @@ T0 = datetime(2026, 8, 5, 12, 0, 0)
 
 
 def test_due_steps_batches_zero_delay_and_stops_at_future():
+    # одновременные шаги уходят вместе, разные ступени - по одной за тик
     assert due_steps(STEPS, T0, 0, T0) == [0, 1]
-    assert due_steps(STEPS, T0, 0, T0 + timedelta(hours=25)) == [0, 1, 2]
+    assert due_steps(STEPS, T0, 0, T0 + timedelta(hours=25)) == [0, 1]
+    assert due_steps(STEPS, T0, 2, T0 + timedelta(hours=25)) == [2]
     assert due_steps(STEPS, T0, 2, T0 + timedelta(hours=23)) == []
-    assert due_steps(STEPS, T0, 0, T0 + timedelta(hours=100)) == [0, 1, 2, 3]
     assert due_steps(STEPS, T0, 4, T0 + timedelta(hours=100)) == []
 
 
@@ -255,3 +256,26 @@ def test_one_broken_contact_does_not_stop_the_others(monkeypatch, tmp_path):
     assert by_status["id1"] == "rejected"
     assert by_status["id2"] == "sent"
     assert stats["enrolled"] == 2
+
+
+def test_backlog_does_not_fire_the_whole_chain_at_once():
+    """Раннер стоял трое суток. Человек не должен получить четыре письма за
+    минуту: отдаём только группу шагов с одинаковой задержкой."""
+    from stripe_sync.campaign_tick import due_steps
+    steps = [{"delay_h": 0}, {"delay_h": 0}, {"delay_h": 24}, {"delay_h": 72}]
+    late = T0 + timedelta(hours=100)
+    assert due_steps(steps, T0, 0, late) == [0, 1]     # только «мгновенная» пара
+    assert due_steps(steps, T0, 2, late) == [2]        # дальше по одному
+    assert due_steps(steps, T0, 3, late) == [3]
+
+
+def test_delay_between_touches_survives_downtime():
+    """Между 2-м и 3-м касанием задумано двое суток - после простоя пауза
+    обязана сохраниться, а не схлопнуться в ноль."""
+    from stripe_sync.campaign_tick import next_step_time
+    steps = [{"delay_h": 0}, {"delay_h": 24}, {"delay_h": 72}]
+    late = T0 + timedelta(hours=100)          # шаг 1 ушёл с опозданием
+    nxt = next_step_time(steps, T0, 2, late)
+    assert nxt == late + timedelta(hours=48)  # 72 - 24 = двое суток от факта
+    # без опоздания расписание прежнее
+    assert next_step_time(steps, T0, 2, T0 + timedelta(hours=24)) == T0 + timedelta(hours=72)

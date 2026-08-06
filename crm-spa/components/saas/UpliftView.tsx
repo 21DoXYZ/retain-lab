@@ -23,6 +23,7 @@ interface UpliftRow {
   avg_check: number;
   incremental_usd: number | null;
   goal_event: string;
+  confident: boolean;
 }
 
 interface UpliftData {
@@ -80,8 +81,10 @@ export function UpliftView() {
         r.incremental_usd === null ? (
           <span className="text-steel">{t("saas.uplift.na")}</span>
         ) : (
-          <span className={r.incremental_usd >= 0 ? "text-pos" : "text-neg"}>
+          <span className={r.incremental_usd >= 0 ? "text-pos" : "text-neg"}
+                title={r.confident ? undefined : t("saas.uplift.earlyHint")}>
             {(r.incremental_usd >= 0 ? "+" : "") + usd(r.incremental_usd)}
+            {r.confident ? "" : " *"}
           </span>
         ),
       sortValue: (r) => r.incremental_usd ?? -Infinity,
@@ -97,6 +100,11 @@ export function UpliftView() {
         <Banner>
           <span className="text-[15px] font-semibold">
             {t("saas.uplift.total", { amount: usd(data.total_incremental) })}
+            {data.campaigns.some((c) => c.incremental_usd !== null && !c.confident) && (
+              <span className="ml-2 text-[12.5px] font-normal text-steel">
+                {t("saas.uplift.earlyNote")}
+              </span>
+            )}
           </span>
         </Banner>
       ) : null}

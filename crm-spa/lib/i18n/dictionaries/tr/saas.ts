@@ -382,6 +382,9 @@ export const saas: Partial<Messages> = {
   "saas.stage.WINBACK": "",
   "saas.stage.MONITOR": "",
 
+  "saas.uplift.earlyHint": "",
+  "saas.uplift.earlyNote": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

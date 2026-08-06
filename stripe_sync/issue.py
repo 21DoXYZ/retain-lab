@@ -70,8 +70,9 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
     rows = client.query(
         """
         SELECT identity_id, client_user_id, stripe_customer_id, sub_status,
-               coalesce(p_convert, 0) AS p_convert,
-               coalesce(p_churn, 0) AS p_churn
+               stage,
+               p_convert,   -- NULL = скора ещё нет; coalesce тут ЛОМАЛ гейты:
+               p_churn      -- «не считали» превращалось в «риск нулевой»
         FROM retention.user_actions
         WHERE tenant_id = %(t)s AND identity_id = %(i)s
         """,
@@ -80,7 +81,7 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
     if not rows:
         raise SystemExit(f"identity {identity_id} не найдена в user_actions")
     user = dict(zip(["identity_id", "client_user_id", "stripe_customer_id",
-                     "sub_status", "p_convert", "p_churn"], rows[0]))
+                     "sub_status", "stage", "p_convert", "p_churn"], rows[0]))
 
     # subscription_id для Stripe-исполнителей
     sub = client.query(

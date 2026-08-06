@@ -41,3 +41,22 @@ def test_autopilot_gate_forces_dry_run():
     assert e.dry_run is True and x.dry_run is True
     e, x = effective_configs({"autopilot": True}, live_email, live_exec)
     assert e.dry_run is False and x.dry_run is False
+
+
+def test_small_groups_are_marked_as_early_signal():
+    """Семь человек против семи - это не измерение, а шум. Цифру показываем,
+    но помечаем: иначе владелец примет случайность за результат."""
+    from stripe_sync.uplift_report import CONFIDENT_MIN_GROUP, uplift_math
+    small = uplift_math(7, 7, 3, 1, 49.0)
+    assert small["incremental_usd"] is not None
+    assert small["confident"] is False
+    big = uplift_math(CONFIDENT_MIN_GROUP, CONFIDENT_MIN_GROUP, 12, 6, 49.0)
+    assert big["confident"] is True
+
+
+def test_invert_goal_counts_staying_not_leaving():
+    """K4: цель - НЕ отменить. Меньше отмен в target = положительный эффект."""
+    from stripe_sync.uplift_report import uplift_math
+    r = uplift_math(100, 100, 10, 25, 50.0, invert=True)
+    assert r["conv_target"] == 0.9 and r["conv_control"] == 0.75
+    assert r["incremental_usd"] == 750.0

@@ -56,6 +56,13 @@ def check_offer_limit_30d(offer: dict, history_30d: list[dict]) -> tuple[bool, s
     return True, ""
 
 
+# Стадии, которые САМИ по себе означают подтверждённый риск: их считает живая
+# вьюха по событиям, а скор p_churn пересчитывается раз в сутки. Если человек
+# открыл отмену в 10 утра, ночной скор про это ещё не знает - и гейт «дарим
+# только рискующим» зарубил бы именно то касание, ради которого всё строилось.
+RISK_STAGES = ("SAVE", "DUNNING", "WINBACK")
+
+
 def check_churn_floor(offer: dict, user: dict, floor: float) -> tuple[bool, str]:
     """Деньги не дарим спокойным: монетарный оффер платящему юзеру с низким
     P(churn) - трата без причины (он и так остаётся). Порог 0 = выключено.
@@ -65,6 +72,8 @@ def check_churn_floor(offer: dict, user: dict, floor: float) -> tuple[bool, str]
         return True, ""
     if str(user.get("sub_status") or "") not in PAYING_STATUSES:
         return True, ""   # неплатящих этот гейт не касается
+    if str(user.get("stage") or "") in RISK_STAGES:
+        return True, ""   # риск уже подтверждён событиями, скор вторичен
     p_churn = user.get("p_churn")
     if p_churn is None:
         return True, ""   # скора нет (джоб ещё не считал) - не блокируем
