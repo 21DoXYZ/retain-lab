@@ -298,8 +298,8 @@ export const saas: Partial<Messages> = {
   "saas.ws.tokenNo": "no token",
   "saas.ws.onboarded": "onboarded",
 
-  "saas.channels.email.acct.title": "Step 1. Your Resend account",
-  "saas.channels.email.acct.platform": "Emails go out through your own Resend account - the domain, sender reputation, limits and billing stay yours, and we never see your correspondence. Sign up at resend.com (the free tier is enough to start), create an API key with Full access under API Keys, and paste it here. Without the key the email channel will not start.",
+  "saas.channels.email.acct.title": "Your Resend account",
+  "saas.channels.email.acct.platform": "Emails go out through your own account: the domain, the reputation and the sending bill stay yours, and we never see your correspondence. Sign up at resend.com (the free tier is enough), create a key under API Keys with Full access, and paste it here.",
   "saas.channels.email.acct.own": "Key accepted - emails will go through your Resend account. Domain, reputation and sending stats are yours. You can detach the key any time, but the channel stops when you do.",
   "saas.channels.email.acct.connect": "Connect key",
   "saas.channels.email.acct.detach": "Detach",
@@ -349,7 +349,7 @@ export const saas: Partial<Messages> = {
   "saas.channels.payoff.sms": "Short messages to a phone - the last resort when an email goes unopened.",
   "saas.channels.payoff.viber": "Viber messages under your name. Cheaper than SMS where Viber is popular.",
   "saas.channels.payoff.whatsapp": "WhatsApp messages under your company name.",
-  "saas.channels.effort.inapp": "Nothing to set up",
+  "saas.channels.effort.inapp": "Turns on with the snippet",
   "saas.channels.effort.telegram": "5 minutes",
   "saas.channels.effort.email": "15 minutes plus DNS wait",
   "saas.channels.effort.sms": "1-3 business days",
@@ -357,7 +357,7 @@ export const saas: Partial<Messages> = {
   "saas.channels.effort.whatsapp": "Not available yet",
 
   "saas.channels.email.acct.ownShort": "Your Resend account is connected",
-  "saas.channels.email.dnsTitle": "Confirm the domain with DNS records",
+  "saas.channels.email.dnsTitle": "Confirm the domain",
   "saas.channels.email.dnsDone": "Domain confirmed",
   "saas.channels.email.hook.okShort": "set up",
   "saas.channels.email.hook.missingShort": "not set up",
@@ -375,7 +375,7 @@ export const saas: Partial<Messages> = {
   "saas.channels.name.telegram": "Telegram",
   "saas.channels.name.inapp": "In-app",
   "saas.channels.inapp.activeNote": "Live. A touch appears as a slim bar at the top of your product while the user is working: one short line, an action button and a close X. Clicked or dismissed - we never show it again; when the stage changes (card fixed, for example) the banner clears itself. No provider and no consent needed, it all runs through your snippet.",
-  "saas.channels.inapp.setupNote": "Off for now. Two things are needed: the snippet on your site and ra.identify(userId, email) after the user logs in. Then the channel turns itself on - a touch shows as a slim bar at the top of your product with an action button and a close X. No provider account required.",
+  "saas.channels.inapp.setupNote": "Waiting for the snippet. Your developer needs to add one line to the site and pass the logged-in user's id into it - both instructions, with the code ready to copy, are on the Get started screen, step 1. After that the channel turns itself on.",
   "saas.channels.name.whatsapp": "WhatsApp",
 
   "saas.channels.state.active": "working",
@@ -389,26 +389,22 @@ export const saas: Partial<Messages> = {
   "saas.channels.copy": "Copy",
   "saas.channels.copied": "Copied",
 
-  "saas.channels.email.domainLabel": "Step 2. Sending subdomain",
-  "saas.channels.email.domainHint":
-    "A dedicated subdomain of your domain, e.g. mail.yourbrand.com - emails are signed with it, your main domain stays untouched.",
+  "saas.channels.email.domainLabel": "Subdomain your letters come from",
+  "saas.channels.email.domainHint": "A dedicated subdomain of your domain, for example mail.yourbrand.com. Letters are signed with it and your main domain is left alone, so its reputation is never at risk.",
   "saas.channels.email.connect": "Connect",
   "saas.channels.email.awaitingNote": "Domain recorded. Paste your Resend key in step 1 - we will then create the domain inside your account and show the DNS records.",
-  "saas.channels.email.dnsLead":
-    "Add these records to your domain's DNS, then press Check DNS. Propagation takes minutes to a couple of hours.",
+  "saas.channels.email.dnsLead": "Add these records where your domain is managed (usually your registrar's panel or Cloudflare), then press Check. Changes spread in anything from minutes to a couple of hours. If someone else manages your domain, just forward them this table.",
   "saas.channels.email.dns.type": "Type",
   "saas.channels.email.dns.name": "Name",
   "saas.channels.email.dns.value": "Value",
   "saas.channels.email.check": "Check DNS",
-  "saas.channels.email.verifiedNote":
-    "Domain verified. Set the From name and address - every email will be sent from it.",
-  "saas.channels.email.fromLabel": "From",
+  "saas.channels.email.verifiedNote": "Domain confirmed. One thing left: what people see in the From field - a name and an address on your subdomain.",
+  "saas.channels.email.fromLabel": "Who the letters come from",
   "saas.channels.email.senderName": "Sender name",
   "saas.channels.email.saveSender": "Save sender",
 
   "saas.channels.msg.label": "Sender name",
-  "saas.channels.msg.hint":
-    "The alpha name recipients see instead of a number (latin letters/digits, up to 11 chars). We register it with the operator.",
+  "saas.channels.msg.hint": "What people see instead of a phone number: latin letters and digits, up to 11 characters. We register it with the mobile operator, which usually takes 1-3 business days.",
   "saas.channels.msg.request": "Request",
   "saas.channels.msg.pendingNote":
     "The name is being registered with the operator - usually 1-3 business days. The channel activates automatically.",
@@ -422,8 +418,7 @@ export const saas: Partial<Messages> = {
     "Give users this link (with their ID substituted) - pressing Start subscribes them with consent:",
   "saas.channels.tg.disconnect": "Disconnect",
 
-  "saas.channels.wa.note":
-    "WhatsApp Business requires Meta verification of your business (WABA). We run the onboarding - tell us when you need the channel.",
+  "saas.channels.wa.note": "To message people on WhatsApp under your company name, Meta has to verify the business. We handle that process - tell us when you need the channel.",
 
   "saas.channels.err.invalid_domain": "Invalid domain - expected something like mail.yourbrand.com.",
   "saas.channels.err.email_not_on_domain": "The address must be on your connected subdomain.",

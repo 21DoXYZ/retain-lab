@@ -297,8 +297,8 @@ export const saas = {
   "saas.ws.tokenNo": "без токена",
   "saas.ws.onboarded": "онбординг пройден",
 
-  "saas.channels.email.acct.title": "Шаг 1. Ваш аккаунт Resend",
-  "saas.channels.email.acct.platform": "Письма уходят через ваш собственный аккаунт Resend - так домен, репутация отправителя, лимиты и оплата остаются вашими, а мы никогда не видим вашу переписку. Заведите аккаунт на resend.com (бесплатного тарифа хватает на старт), в разделе API Keys создайте ключ с правом Full access и вставьте его сюда. Без ключа почтовый канал не запустится.",
+  "saas.channels.email.acct.title": "Ваш аккаунт Resend",
+  "saas.channels.email.acct.platform": "Письма пойдут через ваш аккаунт: домен, репутация и оплата отправки остаются у вас, а мы не видим вашу переписку. Зарегистрируйтесь на resend.com (бесплатного тарифа хватит), создайте ключ в разделе API Keys с правом Full access и вставьте его сюда.",
   "saas.channels.email.acct.own": "Ключ принят - письма пойдут через ваш аккаунт Resend. Домен, репутация и статистика отправки у вас. Отключить ключ можно в любой момент, но канал тогда остановится.",
   "saas.channels.email.acct.connect": "Подключить ключ",
   "saas.channels.email.acct.detach": "Отключить",
@@ -348,7 +348,7 @@ export const saas = {
   "saas.channels.payoff.sms": "Короткие сообщения на телефон - последний рубеж, когда письмо не открыли.",
   "saas.channels.payoff.viber": "Сообщения в Viber от вашего имени. Дешевле SMS там, где Viber популярен.",
   "saas.channels.payoff.whatsapp": "Сообщения в WhatsApp от имени вашей компании.",
-  "saas.channels.effort.inapp": "Ничего настраивать не нужно",
+  "saas.channels.effort.inapp": "Включается вместе со сниппетом",
   "saas.channels.effort.telegram": "5 минут",
   "saas.channels.effort.email": "15 минут плюс ожидание DNS",
   "saas.channels.effort.sms": "1-3 рабочих дня",
@@ -356,7 +356,7 @@ export const saas = {
   "saas.channels.effort.whatsapp": "Пока недоступно",
 
   "saas.channels.email.acct.ownShort": "Ваш аккаунт Resend подключён",
-  "saas.channels.email.dnsTitle": "Подтвердить домен записями в DNS",
+  "saas.channels.email.dnsTitle": "Подтвердить домен",
   "saas.channels.email.dnsDone": "Домен подтверждён",
   "saas.channels.email.hook.okShort": "настроено",
   "saas.channels.email.hook.missingShort": "не настроено",
@@ -374,7 +374,7 @@ export const saas = {
   "saas.channels.name.telegram": "Telegram",
   "saas.channels.name.inapp": "In-app",
   "saas.channels.inapp.activeNote": "Работает. Касание показывается узкой полосой вверху вашего продукта, пока юзер в нём работает: короткий текст, кнопка действия и крестик. Нажал или закрыл - больше не покажем; стадия сменилась (например, карта обновлена) - баннер гаснет сам. Провайдер и согласия не нужны, всё идёт через ваш сниппет.",
-  "saas.channels.inapp.setupNote": "Пока выключен. Нужны две вещи: сниппет на сайте и вызов ra.identify(userId, email) после логина юзера. Дальше канал включится сам - касание покажется полосой вверху вашего продукта с кнопкой действия и крестиком. Отдельного аккаунта у провайдера не нужно.",
+  "saas.channels.inapp.setupNote": "Ждёт сниппет. Разработчику нужно поставить на сайт одну строку и передать в неё id залогиненного юзера - обе инструкции с готовым кодом лежат на экране «Get started», шаг 1. Дальше канал включится сам.",
   "saas.channels.name.whatsapp": "WhatsApp",
 
   "saas.channels.state.active": "работает",
@@ -388,26 +388,22 @@ export const saas = {
   "saas.channels.copy": "Копировать",
   "saas.channels.copied": "Скопировано",
 
-  "saas.channels.email.domainLabel": "Шаг 2. Поддомен отправки",
-  "saas.channels.email.domainHint":
-    "Отдельный поддомен вашего домена, например mail.вашбренд.com - письма подписываются им, основной домен не затрагивается.",
+  "saas.channels.email.domainLabel": "Поддомен, с которого пойдут письма",
+  "saas.channels.email.domainHint": "Отдельный поддомен вашего домена, например mail.вашбренд.com. Письма подписываются им, основной домен не трогаем: если что-то пойдёт не так, репутация основного домена не пострадает.",
   "saas.channels.email.connect": "Подключить",
   "saas.channels.email.awaitingNote": "Домен записан. Вставьте ключ Resend в шаге 1 - сразу после этого мы создадим домен в вашем аккаунте и покажем DNS-записи.",
-  "saas.channels.email.dnsLead":
-    "Добавьте эти записи в DNS вашего домена и нажмите «Проверить DNS». Обновление занимает от минут до пары часов.",
+  "saas.channels.email.dnsLead": "Добавьте эти записи туда, где у вас настроен домен (обычно это панель регистратора или Cloudflare), и нажмите «Проверить». Изменения расходятся от нескольких минут до пары часов. Если делает подрядчик - просто перешлите ему таблицу.",
   "saas.channels.email.dns.type": "Тип",
   "saas.channels.email.dns.name": "Имя",
   "saas.channels.email.dns.value": "Значение",
   "saas.channels.email.check": "Проверить DNS",
-  "saas.channels.email.verifiedNote":
-    "Домен подтверждён. Укажите имя и адрес «От кого» - с него уйдут все письма.",
-  "saas.channels.email.fromLabel": "От кого",
+  "saas.channels.email.verifiedNote": "Домен подтверждён. Осталось решить, что человек увидит в поле «От кого»: имя и адрес на вашем поддомене.",
+  "saas.channels.email.fromLabel": "Кто отправитель",
   "saas.channels.email.senderName": "Имя отправителя",
   "saas.channels.email.saveSender": "Сохранить отправителя",
 
   "saas.channels.msg.label": "Имя отправителя",
-  "saas.channels.msg.hint":
-    "Альфа-имя - то, что получатель видит вместо номера (латиница/цифры, до 11 знаков). Регистрируем у оператора мы.",
+  "saas.channels.msg.hint": "То, что человек увидит вместо номера телефона: латиница и цифры, до 11 знаков. Мы регистрируем это имя у оператора связи - обычно 1-3 рабочих дня.",
   "saas.channels.msg.request": "Запросить",
   "saas.channels.msg.pendingNote":
     "Имя на регистрации у оператора - обычно 1-3 рабочих дня. Канал включится автоматически.",
@@ -421,8 +417,7 @@ export const saas = {
     "Дайте юзерам эту ссылку (подставив их ID) - нажатие Start подписывает их на уведомления с согласием:",
   "saas.channels.tg.disconnect": "Отключить",
 
-  "saas.channels.wa.note":
-    "WhatsApp Business требует верификации вашего бизнеса в Meta (WABA). Онбординг ведём мы - напишите нам, когда канал нужен.",
+  "saas.channels.wa.note": "Чтобы писать в WhatsApp от имени компании, Meta должна проверить бизнес. Проверку ведём мы - скажите, когда канал понадобится.",
 
   "saas.channels.err.invalid_domain": "Некорректный домен - нужен вид mail.вашбренд.com.",
   "saas.channels.err.email_not_on_domain": "Адрес должен быть на подключённом поддомене.",
