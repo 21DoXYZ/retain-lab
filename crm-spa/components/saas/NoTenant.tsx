@@ -17,7 +17,7 @@ export function NoTenant() {
       <p className="mt-1.5 max-w-[560px] text-[13.5px] leading-relaxed text-slate">
         {t("saas.noTenant.desc")}
       </p>
-      <Link href="/workspaces" className="mt-4 inline-block">
+      <Link href="/admin/workspaces" className="mt-4 inline-block">
         <Button variant="brand" size="sm">{t("saas.noTenant.cta")}</Button>
       </Link>
     </Card>

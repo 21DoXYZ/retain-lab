@@ -228,7 +228,9 @@ def _any_channel_active(tenant: str) -> bool:
     """Хоть один внешний канал доведён до конца (email verified+from или
     телеграм-бот подключён). In-app не считаем - он живёт на сниппете."""
     tch = ca.load_tenants().get(tenant, {}) or {}
-    email_ok = ca.email_state(tch, _platform('RESEND_API_KEY')) == 'active'
+    # ключ КЛИЕНТА важнее платформенного: с ним канал живой, даже если у
+    # платформы своего аккаунта Resend нет вовсе
+    email_ok = ca.email_state(tch, bool(_tenant_resend_key(tenant))) == 'active'
     return email_ok or bool(tch.get('telegram_bot_token'))
 
 

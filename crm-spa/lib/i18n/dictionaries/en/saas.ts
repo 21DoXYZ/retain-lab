@@ -298,9 +298,9 @@ export const saas: Partial<Messages> = {
   "saas.ws.tokenNo": "no token",
   "saas.ws.onboarded": "onboarded",
 
-  "saas.channels.email.acct.title": "Sending account",
-  "saas.channels.email.acct.platform": "Emails currently go through the platform account. You can connect YOUR own Resend account - then the domain, reputation, limits and sending costs are fully yours. Sign up at resend.com, create an API key (Full access) and paste it here.",
-  "saas.channels.email.acct.own": "Your own Resend account is connected: emails go through it, domain reputation and stats are yours. Detach to fall back to the platform account.",
+  "saas.channels.email.acct.title": "Step 1. Your Resend account",
+  "saas.channels.email.acct.platform": "Emails go out through your own Resend account - the domain, sender reputation, limits and billing stay yours, and we never see your correspondence. Sign up at resend.com (the free tier is enough to start), create an API key with Full access under API Keys, and paste it here. Without the key the email channel will not start.",
+  "saas.channels.email.acct.own": "Key accepted - emails will go through your Resend account. Domain, reputation and sending stats are yours. You can detach the key any time, but the channel stops when you do.",
   "saas.channels.email.acct.connect": "Connect key",
   "saas.channels.email.acct.detach": "Detach",
   "saas.channels.err.invalid_resend_key": "Resend rejected the key - check it is copied in full and not revoked.",
@@ -343,7 +343,7 @@ export const saas: Partial<Messages> = {
   "saas.channels.state.active": "connected",
   "saas.channels.state.pending_dns": "waiting for DNS",
   "saas.channels.state.pending_approval": "registering",
-  "saas.channels.state.awaiting_provider": "platform pending",
+  "saas.channels.state.awaiting_provider": "Resend key needed",
   "saas.channels.state.sender_needed": "set the sender",
   "saas.channels.state.not_connected": "not connected",
   "saas.channels.state.coming_soon": "coming soon",
@@ -351,12 +351,11 @@ export const saas: Partial<Messages> = {
   "saas.channels.copy": "Copy",
   "saas.channels.copied": "Copied",
 
-  "saas.channels.email.domainLabel": "Sending subdomain",
+  "saas.channels.email.domainLabel": "Step 2. Sending subdomain",
   "saas.channels.email.domainHint":
     "A dedicated subdomain of your domain, e.g. mail.yourbrand.com - emails are signed with it, your main domain stays untouched.",
   "saas.channels.email.connect": "Connect",
-  "saas.channels.email.awaitingNote":
-    "Domain recorded. The platform is finishing email provider setup - DNS records will appear here.",
+  "saas.channels.email.awaitingNote": "Domain recorded. Paste your Resend key in step 1 - we will then create the domain inside your account and show the DNS records.",
   "saas.channels.email.dnsLead":
     "Add these records to your domain's DNS, then press Check DNS. Propagation takes minutes to a couple of hours.",
   "saas.channels.email.dns.type": "Type",

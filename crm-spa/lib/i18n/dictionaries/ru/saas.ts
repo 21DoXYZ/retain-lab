@@ -297,9 +297,9 @@ export const saas = {
   "saas.ws.tokenNo": "без токена",
   "saas.ws.onboarded": "онбординг пройден",
 
-  "saas.channels.email.acct.title": "Аккаунт отправки",
-  "saas.channels.email.acct.platform": "Сейчас письма пойдут через аккаунт платформы. Можно подключить СВОЙ аккаунт Resend - тогда домен, репутация, лимиты и оплата отправки полностью ваши. Зарегистрируйтесь на resend.com, создайте API-ключ (Full access) и вставьте его сюда.",
-  "saas.channels.email.acct.own": "Подключён ваш собственный аккаунт Resend: письма уходят через него, репутация домена и статистика - у вас. Отключите, чтобы вернуться на аккаунт платформы.",
+  "saas.channels.email.acct.title": "Шаг 1. Ваш аккаунт Resend",
+  "saas.channels.email.acct.platform": "Письма уходят через ваш собственный аккаунт Resend - так домен, репутация отправителя, лимиты и оплата остаются вашими, а мы никогда не видим вашу переписку. Заведите аккаунт на resend.com (бесплатного тарифа хватает на старт), в разделе API Keys создайте ключ с правом Full access и вставьте его сюда. Без ключа почтовый канал не запустится.",
+  "saas.channels.email.acct.own": "Ключ принят - письма пойдут через ваш аккаунт Resend. Домен, репутация и статистика отправки у вас. Отключить ключ можно в любой момент, но канал тогда остановится.",
   "saas.channels.email.acct.connect": "Подключить ключ",
   "saas.channels.email.acct.detach": "Отключить",
   "saas.channels.err.invalid_resend_key": "Ключ не принят Resend - проверьте, что скопирован целиком и не отозван.",
@@ -342,7 +342,7 @@ export const saas = {
   "saas.channels.state.active": "подключён",
   "saas.channels.state.pending_dns": "ждём DNS",
   "saas.channels.state.pending_approval": "на регистрации",
-  "saas.channels.state.awaiting_provider": "ждёт платформу",
+  "saas.channels.state.awaiting_provider": "нужен ключ Resend",
   "saas.channels.state.sender_needed": "укажите отправителя",
   "saas.channels.state.not_connected": "не подключён",
   "saas.channels.state.coming_soon": "скоро",
@@ -350,12 +350,11 @@ export const saas = {
   "saas.channels.copy": "Копировать",
   "saas.channels.copied": "Скопировано",
 
-  "saas.channels.email.domainLabel": "Поддомен отправки",
+  "saas.channels.email.domainLabel": "Шаг 2. Поддомен отправки",
   "saas.channels.email.domainHint":
     "Отдельный поддомен вашего домена, например mail.вашбренд.com - письма подписываются им, основной домен не затрагивается.",
   "saas.channels.email.connect": "Подключить",
-  "saas.channels.email.awaitingNote":
-    "Домен зафиксирован. Платформа завершает настройку почтового провайдера - DNS-записи появятся здесь.",
+  "saas.channels.email.awaitingNote": "Домен записан. Вставьте ключ Resend в шаге 1 - сразу после этого мы создадим домен в вашем аккаунте и покажем DNS-записи.",
   "saas.channels.email.dnsLead":
     "Добавьте эти записи в DNS вашего домена и нажмите «Проверить DNS». Обновление занимает от минут до пары часов.",
   "saas.channels.email.dns.type": "Тип",
