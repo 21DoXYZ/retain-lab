@@ -39,3 +39,19 @@ def test_secrets_are_random_and_long():
     assert len(new_token()) >= 24
     assert len(new_password()) == 16
     assert len({new_password() for _ in range(5)}) == 5
+
+
+def test_known_tenants_union_and_service_keys():
+    """Планировщик обслуживает КАЖДОГО заведённого клиента: список - объединение
+    ingest-токенов и конфига каналов, служебные ключи пропускаются."""
+    from provision_util import known_tenants
+    assert known_tenants({"acme": "tok"}, {"acme": {}, "beta": {}}) == ["acme", "beta"]
+    assert known_tenants({"_default": "t"}, {}) == []
+    assert known_tenants({}, {}) == []
+
+
+def test_known_tenants_env_narrows_to_one():
+    """TENANT_ID в окружении - отладочный режим: гоняем только это пространство."""
+    from provision_util import known_tenants
+    assert known_tenants({"acme": "t"}, {"beta": {}}, "beta") == ["beta"]
+    assert known_tenants({"acme": "t"}, {"beta": {}}, "  ") == ["acme", "beta"]

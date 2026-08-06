@@ -174,4 +174,8 @@ def tenant_exec_config(tenant_id: str, cfg: "ExecConfig") -> "ExecConfig":
         cfg = replace(cfg, callback_url=url)
     if token:
         cfg = replace(cfg, callback_token=token)
+    # купоны/скидки создаются в Stripe КЛИЕНТА - его ключ важнее платформенного
+    own_key = str(tc.get("stripe_api_key") or "").strip()
+    if own_key:
+        cfg = replace(cfg, stripe_api_key=own_key)
     return cfg

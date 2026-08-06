@@ -46,7 +46,9 @@ WHERE i.tenant_id = %(t)s
 def main() -> None:
     import clickhouse_connect
 
-    tenant = os.environ.get("TENANT_ID", "hubcontent")
+    tenant = os.environ.get("TENANT_ID", "").strip()
+    if not tenant:
+        raise SystemExit("нужен TENANT_ID: джоб работает в пространстве клиента")
     client = clickhouse_connect.get_client(
         host=os.environ.get("CH_HOST", "clickhouse"),
         port=int(os.environ.get("CH_PORT", "8123")),

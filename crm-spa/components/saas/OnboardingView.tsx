@@ -15,7 +15,7 @@ import { Button, Card, PageHeader } from "@/components/ui";
 interface Payload {
   steps: { snippet: boolean; stripe: boolean; channels: boolean; offers: boolean; autopilot: boolean };
   snippet: { token: string; html: string; ingest_url: string };
-  stripe: { webhook_url: string; events: string[]; secret_set: boolean };
+  stripe: { webhook_url: string; events: string[]; secret_set: boolean; api_key_set: boolean };
   channels: { channel: string; state: string }[];
   offers: { offer_id: string; title: string; max_per_user_30d: number; edited: boolean }[];
   answers: Record<string, unknown>;
@@ -191,6 +191,66 @@ function StepBadge({ done, waitKey }: { done: boolean; waitKey: MessageKey }) {
   );
 }
 
+/** Ключи Stripe клиента: подписной секрет вебхука + restricted-ключ. Оба живут
+ *  в его аккаунте Stripe - платформа их только хранит и использует. */
+function StripeKeys({ data, onSaved }: { data: Payload["stripe"]; onSaved: (p: Payload) => void }) {
+  const t = useT();
+  const [secret, setSecret] = useState("");
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const save = (body: Record<string, string>) => {
+    setBusy(true);
+    setErr("");
+    flaskFetch<Payload>("/api/v1/saas/onboarding/stripe", { method: "POST", body })
+      .then((p) => {
+        setSecret("");
+        setKey("");
+        onSaved(p);
+      })
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : "error"))
+      .finally(() => setBusy(false));
+  };
+
+  const field = (
+    label: string, hint: string, ok: boolean, value: string,
+    set: (v: string) => void, holder: string, send: (v: string) => Record<string, string>,
+  ) => (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <span className="text-[13px] text-slate">{label}</span>
+        <span className={"text-[12px] " + (ok ? "text-pos" : "text-steel")}>
+          {ok ? t("saas.ob.stripe.saved") : t("saas.ob.stripe.notSaved")}
+        </span>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          className="h-[42px] w-full rounded-ctl border border-hair2 bg-canvas px-[13px] font-mono text-sm text-ink placeholder:text-steel/70 outline-none transition-[border-color] duration-150 focus:border-primary"
+          placeholder={holder}
+          value={value}
+          onChange={(e) => set(e.target.value)}
+        />
+        <Button variant="brand" size="sm" loading={busy} disabled={!value.trim()}
+                onClick={() => save(send(value.trim()))}>
+          {t("saas.ob.stripe.save")}
+        </Button>
+      </div>
+      <p className="text-[12.5px] leading-relaxed text-steel">{hint}</p>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col gap-4 rounded-ctl border border-hair bg-surface p-3.5">
+      {field(t("saas.ob.stripe.secretLabel"), t("saas.ob.stripe.secretHint"),
+             data.secret_set, secret, setSecret, "whsec_...", (v) => ({ webhook_secret: v }))}
+      {field(t("saas.ob.stripe.keyLabel"), t("saas.ob.stripe.keyHint"),
+             data.api_key_set, key, setKey, "rk_live_...", (v) => ({ api_key: v }))}
+      {err && <p className="text-[12.5px] text-neg">{err}</p>}
+    </div>
+  );
+}
+
 export function OnboardingView() {
   const t = useT();
   const [data, setData] = useState<Payload | null>(null);
@@ -309,9 +369,7 @@ export function OnboardingView() {
                 </span>
               ))}
             </div>
-            <p className="text-[12.5px] text-steel">
-              {data.stripe.secret_set ? t("saas.ob.stripe.secretOk") : t("saas.ob.stripe.secretNote")}
-            </p>
+            <StripeKeys data={data.stripe} onSaved={setData} />
           </Card>
 
           {/* ── Шаг 3: каналы ── */}

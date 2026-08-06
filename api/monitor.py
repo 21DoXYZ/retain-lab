@@ -538,11 +538,11 @@ if _SAAS_HOST:
     _CURL_EXAMPLE = (
         f'<script src="https://{_SAAS_HOST}/snippet/ra.js"\n'
         f'        data-endpoint="https://{_SAAS_HOST}/ingest/saas/events"\n'
-        '        data-token="<token>" data-tenant="hubcontent"></script>\n'
+        '        data-token="<token>" data-tenant="<tenant>"></script>\n'
         '\n'
         f'curl -X POST https://{_SAAS_HOST}/ingest/saas/events \\\n'
         '  -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \\\n'
-        '  -d \'{"event_id":"...","tenant_id":"hubcontent","event_type":"generation_completed",'
+        '  -d \'{"event_id":"...","tenant_id":"<tenant>","event_type":"generation_completed",'
         '"ts":"2026-08-05 12:00:00.000","client_user_id":"u_18342","tokens_spent":12}\''
     )
     _KAFKA_NOTE = ''

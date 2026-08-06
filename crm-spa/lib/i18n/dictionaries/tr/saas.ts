@@ -298,6 +298,14 @@ export const saas: Partial<Messages> = {
   "saas.channels.email.acct.detach": "",
   "saas.channels.err.invalid_resend_key": "",
 
+  "saas.ob.stripe.secretLabel": "",
+  "saas.ob.stripe.secretHint": "",
+  "saas.ob.stripe.keyLabel": "",
+  "saas.ob.stripe.keyHint": "",
+  "saas.ob.stripe.save": "",
+  "saas.ob.stripe.saved": "",
+  "saas.ob.stripe.notSaved": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

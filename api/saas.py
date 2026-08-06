@@ -30,7 +30,9 @@ LEAK_ROLES = ('super_admin', 'head_retention', 'director', 'analyst',
 # Права на запись настроек (каналы, онбординг, автопилот) - только владельцы.
 CHANNEL_WRITE_ROLES = ('super_admin', 'director', 'head_retention')
 
-DEFAULT_TENANT = 'hubcontent'
+# Пространства по умолчанию НЕТ: тенант приходит из скоупа пользователя или
+# ?tenant=. Для платформенного пользователя дефолт = единственное заведённое
+# пространство (пока клиент один), иначе он обязан выбрать.
 
 
 def _flt(x) -> float:
@@ -298,6 +300,8 @@ def saas_onboarding():
     offers_edited = any(o['edited'] for o in offers_list)
     offers_reviewed = bool((ca.load_tenants().get(tenant, {}) or {}).get('offers_reviewed'))
 
+    _tc = ca.load_tenants().get(tenant, {}) or {}
+
     return api_json({
         'tenant': tenant,
         'steps': {
@@ -311,15 +315,17 @@ def saas_onboarding():
         'snippet': {'token': token, 'html': snippet_html,
                     'ingest_url': f'https://{host}/ingest/saas/events' if host else ''},
         'stripe': {
-            'webhook_url': f'https://{host}/stripe/webhook' if host else '',
+            # URL СВОЙ у каждого пространства: без хвоста события некуда класть
+            'webhook_url': f'https://{host}/stripe/webhook/{tenant}' if host else '',
             'events': ['checkout.session.completed', 'customer.subscription.created',
                        'customer.subscription.updated', 'customer.subscription.deleted',
                        'invoice.paid', 'invoice.payment_failed',
                        'charge.refunded', 'charge.dispute.created'],
-            'secret_set': bool(_os.environ.get('STRIPE_WEBHOOK_SECRET', '').strip()),
+            'secret_set': bool(str(_tc.get('stripe_webhook_secret') or '').strip()),
+            'api_key_set': bool(str(_tc.get('stripe_api_key') or '').strip()),
         },
         'channels': [{'channel': c['channel'], 'state': c['state']} for c in ch],
-        'answers': (ca.load_tenants().get(tenant, {}) or {}).get('onboarding_answers') or {},
+        'answers': _tc.get('onboarding_answers') or {},
         'ai_enabled': _ai_enabled(),
     })
 
@@ -635,14 +641,27 @@ def resolve_tenant(scope: str, requested: str, default: str) -> tuple[str, str]:
     return scope, ''
 
 
+def _default_tenant() -> str:
+    """Дефолт платформенного пользователя: TENANT_ID из env, иначе единственное
+    заведённое пространство. Двух и больше - выбирай явно (?tenant=)."""
+    import os as _os
+    env = _os.environ.get('TENANT_ID', '').strip()
+    if env:
+        return env
+    known = sorted(_known_tenants())
+    return known[0] if len(known) == 1 else ''
+
+
 def _tenant_arg() -> str:
     """Эффективный тенант ЧТЕНИЯ с изоляцией по скоупу пользователя.
     При нарушении скоупа поднимаем 403 через flask.abort."""
     from flask import abort, make_response
     tenant, reason = resolve_tenant(current_tenant_scope(), _requested_tenant(),
-                                    DEFAULT_TENANT)
+                                    _default_tenant())
     if reason:
         abort(make_response(api_json(None, 403, reason)))
+    if not tenant:
+        abort(make_response(api_json(None, 400, 'no_tenant_selected')))
     return tenant
 
 
@@ -651,6 +670,7 @@ def _known_tenants() -> set:
     _default) + уже заведённые в tenants.json. Иначе ?tenant=мусор плодил бы
     фантомные записи в runtime-файлах."""
     import json as _json
+    import os as _os
     from pathlib import Path as _Path
     out = set(ca.load_tenants().keys())
     p = _Path(__file__).resolve().parent.parent / 'stripe_sync' / 'saas_campaigns.json'
@@ -658,7 +678,11 @@ def _known_tenants() -> set:
         out |= {k for k in _json.loads(p.read_text()).keys() if k != '_default'}
     except Exception:
         pass
-    out.add(DEFAULT_TENANT)
+    try:
+        with open(_os.environ.get('TOKENS_FILE', '/secrets/tokens.json')) as fh:
+            out |= {k for k in _json.load(fh).keys() if not k.startswith('_')}
+    except Exception:
+        pass
     return out
 
 
@@ -1222,6 +1246,53 @@ def channels_email_key():
     ca.update_tenant(tenant, {'resend_api_key': key})
     print(f'[channels] {tenant}: подключён собственный аккаунт Resend', flush=True)
     return api_json(_channels_payload(tenant))
+
+
+@bp.post('/saas/onboarding/stripe')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def onboarding_stripe():
+    """Ключи Stripe КЛИЕНТА: подписной секрет вебхука (whsec_, обязателен для
+    приёма событий) и restricted-ключ (rk_/sk_, нужен только для купонов и
+    цен планов). Пустая строка стирает ключ. Ключ проверяем живым запросом."""
+    import urllib.error as _ue
+    import urllib.request as _ur
+
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    patch = {}
+
+    if 'webhook_secret' in body:
+        sec = str(body.get('webhook_secret') or '').strip()
+        if sec and not (sec.startswith('whsec_') and len(sec) >= 20):
+            return _bad('invalid_webhook_secret')
+        patch['stripe_webhook_secret'] = sec or None
+
+    if 'api_key' in body:
+        key = str(body.get('api_key') or '').strip()
+        if key:
+            if not (key.startswith('rk_') or key.startswith('sk_')) or len(key) < 20:
+                return _bad('invalid_stripe_key')
+            req = _ur.Request('https://api.stripe.com/v1/customers?limit=1',
+                              headers={'Authorization': f'Bearer {key}'})
+            try:
+                with _ur.urlopen(req, timeout=20) as resp:
+                    if not (200 <= resp.status < 300):
+                        return _bad(f'stripe_http_{resp.status}', 502)
+            except _ue.HTTPError as exc:
+                return _bad('invalid_stripe_key' if exc.code in (401, 403)
+                            else f'stripe_http_{exc.code}',
+                            400 if exc.code in (401, 403) else 502)
+            except Exception as exc:  # noqa: BLE001
+                return _bad(f'stripe_{type(exc).__name__}', 502)
+        patch['stripe_api_key'] = key or None
+
+    if not patch:
+        return _bad('nothing_to_save')
+    ca.update_tenant(tenant, patch)
+    print(f'[onboarding] {tenant}: ключи Stripe обновлены ({", ".join(patch)})', flush=True)
+    return saas_onboarding()
 
 
 @bp.post('/saas/channels/messaging')

@@ -261,7 +261,9 @@ def main() -> None:
     import clickhouse_connect
     from pathlib import Path
 
-    tenant = os.environ.get("TENANT_ID", "hubcontent")
+    tenant = os.environ.get("TENANT_ID", "").strip()
+    if not tenant:
+        raise SystemExit("нужен TENANT_ID: джоб работает в пространстве клиента")
     days = int(os.environ.get("ANALYST_DAYS", "7"))
 
     cfgs = json.loads((Path(__file__).parent / "saas_campaigns.json").read_text())

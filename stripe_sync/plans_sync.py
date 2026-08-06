@@ -66,7 +66,9 @@ def main() -> None:
     import clickhouse_connect
     from saas_senders import load_tenant_channels
 
-    tenant = os.environ.get("TENANT_ID", "hubcontent")
+    tenant = os.environ.get("TENANT_ID", "").strip()
+    if not tenant:
+        raise SystemExit("нужен TENANT_ID: джоб работает в пространстве клиента")
     answers = (load_tenant_channels(tenant) or {}).get("onboarding_answers") or {}
     monthly_units = int(answers.get("monthly_units") or 0)
 

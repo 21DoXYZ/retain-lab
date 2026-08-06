@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import secrets
 
@@ -62,3 +64,37 @@ def new_password() -> str:
     """Временный пароль владельца: показывается один раз при создании."""
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
     return "".join(secrets.choice(alphabet) for _ in range(16))
+
+
+def known_tenants(tokens: dict | None, tenants: dict | None,
+                  env_tenant: str = "") -> list[str]:
+    """Все пространства, которые обслуживает планировщик.
+
+    Источники - ingest-токены (клиент завёлся) и конфиг каналов. TENANT_ID в
+    окружении, если задан, сужает прогон до одного пространства (отладка).
+    Служебные ключи (_default) пропускаем.
+    """
+    if str(env_tenant or "").strip():
+        return [str(env_tenant).strip()]
+    out: list[str] = []
+    for src in (tokens or {}, tenants or {}):
+        for key in src:
+            t = str(key).strip()
+            if t and not t.startswith("_") and t not in out:
+                out.append(t)
+    return sorted(out)
+
+
+def load_known_tenants() -> list[str]:
+    """known_tenants() поверх реальных файлов секретов (пустой список, если их нет)."""
+    def _read(path: str) -> dict:
+        try:
+            with open(path) as fh:
+                doc = json.load(fh)
+            return doc if isinstance(doc, dict) else {}
+        except (OSError, ValueError):
+            return {}
+    return known_tenants(
+        _read(os.environ.get("TOKENS_FILE", "/secrets/tokens.json")),
+        _read(os.environ.get("TENANTS_FILE", "/secrets/tenants.json")),
+        os.environ.get("TENANT_ID", ""))

@@ -304,6 +304,14 @@ export const saas = {
   "saas.channels.email.acct.detach": "Отключить",
   "saas.channels.err.invalid_resend_key": "Ключ не принят Resend - проверьте, что скопирован целиком и не отозван.",
 
+  "saas.ob.stripe.secretLabel": "Подписной секрет вебхука",
+  "saas.ob.stripe.secretHint": "Stripe покажет его один раз сразу после создания вебхука (Reveal signing secret). Без него мы обязаны отклонять входящие события - иначе кто угодно смог бы подделать оплату.",
+  "saas.ob.stripe.keyLabel": "Restricted-ключ Stripe (необязательно)",
+  "saas.ob.stripe.keyHint": "Нужен только чтобы выдавать скидочные купоны и читать цены планов. Developers - API keys - Create restricted key, права на запись Coupons и чтение Products/Prices. Без него офферы со скидкой будут отклоняться.",
+  "saas.ob.stripe.save": "Сохранить",
+  "saas.ob.stripe.saved": "сохранён",
+  "saas.ob.stripe.notSaved": "не задан",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

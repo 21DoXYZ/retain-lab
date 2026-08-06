@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 
 BROKER = os.environ.get("KAFKA_BROKER", "redpanda:9092")
 TOPIC = os.environ.get("SAAS_KAFKA_TOPIC", "saas.events")
-DEFAULT_TENANT = os.environ.get("TENANT_ID", "hubcontent")
+DEFAULT_TENANT = os.environ.get("TENANT_ID", "").strip()
 WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 SIGVERIFY_OFF = os.environ.get("STRIPE_SIGVERIFY_OFF", "") == "1"
 
@@ -57,16 +57,31 @@ def _ch():
     return _ch_client
 
 
-def _verified_event() -> dict | None:
+def _tenant_secret(tenant: str) -> str:
+    """Подписной секрет вебхука ЭТОГО клиента: он заводит вебхук в СВОЁМ Stripe
+    и получает свой whsec_. Платформенный env - фолбэк для нашего аккаунта."""
+    try:
+        from saas_senders import load_tenant_channels
+    except ImportError:
+        from stripe_sync.saas_senders import load_tenant_channels
+    try:
+        own = str((load_tenant_channels(tenant) or {}).get("stripe_webhook_secret") or "")
+    except Exception:  # noqa: BLE001 - файла нет/битый: остаётся платформенный
+        own = ""
+    return own.strip() or WEBHOOK_SECRET
+
+
+def _verified_event(tenant: str) -> dict | None:
     payload = request.get_data()
     if SIGVERIFY_OFF:
         return json.loads(payload)
-    if not WEBHOOK_SECRET:
+    secret = _tenant_secret(tenant)
+    if not secret:
         return None
     import stripe
     try:
         return stripe.Webhook.construct_event(
-            payload, request.headers.get("Stripe-Signature", ""), WEBHOOK_SECRET,
+            payload, request.headers.get("Stripe-Signature", ""), secret,
         )
     except Exception as exc:  # подпись/формат — 400, Stripe перепошлёт
         log.warning("signature check failed: %s", exc)
@@ -77,7 +92,10 @@ def _verified_event() -> dict | None:
 @app.post("/stripe/webhook/<tenant_id>")
 def stripe_webhook(tenant_id: str = ""):
     tenant = tenant_id or DEFAULT_TENANT
-    evt = _verified_event()
+    if not tenant:
+        # без пространства событие некуда класть: раньше падало в «hubcontent»
+        return jsonify(error="tenant required in url: /stripe/webhook/<tenant>"), 400
+    evt = _verified_event(tenant)
     if evt is None:
         return jsonify(error="signature verification failed"), 400
 

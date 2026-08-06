@@ -305,6 +305,14 @@ export const saas: Partial<Messages> = {
   "saas.channels.email.acct.detach": "Detach",
   "saas.channels.err.invalid_resend_key": "Resend rejected the key - check it is copied in full and not revoked.",
 
+  "saas.ob.stripe.secretLabel": "Webhook signing secret",
+  "saas.ob.stripe.secretHint": "Stripe shows it once, right after you create the webhook (Reveal signing secret). Without it we have to reject incoming events - otherwise anyone could fake a payment.",
+  "saas.ob.stripe.keyLabel": "Stripe restricted key (optional)",
+  "saas.ob.stripe.keyHint": "Only needed to issue discount coupons and read plan prices. Developers - API keys - Create restricted key, with write on Coupons and read on Products/Prices. Without it discount offers get rejected.",
+  "saas.ob.stripe.save": "Save",
+  "saas.ob.stripe.saved": "saved",
+  "saas.ob.stripe.notSaved": "not set",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

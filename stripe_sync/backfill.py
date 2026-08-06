@@ -143,7 +143,9 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()
 
-    tenant = os.environ.get("TENANT_ID", "hubcontent")
+    tenant = os.environ.get("TENANT_ID", "").strip()
+    if not tenant:
+        raise SystemExit("нужен TENANT_ID: джоб работает в пространстве клиента")
     if args.mock:
         world = mock_world(tenant, args.mock, args.seed)
     elif os.environ.get("STRIPE_API_KEY"):
