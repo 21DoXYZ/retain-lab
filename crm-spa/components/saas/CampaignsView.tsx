@@ -287,7 +287,7 @@ export function CampaignsView() {
           {/* Откуда взялись тексты. Пока опросник не заполнен, на экране лежит
               нейтральный каркас платформы - и это должно быть сказано прямо. */}
           {!data.tailored ? (
-            <Card className="flex flex-col gap-3 border-[#fedf89] bg-[#fffcf5] p-5">
+            <div className="flex flex-col gap-3 rounded-card border border-[#fedf89] bg-[#fffcf5] p-5">
               <div className="text-[15px] font-semibold text-ink">{t("saas.camp.origin.draft.title")}</div>
               <p className="max-w-[720px] text-[13.5px] leading-relaxed text-slate">
                 {t("saas.camp.origin.draft.body")}
@@ -295,7 +295,7 @@ export function CampaignsView() {
               <Link href="/onboarding" className="inline-block">
                 <Button variant="brand" size="sm">{t("saas.camp.origin.draft.cta")}</Button>
               </Link>
-            </Card>
+            </div>
           ) : (
             <p className="text-[13px] text-steel">
               {t("saas.camp.origin.tailored", { product: data.product_name || "-" })}
