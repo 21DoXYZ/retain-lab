@@ -217,11 +217,12 @@ K3 payment failed (dunning):
     {{card_update_url}}.
   step 3 email (72h): honest last call - access pauses soon, still 30 seconds
     to fix. Firm but never threatening. MUST contain {{card_update_url}}.
-K4 save (cancel flow / activity dropped):
+K4 save (STILL SUBSCRIBED, opened cancel flow or went quiet):
   step 1 email: acknowledge the right to leave; pause for a month as the
     no-cost alternative (keep history and data, pay nothing).
-  step 2 email (72h): their investment - what they built here - plus what is
-    new since they left.
+  step 2 email (72h): their investment - what they already built here - plus
+    one recent improvement they have not tried yet. They have NOT left: never
+    write as if the subscription is already over.
 K5 upgrade (80%+ of plan limit):
   step 0 email: compliment the power use, then the math - the higher tier is
     cheaper per unit at their volume.
@@ -232,6 +233,10 @@ K6 winback (canceled 30+ days ago):
   step 2 email: their account and history are safe, the door is open.
 
 Hard rules:
+- Past-departure voice ("since you left", "welcome back", "come back to us",
+  "now that you are gone") belongs ONLY to K6 winback. In K1-K5 the person is
+  still a user or still paying - addressing them as a leaver is a factual
+  error and the step gets thrown away.
 - Subjects under 60 chars, bodies 1-3 sentences, ONE call to action per email.
 - Use the product name and its value unit naturally - never a generic
   "your product" voice.
@@ -252,6 +257,21 @@ def _sanitize(txt: str) -> str:
     (em/en) -> обычный дефис. Промпт просит - код гарантирует."""
     return (txt.replace("\u2014", " - ").replace("\u2013", "-")
                .replace("  ", " ").strip())
+
+
+LEAVER_PHRASES = (
+    "since you left", "since you've left", "since you have left",
+    "after you left", "when you left", "you left us",
+    "welcome back", "come back to us", "now that you are gone",
+    "now that you're gone", "since you cancel", "after you cancel",
+    "your former", "you used to be",
+)
+
+
+def _talks_to_leaver(text: str) -> bool:
+    """Речь про уже ушедшего юзера. Уместна только в винбэке."""
+    low = " ".join(str(text or "").lower().split())
+    return any(p in low for p in LEAVER_PHRASES)
 
 
 def parse_ai_copy(text: str) -> dict:
@@ -284,6 +304,11 @@ def parse_ai_copy(text: str) -> dict:
                 continue
             # баннер без заголовка - обрубок; шаг уходит на шаблон
             if str(cid) == "K3_payment_recovery" and i == 0 and not subject:
+                continue
+            # «с тех пор как вы ушли» человеку, который НЕ уходил: фактическая
+            # ошибка модели. Такое письмо обесценивает всю рассылку - шаг
+            # выбрасываем, остаётся нейтральный шаблон.
+            if str(cid) != "K6_winback" and _talks_to_leaver(subject + " " + body):
                 continue
             clean[i] = {"subject": subject, "body": body}
         if clean:

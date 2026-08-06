@@ -91,3 +91,27 @@ def test_churn_floor_blocks_money_for_calm_payers():
     assert check_churn_floor(money, calm, 0.0)[0] is True          # гейт выключен
     assert check_churn_floor(money, {"sub_status": "trialing", "p_churn": 0.0}, 0.25)[0] is True
     assert check_churn_floor(money, {"sub_status": "active"}, 0.25)[0] is True  # скора нет
+
+
+def test_leaver_voice_dropped_outside_winback():
+    """«Since you left» в SAVE - фактическая ошибка: юзер ещё платит. Такой шаг
+    выбрасывается, остаётся детерминированный шаблон. В K6 та же фраза легальна."""
+    from stripe_sync.ai_compose import parse_ai_copy
+    doc = {
+        "K4_save": {
+            "1": {"subject": "Pause instead", "body": "You can pause for a month."},
+            "2": {"subject": "Your work", "body": "Since you left we added new charts."},
+        },
+        "K6_winback": {
+            "0": {"subject": "What is new", "body": "Since you left we added new charts."},
+        },
+    }
+    out = parse_ai_copy(json.dumps(doc))
+    assert set(out["K4_save"]) == {1}
+    assert set(out["K6_winback"]) == {0}
+
+
+def test_leaver_detector_ignores_case_and_spacing():
+    from stripe_sync.ai_compose import _talks_to_leaver
+    assert _talks_to_leaver("Welcome   BACK to the product")
+    assert not _talks_to_leaver("Come back to the dashboard when ready")
