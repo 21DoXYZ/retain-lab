@@ -18,6 +18,7 @@ export const saas = {
   "saas.leak.deadTrials": "Мёртвые триалы",
   "saas.leak.deadTrialsSub": "{count} истекли без оплаты - потенциал",
 
+  "nav.insights": "ИИ-аналитик",
   "nav.uplift": "Инкремент кампаний",
 
   "saas.uplift.title": "Uplift-отчёт",
@@ -248,6 +249,28 @@ export const saas = {
   "saas.camp.platformDry": "Автопилот включён, но действует платформенный dry-run (ключи каналов ещё не активированы) - касания пока не уходят. Снимем при выдаче ключей.",
   "saas.q.avg_plan_price": "Средняя цена платного плана, $ (если Stripe ещё не подключён)",
   "saas.q.avg_plan_price.ph": "49 (долларов)",
+
+  "saas.insights.title": "Что советует ИИ-аналитик",
+  "saas.insights.lead": "Раз в неделю система читает результаты кампаний и говорит, что конкретно поменять - с цифрами в обосновании. Применяешь ты, не она.",
+  "saas.insights.empty": "Рекомендаций пока нет. Первые появятся после недели работы кампаний (анализ идёт по понедельникам).",
+  "saas.insights.apply": "Применить",
+  "saas.insights.dismiss": "Отклонить",
+  "saas.insights.manual": "Это решение принимаешь ты - платформа не меняет структуру цепочек сама.",
+  "saas.insights.reasons": "Почему уходят (словами юзеров)",
+  "saas.insights.kind.drop_step": "убрать шаг",
+  "saas.insights.kind.change_delay": "поменять тайминг",
+  "saas.insights.kind.rewrite_copy": "переписать текст",
+  "saas.insights.kind.cut_offer": "убрать оффер",
+  "saas.insights.kind.raise_cap": "поднять лимит",
+  "saas.insights.kind.scale_up": "работает, масштабировать",
+  "saas.insights.kind.no_action": "данных мало",
+  "saas.insights.reason.price": "Дорого",
+  "saas.insights.reason.missing_feature": "Не хватило функции",
+  "saas.insights.reason.one_time_need": "Задача закончилась",
+  "saas.insights.reason.switched": "Ушли к другим",
+  "saas.insights.reason.quality": "Качество и баги",
+  "saas.insights.reason.support": "Поддержка",
+  "saas.insights.reason.other": "Другое",
 
   "nav.channelsSetup": "Каналы",
 

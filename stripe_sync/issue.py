@@ -67,7 +67,8 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
     rows = client.query(
         """
         SELECT identity_id, client_user_id, stripe_customer_id, sub_status,
-               coalesce(p_convert, 0) AS p_convert
+               coalesce(p_convert, 0) AS p_convert,
+               coalesce(p_churn, 0) AS p_churn
         FROM retention.user_actions
         WHERE tenant_id = %(t)s AND identity_id = %(i)s
         """,
@@ -76,7 +77,7 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
     if not rows:
         raise SystemExit(f"identity {identity_id} не найдена в user_actions")
     user = dict(zip(["identity_id", "client_user_id", "stripe_customer_id",
-                     "sub_status", "p_convert"], rows[0]))
+                     "sub_status", "p_convert", "p_churn"], rows[0]))
 
     # subscription_id для Stripe-исполнителей
     sub = client.query(
@@ -99,7 +100,8 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
     h14 = [r for r in history if r["issued_at"] >= _cutoff_14d()]
 
     ok, reason = run_checks(offer, user, h14, history,
-                            float(catalog.get("p_convert_cap", 0.7)))
+                            float(catalog.get("p_convert_cap", 0.7)),
+                            float(catalog.get("churn_floor", 0.0)))
     if not ok:
         _log(client, tenant_id, offer, user, campaign_id, False, "rejected", reason)
         return "rejected", reason

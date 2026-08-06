@@ -56,11 +56,30 @@ def check_offer_limit_30d(offer: dict, history_30d: list[dict]) -> tuple[bool, s
     return True, ""
 
 
+def check_churn_floor(offer: dict, user: dict, floor: float) -> tuple[bool, str]:
+    """Деньги не дарим спокойным: монетарный оффер платящему юзеру с низким
+    P(churn) - трата без причины (он и так остаётся). Порог 0 = выключено.
+    Зеркало p_convert_cap с другой стороны воронки: там «купит и без скидки»,
+    тут «останется и без подарка»."""
+    if not offer.get("monetary") or floor <= 0:
+        return True, ""
+    if str(user.get("sub_status") or "") not in PAYING_STATUSES:
+        return True, ""   # неплатящих этот гейт не касается
+    p_churn = user.get("p_churn")
+    if p_churn is None:
+        return True, ""   # скора нет (джоб ещё не считал) - не блокируем
+    if float(p_churn) < floor:
+        return False, "low_churn_risk"
+    return True, ""
+
+
 def run_checks(offer: dict, user: dict, history_14d: list[dict],
-               history_30d: list[dict], p_convert_cap: float) -> tuple[bool, str]:
+               history_30d: list[dict], p_convert_cap: float,
+               churn_floor: float = 0.0) -> tuple[bool, str]:
     """Все проверки по порядку; первый отказ — итог."""
     for ok, reason in (
         check_p_convert_cap(offer, user, p_convert_cap),
+        check_churn_floor(offer, user, churn_floor),
         check_monetary_cap_14d(offer, history_14d),
         check_offer_limit_30d(offer, history_30d),
     ):

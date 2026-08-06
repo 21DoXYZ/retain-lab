@@ -19,6 +19,7 @@ export const saas: Partial<Messages> = {
   "saas.leak.deadTrials": "Dead trials",
   "saas.leak.deadTrialsSub": "{count} expired without paying - pipeline",
 
+  "nav.insights": "AI analyst",
   "nav.uplift": "Campaign uplift",
 
   "saas.uplift.title": "Uplift report",
@@ -249,6 +250,28 @@ export const saas: Partial<Messages> = {
   "saas.camp.platformDry": "Autopilot is on, but a platform-level dry-run is still active (channel keys not yet enabled) - touches are not leaving yet. We lift it when the keys go live.",
   "saas.q.avg_plan_price": "Average paid plan price, $ (if Stripe is not connected yet)",
   "saas.q.avg_plan_price.ph": "49",
+
+  "saas.insights.title": "What the AI analyst suggests",
+  "saas.insights.lead": "Once a week the system reads campaign results and tells you what to change, with the numbers behind it. You apply it, not the machine.",
+  "saas.insights.empty": "No recommendations yet. The first ones appear after a week of campaign data (analysis runs on Mondays).",
+  "saas.insights.apply": "Apply",
+  "saas.insights.dismiss": "Dismiss",
+  "saas.insights.manual": "This one is your call - the platform never changes chain structure by itself.",
+  "saas.insights.reasons": "Why they leave (in users' own words)",
+  "saas.insights.kind.drop_step": "drop the step",
+  "saas.insights.kind.change_delay": "change timing",
+  "saas.insights.kind.rewrite_copy": "rewrite copy",
+  "saas.insights.kind.cut_offer": "cut the offer",
+  "saas.insights.kind.raise_cap": "raise the cap",
+  "saas.insights.kind.scale_up": "works, scale up",
+  "saas.insights.kind.no_action": "not enough data",
+  "saas.insights.reason.price": "Too expensive",
+  "saas.insights.reason.missing_feature": "Missing feature",
+  "saas.insights.reason.one_time_need": "Job finished",
+  "saas.insights.reason.switched": "Switched away",
+  "saas.insights.reason.quality": "Quality and bugs",
+  "saas.insights.reason.support": "Support",
+  "saas.insights.reason.other": "Other",
 
   "nav.channelsSetup": "Channels",
 

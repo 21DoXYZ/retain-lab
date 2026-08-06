@@ -540,3 +540,61 @@ SELECT tenant_id, client_user_id, channel,
        argMax(consent_ts, updated_at) AS consent_ts
 FROM retention.contacts
 GROUP BY tenant_id, client_user_id, channel;
+
+-- ============================================================================
+-- ИИ-слой 2: аналитик результатов + разбор причин отмены.
+-- LLM здесь ПРЕДЛАГАЕТ и КЛАССИФИЦИРУЕТ, но ничего не исполняет: правки
+-- кампаний применяет владелец кнопкой, категории отмен - только чтение.
+-- ============================================================================
+
+-- Рекомендации ИИ-аналитика по результатам (вход: uplift + логи касаний).
+CREATE TABLE IF NOT EXISTS retention.ai_insights
+(
+    `tenant_id`    LowCardinality(String),
+    `insight_id`   String,                    -- детерминированный: период+кампания+вид
+    `period_start` Date,
+    `period_end`   Date,
+    `campaign_id`  LowCardinality(String),
+    `step_idx`     Int32,                     -- -1 = про кампанию целиком
+    `kind`         LowCardinality(String),    -- drop_step|change_delay|rewrite_copy|cut_offer|raise_cap|scale_up|no_action
+    `title`        String,
+    `rationale`    String,                    -- обоснование ЦИФРАМИ из evidence
+    `evidence`     String,                    -- JSON фактов, на которых построено
+    `suggestion`   String,                    -- JSON конкретной правки (что применить)
+    `status`       LowCardinality(String),    -- new|applied|dismissed
+    `created_at`   DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (tenant_id, insight_id);
+
+CREATE OR REPLACE VIEW retention.ai_insights_current AS
+SELECT tenant_id, insight_id,
+       argMax(period_start, created_at) AS period_start,
+       argMax(period_end, created_at)   AS period_end,
+       argMax(campaign_id, created_at)  AS campaign_id,
+       argMax(step_idx, created_at)     AS step_idx,
+       argMax(kind, created_at)         AS kind,
+       argMax(title, created_at)        AS title,
+       argMax(rationale, created_at)    AS rationale,
+       argMax(evidence, created_at)     AS evidence,
+       argMax(suggestion, created_at)   AS suggestion,
+       argMax(status, created_at)       AS status,
+       max(created_at)                  AS created_at_max
+FROM retention.ai_insights
+GROUP BY tenant_id, insight_id;
+
+-- Причины отмены: свободный текст юзера -> фиксированная категория.
+CREATE TABLE IF NOT EXISTS retention.cancel_reasons
+(
+    `tenant_id`   LowCardinality(String),
+    `event_id`    String,
+    `identity_id` String,
+    `category`    LowCardinality(String),  -- price|missing_feature|one_time_need|switched|quality|support|other
+    `summary`     String,                  -- краткий пересказ (1 фраза)
+    `verbatim`    String,                  -- исходный текст юзера
+    `mrr`         Decimal(18, 2),
+    `ts`          DateTime64(3),
+    `created_at`  DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (tenant_id, event_id);

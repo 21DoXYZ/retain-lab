@@ -690,6 +690,111 @@ def channels():
     return api_json(_channels_payload(_tenant_arg()))
 
 
+# ── ИИ-аналитик: рекомендации и их применение ────────────────────────────────
+
+@bp.get('/saas/insights')
+@require_auth(roles=LEAK_ROLES)
+def saas_insights():
+    """Рекомендации ИИ-аналитика (Пн 08:10) + сводка причин отмены."""
+    tenant = _tenant_arg()
+
+    rows = q(
+        """
+        SELECT insight_id, campaign_id, step_idx, kind, title, rationale,
+               suggestion, status, toString(period_start), toString(period_end)
+        FROM ai_insights_current
+        WHERE tenant_id = {t:String} AND status != 'dismissed'
+        ORDER BY created_at_max DESC
+        LIMIT 20
+        """, {'t': tenant})[1]
+    import json as _json
+    insights = [{
+        'insight_id': r[0], 'campaign_id': r[1], 'step_idx': int(r[2]),
+        'kind': r[3], 'title': r[4], 'rationale': r[5],
+        'suggestion': _json.loads(r[6] or '{}'), 'status': r[7],
+        'period': f'{r[8]} - {r[9]}',
+    } for r in rows]
+
+    reasons = [{'category': r[0], 'count': int(r[1]), 'mrr': _flt(r[2]),
+                'examples': list(r[3])[:3]} for r in q(
+        """
+        SELECT category, count(), sum(toFloat64(mrr)), groupArray(summary)
+        FROM cancel_reasons WHERE tenant_id = {t:String}
+        GROUP BY category ORDER BY count() DESC
+        """, {'t': tenant})[1]]
+
+    return api_json({'tenant': tenant, 'insights': insights,
+                     'cancel_reasons': reasons})
+
+
+@bp.post('/saas/insights/act')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_insight_act():
+    """Применить рекомендацию (правка идёт через тот же overrides-слой, что и
+    ручное редактирование) либо отклонить. LLM сам ничего не применяет."""
+    from stripe_sync import overrides as ovr
+    import json as _json
+
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    iid = str(body.get('insight_id', ''))
+    action = str(body.get('action', ''))
+    if action not in ('apply', 'dismiss'):
+        return _bad('unknown_action')
+
+    row = q(
+        """
+        SELECT campaign_id, step_idx, kind, suggestion, title, rationale,
+               toString(period_start), toString(period_end)
+        FROM ai_insights_current
+        WHERE tenant_id = {t:String} AND insight_id = {i:String}
+        """, {'t': tenant, 'i': iid})[1]
+    if not row:
+        return _bad('unknown_insight', 404)
+    campaign_id, step_idx, kind, suggestion_raw = row[0][0], int(row[0][1]), row[0][2], row[0][3]
+    sug = _json.loads(suggestion_raw or '{}')
+
+    applied = ''
+    if action == 'apply':
+        if kind == 'change_delay' and step_idx >= 0:
+            ovr.set_campaign_step(tenant, campaign_id, step_idx,
+                                  {'delay_h': float(sug['delay_h'])})
+            applied = f'delay_h={sug["delay_h"]}'
+        elif kind == 'rewrite_copy' and step_idx >= 0:
+            ovr.set_campaign_step(tenant, campaign_id, step_idx,
+                                  {'subject': sug.get('subject', ''),
+                                   'body': sug.get('body', '')})
+            applied = 'copy'
+        elif kind == 'cut_offer' and step_idx >= 0:
+            ovr.set_campaign_step(tenant, campaign_id, step_idx, {'offer_id': ''})
+            applied = 'offer_unbound'
+        else:
+            # drop_step/raise_cap/scale_up/no_action - решение владельца руками
+            return _bad(f'manual_only:{kind}')
+
+    # статус пишем новой строкой (ReplacingMergeTree по insight_id)
+    import clickhouse_connect as _cc
+    import os as _os4
+    cl = _cc.get_client(host=_os4.environ.get('CH_HOST', 'clickhouse'),
+                        port=int(_os4.environ.get('CH_PORT', '8123')),
+                        username=_os4.environ.get('CH_USER', 'default'),
+                        password=_os4.environ.get('CH_PASSWORD', ''),
+                        database=_os4.environ.get('CH_DB', 'retention'))
+    from datetime import datetime as _dt, timezone as _tz
+    cl.insert('retention.ai_insights',
+              [[tenant, iid, row[0][6], row[0][7], campaign_id, step_idx, kind,
+                row[0][4], row[0][5], '{}', suggestion_raw,
+                'applied' if action == 'apply' else 'dismissed',
+                _dt.now(tz=_tz.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]]],
+              column_names=['tenant_id', 'insight_id', 'period_start', 'period_end',
+                            'campaign_id', 'step_idx', 'kind', 'title', 'rationale',
+                            'evidence', 'suggestion', 'status', 'created_at'])
+    print(f'[insight] {tenant}: {iid} -> {action} {applied}', flush=True)
+    return api_json({'insight_id': iid, 'action': action, 'applied': applied})
+
+
 # ── Кампании: что автопилот шлёт юзерам + рубильник ──────────────────────────
 
 def _campaigns_conf(tenant: str) -> dict:

@@ -57,6 +57,12 @@ const PATHS: Record<string, ReactNode> = {
       <circle cx="12" cy="7" r="4" />
     </>
   ),
+  insights: (
+    <>
+      <path d="M9 18h6M10 22h4" />
+      <path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z" />
+    </>
+  ),
   segments: (
     <>
       <polygon points="12 2 2 7 12 12 22 7 12 2" />

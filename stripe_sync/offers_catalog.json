@@ -1,1 +1,8 @@
-{}
+{
+  "_default": {
+    "control_pct": 10,
+    "p_convert_cap": 0.7,
+    "churn_floor": 0.25,
+    "offers": []
+  }
+}

@@ -33,6 +33,12 @@ JOBS = [
      lambda t: t.hour == 3 and t.minute == 10),
     ("uplift_report", ["python", "uplift_report.py"],
      lambda t: t.weekday() == 0 and t.hour == 8 and t.minute == 0),
+    # ИИ-аналитик читает свежий uplift -> рекомендации владельцу
+    ("ai_analyst", ["python", "ai_analyst.py"],
+     lambda t: t.weekday() == 0 and t.hour == 8 and t.minute == 10),
+    # разбор причин отмены (свободный текст юзеров -> категории)
+    ("cancel_reasons", ["python", "cancel_reasons.py"],
+     lambda t: t.minute == 20),
 ]
 
 
@@ -54,7 +60,7 @@ def run_job(name: str, argv: list[str]) -> None:
 
 
 def main() -> None:
-    print("[ops] scheduler up (UTC): tick */15m · stitch+contacts+plans :05 · scoring 03:10 · uplift Mon 08:00",
+    print("[ops] scheduler up (UTC): tick */15m · stitch+contacts+plans :05 · scoring 03:10 · uplift Mon 08:00 · analyst Mon 08:10 · reasons :20",
           flush=True)
     last_key = ""
     while True:
