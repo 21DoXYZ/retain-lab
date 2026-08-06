@@ -362,6 +362,12 @@ export const saas: Partial<Messages> = {
   "saas.camp.goalOf.billing.subscription_canceled": "",
   "saas.camp.goalOf.not_billing.subscription_canceled": "",
 
+  "saas.home.noData": "",
+  "saas.leak.noData": "",
+
+  "saas.offers.empty.title": "",
+  "saas.offers.empty.desc": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

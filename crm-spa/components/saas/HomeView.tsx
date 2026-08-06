@@ -64,6 +64,8 @@ export function HomeView() {
     { key: "autopilot", ok: data?.setup.autopilot ?? false, href: "/campaigns" },
   ] as const;
   const goliveDone = golive.filter((s) => s.ok).length;
+  // «нет данных» - это не ноль: цифры появятся только после биллинга и сниппета
+  const noData = !loading && (data?.users_total ?? 0) === 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -74,18 +76,27 @@ export function HomeView() {
         <div className="text-steel text-[14.5px] mt-1.5 max-w-[640px]">{t("saas.home.tagline")}</div>
       </div>
 
+      {/* Пока данных нет, $0 читается как «всё хорошо, ничего не течёт» - это
+          неправда. Показываем прочерк и говорим, чего не хватает. */}
       <SCardGrid>
-        <SCard loading={loading} label={t("saas.home.kpi.mrr")} value={usd(data?.mrr)} />
-        <SCard loading={loading} label={t("saas.home.kpi.leak")} value={usd(leak ?? 0)} valueTone="neg" />
-        <SCard loading={loading} label={t("saas.home.kpi.users")} value={String(data?.users_total ?? 0)} />
+        <SCard loading={loading} label={t("saas.home.kpi.mrr")}
+               value={noData ? "-" : usd(data?.mrr)} />
+        <SCard loading={loading} label={t("saas.home.kpi.leak")}
+               value={noData ? "-" : usd(leak ?? 0)} valueTone={noData ? undefined : "neg"} />
+        <SCard loading={loading} label={t("saas.home.kpi.users")}
+               value={String(data?.users_total ?? 0)} />
         <SCard
           loading={loading}
           label={t("saas.home.kpi.atRisk")}
-          value={String(data?.at_risk_now ?? 0)}
+          value={noData ? "-" : String(data?.at_risk_now ?? 0)}
           sub={t("saas.home.kpi.atRiskSub")}
-          valueTone="neg"
+          valueTone={noData ? undefined : "neg"}
         />
       </SCardGrid>
+
+      {!loading && noData ? (
+        <p className="text-[13px] text-steel">{t("saas.home.noData")}</p>
+      ) : null}
 
       {!loading && goliveDone < golive.length ? (
         <Card className="p-5">

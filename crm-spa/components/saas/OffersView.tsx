@@ -406,6 +406,8 @@ export function OffersView() {
         getRowKey={(r) => r.offer_id}
         state={state}
         onRetry={load}
+        emptyTitle={t("saas.offers.empty.title")}
+        emptyDescription={t("saas.offers.empty.desc")}
       />
       )}
     </div>

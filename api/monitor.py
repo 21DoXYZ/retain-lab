@@ -586,17 +586,47 @@ def _keys_payload() -> dict:
         'kafka_note': _KAFKA_NOTE,
     }
     if _SAAS_HOST:
-        # SaaS-онбординг: блок подключения Stripe (вебхук ставит клиент,
-        # секрет вносим мы на сервере - экран показывает статус).
+        # SaaS-онбординг: блок подключения Stripe. URL вебхука ОБЯЗАН нести
+        # хвост пространства - без него события некуда класть, endpoint отвечает
+        # 400. Статус секрета - из конфига ТЕНАНТА (клиент вставляет свой whsec
+        # на экране Get started), env остаётся фолбэком платформы.
+        _tenant = _first_tenant()
+        _tc = _tenant_conf(_tenant)
         out['stripe'] = {
-            'webhook_url': f'https://{_SAAS_HOST}/stripe/webhook',
+            'webhook_url': (f'https://{_SAAS_HOST}/stripe/webhook/{_tenant}'
+                            if _tenant else ''),
             'events': ['checkout.session.completed', 'customer.subscription.created',
                        'customer.subscription.updated', 'customer.subscription.deleted',
                        'invoice.paid', 'invoice.payment_failed',
                        'charge.refunded', 'charge.dispute.created'],
-            'secret_set': bool(_os.environ.get('STRIPE_WEBHOOK_SECRET', '').strip()),
+            'secret_set': bool(str(_tc.get('stripe_webhook_secret') or '').strip()
+                               or _os.environ.get('STRIPE_WEBHOOK_SECRET', '').strip()),
         }
     return out
+
+
+
+def _first_tenant() -> str:
+    """Единственное заведённое пространство (экран /keys - платформенный и
+    показывает подключение для текущего клиента)."""
+    import json as _json
+    try:
+        with open(_os.environ.get('TOKENS_FILE', '/secrets/tokens.json')) as fh:
+            keys = [k for k in _json.load(fh) if not k.startswith('_')]
+        return sorted(keys)[0] if keys else ''
+    except Exception:  # noqa: BLE001
+        return ''
+
+
+def _tenant_conf(tenant: str) -> dict:
+    import json as _json
+    if not tenant:
+        return {}
+    try:
+        with open(_os.environ.get('TENANTS_FILE', '/secrets/tenants.json')) as fh:
+            return _json.load(fh).get(tenant, {}) or {}
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 @bp.get('/keys')

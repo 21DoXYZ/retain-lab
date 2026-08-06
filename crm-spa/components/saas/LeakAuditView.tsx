@@ -61,7 +61,9 @@ export function LeakAuditView() {
           {data ? (
             <Banner>
               <span className="text-[15px] font-semibold">
-                {t("saas.leak.headline", { amount: usd(data.headline_monthly_leak) })}
+                {data.headline_monthly_leak > 0
+                  ? t("saas.leak.headline", { amount: usd(data.headline_monthly_leak) })
+                  : t("saas.leak.noData")}
               </span>
             </Banner>
           ) : null}
