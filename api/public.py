@@ -128,7 +128,15 @@ def inbox():
         """,
         {'t': tenant, 'u': user})[1]
 
-    return api_json({'messages': [
+    # username бота тенанта (публичен) - из него сниппет строит ссылку подписки
+    # с id ЭТОГО юзера: без id мы не поймём, чей это чат
+    try:
+        from stripe_sync.channels_admin import load_tenants
+        tg_bot = str((load_tenants().get(tenant, {}) or {}).get('telegram_bot_username') or '')
+    except Exception:  # noqa: BLE001 - канал не настроен: просто нет кнопки
+        tg_bot = ''
+
+    return api_json({'tg_bot': tg_bot, 'messages': [
         {'message_id': r[0], 'title': r[1], 'body': r[2],
          'cta_label': r[3], 'cta_url': r[4]} for r in rows]})
 

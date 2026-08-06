@@ -53,6 +53,12 @@
   </div>
 
   <div class="card">
+    <label>Telegram subscribe button (data-ra-telegram)</label>
+    <a data-ra-telegram class="ghost" style="display:inline-block;text-decoration:none">Get updates in Telegram</a>
+    <pre id="tglog">hidden until the channel is connected and the user identified</pre>
+  </div>
+
+  <div class="card">
     <label>Event log (what left the browser)</label>
     <pre id="log">waiting for actions...</pre>
   </div>
@@ -76,6 +82,14 @@
     logEl.textContent = lines.join("\n");
   }
   if (!window.RA_CONFIG.token) log("WARN: no ?token= in URL - ingest will reject (401)");
+  // видно, что именно подставил сниппет в кнопку подписки
+  setInterval(function () {
+    var el = document.querySelector("[data-ra-telegram]");
+    var link = (window.ra && ra.telegramLink && ra.telegramLink()) || "";
+    document.getElementById("tglog").textContent =
+      link ? "link: " + link : "channel off or user not identified - button hidden ("
+             + (el && el.style.display === "none" ? "hidden" : "visible") + ")";
+  }, 1500);
 
   var USER_ID = "u_demo_1";
   var buttons = ["generate", "pricing", "checkout", "cancel"].map(function (id) {

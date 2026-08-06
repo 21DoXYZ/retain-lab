@@ -323,6 +323,16 @@ export const saas: Partial<Messages> = {
   "saas.noTenant.desc": "Data, campaigns and offers all live inside a product workspace. Create the first one - the system issues an ingest token, an owner account and an empty campaign skeleton, and the Get started wizard starts working right away.",
   "saas.noTenant.cta": "Create workspace",
 
+  "saas.channels.tg.subs.title": "How to get users connected",
+  "saas.channels.tg.subs.lead": "The bot is ready, but there is nobody to write to yet: Telegram hands us a chat only after the person presses Start themselves. The link must carry your product user id - otherwise we cannot tell whose chat it is.",
+  "saas.channels.tg.subs.wayA": "Option 1 - a button inside your product (recommended)",
+  "saas.channels.tg.subs.wayAdesc": "Drop this element anywhere in your markup: account settings, the screen after a result, onboarding. The snippet fills in the link with the current user id, and hides the button when the channel is off. No JavaScript to write.",
+  "saas.channels.tg.subs.wayB": "Option 2 - the raw link",
+  "saas.channels.tg.subs.wayBdesc": "For emails and server-side templates: replace {client_user_id} with the same id you pass to ra.identify.",
+  "saas.channels.tg.subs.consent": "Start pressed - the contact is created with consent and touches start flowing. /stop or blocking the bot removes consent automatically and we go quiet; if they come back, the same chat is restored.",
+  "saas.channels.tg.subs.tip": "Subscriptions grow best at the value moment - right after a result, not as a lonely toggle in settings.",
+  "saas.channels.tg.subs.coverage": "Connected with consent right now: {n}.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

@@ -55,6 +55,9 @@ const ERR_KEYS = new Set([
   "invalid_webhook_secret",
 ]);
 
+/** Готовая кнопка подписки: сниппет сам подставит ссылку с id юзера. */
+const TG_BUTTON = '<a data-ra-telegram>Get updates in Telegram</a>';
+
 const inputCls =
   "h-[42px] w-full rounded-ctl border border-hair2 bg-canvas px-[13px] text-sm " +
   "text-ink placeholder:text-steel/70 outline-none transition-[border-color] " +
@@ -393,14 +396,53 @@ function ChannelCard({
           {st === "active" && (
             <>
               <Field label="Bot" value={`@${row.telegram?.bot_username ?? ""}`} />
-              <p className="text-[13px] text-slate">{t("saas.channels.tg.linkLead")}</p>
-              <div className="flex items-center gap-2.5">
-                <code className="min-w-0 flex-1 truncate rounded-ctl border border-hair bg-surface px-[13px] py-[9px] font-mono text-[12.5px]">
-                  {row.telegram?.connect_link}
-                  {"{client_user_id}"}
-                </code>
-                <CopyButton text={`${row.telegram?.connect_link ?? ""}{client_user_id}`} />
+
+              {/* Бот подключён - дальше вся работа в том, чтобы юзеры нажали
+                  Start по ссылке СО СВОИМ id: без него чат не с кем связать. */}
+              <div className="rounded-ctl border border-hair bg-surface p-3.5">
+                <div className="text-[13px] font-medium text-ink">{t("saas.channels.tg.subs.title")}</div>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-steel">
+                  {t("saas.channels.tg.subs.lead")}
+                </p>
+
+                <div className="mt-3 text-[12.5px] font-medium text-slate">
+                  {t("saas.channels.tg.subs.wayA")}
+                </div>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-steel">
+                  {t("saas.channels.tg.subs.wayAdesc")}
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre rounded-ctl border border-hair2 bg-canvas px-[11px] py-[7px] font-mono text-[12px] text-slate">
+                    {TG_BUTTON}
+                  </code>
+                  <CopyButton text={TG_BUTTON} />
+                </div>
+
+                <div className="mt-3.5 text-[12.5px] font-medium text-slate">
+                  {t("saas.channels.tg.subs.wayB")}
+                </div>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-steel">
+                  {t("saas.channels.tg.subs.wayBdesc")}
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded-ctl border border-hair2 bg-canvas px-[11px] py-[7px] font-mono text-[12px] text-slate">
+                    {row.telegram?.connect_link}
+                    {"{client_user_id}"}
+                  </code>
+                  <CopyButton text={`${row.telegram?.connect_link ?? ""}{client_user_id}`} />
+                </div>
+
+                <p className="mt-3.5 text-[12.5px] leading-relaxed text-steel">
+                  {t("saas.channels.tg.subs.consent")}
+                </p>
+                <p className="mt-1.5 text-[12.5px] leading-relaxed text-steel">
+                  {t("saas.channels.tg.subs.tip")}
+                </p>
+                <p className="mt-2.5 text-[12.5px] text-slate">
+                  {t("saas.channels.tg.subs.coverage", { n: row.consented })}
+                </p>
               </div>
+
               <div>
                 <Button variant="ghost" size="sm" loading={busy} onClick={() => post("telegram", { bot_token: "" })}>
                   {t("saas.channels.tg.disconnect")}

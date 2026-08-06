@@ -316,6 +316,16 @@ export const saas: Partial<Messages> = {
   "saas.noTenant.desc": "",
   "saas.noTenant.cta": "",
 
+  "saas.channels.tg.subs.title": "",
+  "saas.channels.tg.subs.lead": "",
+  "saas.channels.tg.subs.wayA": "",
+  "saas.channels.tg.subs.wayAdesc": "",
+  "saas.channels.tg.subs.wayB": "",
+  "saas.channels.tg.subs.wayBdesc": "",
+  "saas.channels.tg.subs.consent": "",
+  "saas.channels.tg.subs.tip": "",
+  "saas.channels.tg.subs.coverage": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

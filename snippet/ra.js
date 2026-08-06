@@ -9,6 +9,12 @@
  *   ra.identify(userId, email)          // после логина; email хэшируется локально (sha256)
  *   ra.track('generation_completed', {tokens_spent: 12})
  *
+ * Подписка на телеграм-бота: поставьте в разметку ЛЮБОЙ элемент с атрибутом
+ * data-ra-telegram - сниппет сам подставит ссылку с id юзера и спрячет элемент,
+ * если канал не подключён:
+ *   <a data-ra-telegram>Получать уведомления в Telegram</a>
+ * Программно: ra.telegramLink() -> строка ссылки или "" (канал выключен).
+ *
  * Автособытия: session_start (раз в 30 мин тишины), page_view для /pricing|/cancel.
  * В сеть уходит ТОЛЬКО sha256(email) — сырой email не покидает страницу.
  */
@@ -160,14 +166,48 @@
     send("inapp_shown", { meta: JSON.stringify({ message_id: msg.message_id }) });
   }
 
+  // ── Подписка на телеграм-бота тенанта ──────────────────────────────────
+  var tgBot = "";
+
+  function telegramLink() {
+    var uid = localStorage.getItem(K);
+    return (tgBot && uid) ? "https://t.me/" + tgBot + "?start=" + encodeURIComponent(uid) : "";
+  }
+
+  function applyTelegram() {
+    var els = document.querySelectorAll("[data-ra-telegram]");
+    var href = telegramLink();
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      // канал не подключён или юзер не опознан - кнопке подписки неоткуда взять
+      // привязку, показывать её бессмысленно
+      if (!href) { el.style.display = "none"; continue; }
+      el.style.display = "";
+      if (el.tagName === "A") {
+        el.setAttribute("href", href);
+        el.setAttribute("target", "_blank");
+        el.setAttribute("rel", "noopener");
+      }
+      if (!el.dataset.raTgBound) {
+        el.dataset.raTgBound = "1";
+        el.addEventListener("click", function () {
+          send("telegram_connect_clicked");
+          if (this.tagName !== "A") window.open(telegramLink(), "_blank", "noopener");
+        });
+      }
+    }
+  }
+
   function checkInbox() {
     var uid = localStorage.getItem(K);
     var base = inboxBase();
-    if (!uid || !base || !cfg.token || !cfg.tenant) return;
+    if (!uid || !base || !cfg.token || !cfg.tenant) { applyTelegram(); return; }
     fetch(base + "/public/saas/inbox?tenant=" + encodeURIComponent(cfg.tenant) +
           "&user=" + encodeURIComponent(uid), {
       headers: { Authorization: "Bearer " + cfg.token },
     }).then(function (r) { return r.json(); }).then(function (j) {
+      tgBot = (j && j.data && j.data.tg_bot) || "";
+      applyTelegram();
       var msgs = (j && j.data && j.data.messages) || [];
       var hidden = hiddenIds();
       for (var i = 0; i < msgs.length; i++) {
@@ -189,6 +229,7 @@
       });
     },
     track: function (type, props) { send(type, props); },
+    telegramLink: telegramLink,
   };
 
   sessionId();
