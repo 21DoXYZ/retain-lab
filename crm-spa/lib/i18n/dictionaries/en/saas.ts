@@ -227,7 +227,7 @@ export const saas: Partial<Messages> = {
   "saas.offers.disable": "Disable",
 
   "saas.q.product_name": "Product name",
-  "saas.q.product_name.ph": "Hub Content",
+  "saas.q.product_name.ph": "Acme Analytics",
   "saas.q.product_desc": "What the product does (one phrase)",
   "saas.q.product_desc.ph": "generates videos for social media",
   "saas.q.app_url": "App URL (where to send users)",

@@ -226,7 +226,7 @@ export const saas = {
   "saas.offers.disable": "Выключить",
 
   "saas.q.product_name": "Название продукта",
-  "saas.q.product_name.ph": "например Hub Content",
+  "saas.q.product_name.ph": "например Acme Analytics",
   "saas.q.product_desc": "Что делает продукт (одна фраза)",
   "saas.q.product_desc.ph": "генерирует видео для соцсетей",
   "saas.q.app_url": "URL приложения (куда вести юзеров)",

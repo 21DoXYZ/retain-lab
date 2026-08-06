@@ -115,12 +115,12 @@ export function WorkspacesView() {
         <div className="grid gap-2.5 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-[12px] text-steel">
             {t("saas.q.product_name")}
-            <input className={inputCls} placeholder="Hub Content" value={name}
+            <input className={inputCls} placeholder="Acme Analytics" value={name}
                    onChange={(e) => setName(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1 text-[12px] text-steel">
             {t("saas.ws.f.ownerEmail")}
-            <input className={inputCls} placeholder="owner@hubcontent.com" value={email}
+            <input className={inputCls} placeholder="owner@acme.com" value={email}
                    onChange={(e) => setEmail(e.target.value)} />
           </label>
         </div>
