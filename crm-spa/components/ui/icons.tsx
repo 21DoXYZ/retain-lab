@@ -51,6 +51,14 @@ const PATHS: Record<string, ReactNode> = {
       <line x1="4" y1="22" x2="4" y2="15" />
     </>
   ),
+  workspaces: (
+    <>
+      <path d="M3 21h18" />
+      <path d="M5 21V7l7-4 7 4v14" />
+      <path d="M9 21v-6h6v6" />
+      <path d="M9 11h.01M15 11h.01" />
+    </>
+  ),
   team: (
     <>
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
