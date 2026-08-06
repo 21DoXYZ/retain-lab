@@ -294,7 +294,8 @@ def compose_campaign_copy(answers: dict) -> dict:
                 "body": f"Here is what is new since you canceled - worth a "
                         f"fresh look: {app}"},
             2: {"subject": "Your account is still here",
-                "body": f"Your history{units} are saved. Come back anytime: {app}"},
+                "body": f"Your history{units} {'are' if units else 'is'} saved. "
+                        f"Come back anytime: {app}"},
         },
         "K5_upgrade": {
             0: {"subject": "You are hitting your plan limit",

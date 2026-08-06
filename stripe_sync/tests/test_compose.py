@@ -164,3 +164,19 @@ def test_site_scan_guards_private_hosts():
     assert normalize_url("hubcontent.ai") == "https://hubcontent.ai/"
     assert normalize_url("ftp://x.com") == ""
     assert normalize_url("") == ""
+
+
+def test_copy_reads_correctly_without_a_value_unit():
+    """Без юнита ценности шаблоны не должны выдавать «Your account are safe»:
+    клиент видит эти тексты на экране кампаний до всякой генерации."""
+    import re
+    from stripe_sync.compose import compose_campaign_copy
+    for answers in ({}, {"value_unit": "reports"}):
+        copy = compose_campaign_copy(answers)
+        for cid, steps in copy.items():
+            for idx, step in steps.items():
+                for field in ("subject", "body"):
+                    text = step[field]
+                    assert not re.search(r"\b(account|history|work) are\b", text), \
+                        f"{cid}:{idx}:{field} -> {text}"
+                    assert "your your" not in text.lower()

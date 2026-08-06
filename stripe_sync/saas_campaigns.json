@@ -176,7 +176,7 @@
             "delay_h": 96,
             "action": "email",
             "subject": "Your account is still here",
-            "body": "Your history are saved. Come back anytime: {{app_url}}"
+            "body": "Your history is saved. Come back anytime: {{app_url}}"
           }
         ],
         "goal": {
