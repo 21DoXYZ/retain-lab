@@ -5,8 +5,11 @@
   R2. Ключ событий (client_user_id, email_hash) → та же identity по email_hash;
       client_user_id дописывается в неё.
   R3. Ключ событий со stripe_customer_id → identity этого кастомера.
-  R4. client_user_id без email_hash и без stripe_customer_id → unmatched
-      (reason=no_email_hash) — ждёт, пока сниппет пришлёт hash.
+  R4. client_user_id без email_hash и без stripe_customer_id → СВОЯ identity
+      по cuid (uuid5 "cuid:<id>"): такой юзер должен быть видим (стадия,
+      ACTIVATE-кампания, in-app баннер по client_user_id). Появится email -
+      R2 сделает каноническую identity по email_hash, cuid-овая исчезнет при
+      следующей пересборке.
   R5. Один client_user_id с двумя разными email_hash → выигрывает поздний по ts,
       прежняя пара уходит в unmatched (reason=conflicting_email).
 
@@ -83,6 +86,9 @@ def build_identities(
         if cid:
             by_customer[cid] = ident
 
+    # identity по одному client_user_id (R4) - для юзеров без email и биллинга
+    by_cuid: dict[str, Identity] = {}
+
     # R5 — конфликт client_user_id с несколькими email_hash: поздний побеждает
     latest_hash_for_cuid: dict[str, EventKey] = {}
     for k in event_keys:
@@ -126,15 +132,24 @@ def build_identities(
             _add_source(ident, "snippet")
             continue
 
-        # R4 — нечем склеивать
+        # R4 — только client_user_id (юзер ещё не дал email и не платил).
+        # Заводим СВОЮ identity по cuid: иначе такой юзер невидим системе -
+        # нет стадии, нет ACTIVATE-кампании, нет in-app баннера (а он как раз
+        # адресуется по client_user_id). Когда email появится, R2 создаст
+        # каноническую identity по email_hash, а эта исчезнет на следующей
+        # пересборке (джоб собирает всё заново).
         if k.client_user_id:
-            unmatched.append({
-                "tenant_id": tenant_id, "source": "snippet",
-                "key_type": "client_user_id", "key_value": k.client_user_id,
-                "reason": "no_email_hash", "ts": k.last_ts,
-            })
+            if k.client_user_id in latest_hash_for_cuid:
+                continue      # email у этого cuid уже есть - живёт по R2
+            ident = by_cuid.get(k.client_user_id) or Identity(
+                tenant_id, _iid(tenant_id, f"cuid:{k.client_user_id}"),
+                client_user_id=k.client_user_id,
+            )
+            by_cuid[k.client_user_id] = ident
+            _add_source(ident, "snippet")
 
-    identities = list({id(i): i for i in [*by_hash.values(), *by_customer.values()]}.values())
+    identities = list({id(i): i for i in [*by_hash.values(), *by_customer.values(),
+                                          *by_cuid.values()]}.values())
     return identities, unmatched
 
 

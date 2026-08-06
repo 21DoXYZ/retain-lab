@@ -34,13 +34,15 @@ def test_r3_direct_stripe_customer_id_in_event():
     assert unmatched == []
 
 
-def test_r4_no_keys_goes_to_unmatched():
+def test_r4_cuid_only_is_visible_not_discarded():
+    """ПРАВИЛО ИЗМЕНЕНО: юзер без email/биллинга больше не выбрасывается в
+    unmatched - он получает identity по client_user_id, иначе для него не
+    работают ни стадии, ни ACTIVATE-кампания, ни in-app баннер."""
     idents, unmatched = build_identities(TENANT, [], [
         EventKey(client_user_id="u_ghost", last_ts="2026-08-02"),
     ])
-    assert idents == []
-    assert unmatched[0]["reason"] == "no_email_hash"
-    assert unmatched[0]["key_value"] == "u_ghost"
+    assert len(idents) == 1 and idents[0].client_user_id == "u_ghost"
+    assert unmatched == []
 
 
 def test_r5_conflicting_email_latest_wins():
@@ -83,3 +85,23 @@ def test_bridge_event_binds_customer_without_backfill():
     assert ident.stripe_customer_id == "cus_demo_1"
     assert set(ident.sources) == {"stripe", "snippet"}
     assert unmatched == []
+
+
+def test_r4_cuid_only_user_gets_identity():
+    """Юзер без email и биллинга должен быть виден: своя identity по cuid."""
+    ids, unm = build_identities("hub", [], [
+        EventKey(client_user_id="u_no_email", last_ts="2026-08-05 10:00:00"),
+    ])
+    assert len(ids) == 1
+    assert ids[0].client_user_id == "u_no_email"
+    assert ids[0].email_hash == ""
+    assert "snippet" in ids[0].sources
+
+
+def test_r4_yields_to_email_identity_when_hash_appears():
+    """Как только у cuid появился email - живём по email-identity, без дубля."""
+    ids, _ = build_identities("hub", [], [
+        EventKey(client_user_id="u1", last_ts="2026-08-05 10:00:00"),
+        EventKey(client_user_id="u1", email_hash="h1", last_ts="2026-08-05 11:00:00"),
+    ])
+    assert len(ids) == 1 and ids[0].email_hash == "h1"
