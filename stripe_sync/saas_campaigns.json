@@ -78,7 +78,7 @@
             "delay_h": 0,
             "action": "email",
             "subject": "Payment issue - your account is safe",
-            "body": "Your last payment did not go through (this is usually a card issue, not you). Update your card in 30 seconds: {{card_update_url}}. Your account are safe."
+            "body": "Your last payment did not go through (this is usually a card issue, not you). Update your card in 30 seconds: {{card_update_url}}. Your account is safe."
           },
           {
             "delay_h": 24,

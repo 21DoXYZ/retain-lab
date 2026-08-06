@@ -30,7 +30,7 @@ interface Campaign {
   campaign_id: string;
   title: string;
   entry_stage: string;
-  goal: { event_type?: string; window_days?: number };
+  goal: { event_type?: string; window_days?: number; invert?: boolean };
   steps: Step[];
   stats: { enrolled: number; active: number; holdout: number; done: number; exited: number; touches: number };
 }
@@ -402,8 +402,13 @@ export function CampaignsView() {
               <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-hair pt-3 text-[12.5px] text-steel">
                 {c.goal.event_type && (
                   <span>
-                    {t("saas.camp.goal")}: <span className="font-mono text-ink">{c.goal.event_type}</span>
-                    {c.goal.window_days ? ` / ${c.goal.window_days}d` : ""}
+                    {t("saas.camp.goal")}:{" "}
+                    <span className="text-ink">
+                      {t(`saas.camp.goalOf.${c.goal.invert ? "not_" : ""}${c.goal.event_type}` as MessageKey)}
+                      {c.goal.window_days
+                        ? " " + t("saas.camp.goalWindow", { d: c.goal.window_days })
+                        : ""}
+                    </span>
                   </span>
                 )}
                 <span>

@@ -361,6 +361,13 @@ export const saas = {
   "saas.channels.email.hook.okShort": "настроено",
   "saas.channels.email.hook.missingShort": "не настроено",
 
+  "saas.camp.goalWindow": "в течение {d} дней",
+  "saas.camp.goalOf.value_moment": "человек получает свой первый результат",
+  "saas.camp.goalOf.billing.invoice_paid": "человек оплачивает",
+  "saas.camp.goalOf.billing.subscription_updated": "человек переходит на больший тариф",
+  "saas.camp.goalOf.billing.subscription_canceled": "человек отменяет подписку",
+  "saas.camp.goalOf.not_billing.subscription_canceled": "человек НЕ отменяет подписку",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

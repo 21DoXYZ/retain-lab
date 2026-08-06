@@ -355,6 +355,13 @@ export const saas: Partial<Messages> = {
   "saas.channels.email.hook.okShort": "",
   "saas.channels.email.hook.missingShort": "",
 
+  "saas.camp.goalWindow": "",
+  "saas.camp.goalOf.value_moment": "",
+  "saas.camp.goalOf.billing.invoice_paid": "",
+  "saas.camp.goalOf.billing.subscription_updated": "",
+  "saas.camp.goalOf.billing.subscription_canceled": "",
+  "saas.camp.goalOf.not_billing.subscription_canceled": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

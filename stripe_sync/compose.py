@@ -273,7 +273,8 @@ def compose_campaign_copy(answers: dict) -> dict:
             1: {"subject": f"Payment issue - {yours} account is safe",
                 "body": "Your last payment did not go through (this is usually a "
                         "card issue, not you). Update your card in 30 seconds: "
-                        f"{{{{card_update_url}}}}. Your account{units} are safe."},
+                        f"{{{{card_update_url}}}}. Your account{units} "
+                        f"{'are' if units else 'is'} safe."},
             2: {"subject": "Reminder: update your card",
                 "body": "Quick reminder to update your payment method: "
                         "{{card_update_url}}. We retry automatically once it is updated."},
