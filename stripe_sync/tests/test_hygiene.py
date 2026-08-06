@@ -57,3 +57,20 @@ def test_holdout_deterministic_and_near_10pct():
     assert 0.07 < share < 0.13
     assert holdout_split("t", "K3", "x", 0) is False
     assert holdout_split("t", "K3", "x", 100) is True
+
+
+def test_new_tenant_inherits_default_thresholds(tmp_path, monkeypatch):
+    """Клиент без git-пресета обязан получить пороги экономики из _default:
+    иначе churn_floor=0 и монетарные офферы летят тем, кто не собирался уходить."""
+    import json
+    import issue
+    catalog = {"_default": {"control_pct": 10, "p_convert_cap": 0.7,
+                            "churn_floor": 0.25, "offers": []}}
+    path = tmp_path / "offers_catalog.json"
+    path.write_text(json.dumps(catalog))
+    monkeypatch.setattr(issue, "CATALOG_PATH", path)
+    monkeypatch.setenv("CAMPAIGN_OVERRIDES_FILE", str(tmp_path / "overrides.json"))
+    loaded = issue.load_catalog("brandnew")
+    assert loaded["churn_floor"] == 0.25
+    assert loaded["p_convert_cap"] == 0.7
+    assert loaded["offers"] == []

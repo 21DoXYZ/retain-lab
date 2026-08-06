@@ -23,9 +23,12 @@ CATALOG_PATH = Path(__file__).parent / "offers_catalog.json"
 
 def load_catalog(tenant_id: str) -> dict:
     data = json.loads(CATALOG_PATH.read_text())
-    # тенант без git-пресета живёт на пустой базе: офферы приходят из
-    # опросника/CRM (overrides.custom_offers)
-    base = data.get(tenant_id) or {"control_pct": 10, "offers": []}
+    # Тенант без git-пресета живёт на скелете _default: офферы приходят из
+    # опросника/CRM (overrides.custom_offers), а ЭКОНОМИЧЕСКИЕ пороги (контроль,
+    # потолок p_convert, пол churn) обязаны действовать с первого дня - иначе
+    # скидки полетели бы тем, кто и так не собирался уходить.
+    base = {**(data.get("_default") or {"control_pct": 10, "offers": []}),
+            **(data.get(tenant_id) or {})}
     # правки щедрости/лимитов из CRM (runtime-файл, мерж без деплоя)
     from overrides import load_tenant as load_overrides, merge_catalog
     return merge_catalog(base, load_overrides(tenant_id))

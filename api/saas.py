@@ -580,7 +580,9 @@ def saas_offers():
     path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
                          'stripe_sync', 'offers_catalog.json')
     from stripe_sync import overrides as ovr
-    catalog = ovr.merge_catalog(_json.load(open(path)).get(tenant, {}),
+    _base = _json.load(open(path))
+    catalog = ovr.merge_catalog({**(_base.get('_default') or {}),
+                                 **(_base.get(tenant) or {})},
                                 ovr.load_tenant(tenant))
 
     stats = {r[0]: {'issued': int(r[1]), 'dry_run': int(r[2]),
@@ -606,6 +608,8 @@ def saas_offers():
     } for o in catalog.get('offers', [])]
 
     return api_json({'tenant': tenant, 'control_pct': catalog.get('control_pct', 10),
+                     'p_convert_cap': catalog.get('p_convert_cap'),
+                     'churn_floor': catalog.get('churn_floor'),
                      'offers': offers})
 
 
