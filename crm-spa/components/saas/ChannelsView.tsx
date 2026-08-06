@@ -28,7 +28,7 @@ interface ChannelRow {
   detail: string;
   contacts: number;
   consented: number;
-  email?: { domain: string; from: string; dns_records: DnsRecord[] };
+  email?: { domain: string; from: string; own_account?: boolean; dns_records: DnsRecord[] };
   telegram?: { bot_username: string; connect_link: string };
 }
 
@@ -47,6 +47,7 @@ const STATE_TONE: Record<string, string> = {
 const ERR_KEYS = new Set([
   "invalid_domain", "email_not_on_domain", "no_domain", "telegram_invalid_token",
   "invalid_sms_sender", "invalid_viber_sender", "resend_not_configured",
+  "invalid_resend_key",
 ]);
 
 const inputCls =
@@ -101,6 +102,7 @@ function ChannelCard({
   const [fromEmail, setFromEmail] = useState("");
   const [sender, setSender] = useState("");
   const [token, setToken] = useState("");
+  const [resendKey, setResendKey] = useState("");
 
   const post = useCallback(
     (path: string, body: Record<string, unknown>) => {
@@ -130,9 +132,42 @@ function ChannelCard({
         <StateBadge state={st} />
       </div>
 
-      {/* ── Email: домен -> DNS -> верификация -> отправитель ── */}
+      {/* ── Email: свой аккаунт -> домен -> DNS -> отправитель ── */}
       {row.channel === "email" && (
         <>
+          <div className="rounded-ctl border border-hair bg-surface p-3">
+            <div className="text-[13px] font-medium text-ink">
+              {t("saas.channels.email.acct.title")}
+            </div>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-steel">
+              {row.email?.own_account
+                ? t("saas.channels.email.acct.own")
+                : t("saas.channels.email.acct.platform")}
+            </p>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                className={inputCls + " font-mono"}
+                placeholder="re_..."
+                value={resendKey}
+                onChange={(e) => setResendKey(e.target.value)}
+              />
+              <Button
+                variant={row.email?.own_account ? "ghost" : "brand"}
+                size="sm"
+                loading={busy}
+                disabled={!resendKey.trim()}
+                onClick={() => post("email/key", { api_key: resendKey.trim() })}
+              >
+                {t("saas.channels.email.acct.connect")}
+              </Button>
+              {row.email?.own_account && (
+                <Button variant="ghost" size="sm" loading={busy}
+                        onClick={() => post("email/key", { api_key: "" })}>
+                  {t("saas.channels.email.acct.detach")}
+                </Button>
+              )}
+            </div>
+          </div>
           {st === "not_connected" && (
             <div className="flex flex-col gap-2">
               <label className="text-[13px] text-slate">{t("saas.channels.email.domainLabel")}</label>

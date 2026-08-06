@@ -297,6 +297,13 @@ export const saas = {
   "saas.ws.tokenNo": "без токена",
   "saas.ws.onboarded": "онбординг пройден",
 
+  "saas.channels.email.acct.title": "Аккаунт отправки",
+  "saas.channels.email.acct.platform": "Сейчас письма пойдут через аккаунт платформы. Можно подключить СВОЙ аккаунт Resend - тогда домен, репутация, лимиты и оплата отправки полностью ваши. Зарегистрируйтесь на resend.com, создайте API-ключ (Full access) и вставьте его сюда.",
+  "saas.channels.email.acct.own": "Подключён ваш собственный аккаунт Resend: письма уходят через него, репутация домена и статистика - у вас. Отключите, чтобы вернуться на аккаунт платформы.",
+  "saas.channels.email.acct.connect": "Подключить ключ",
+  "saas.channels.email.acct.detach": "Отключить",
+  "saas.channels.err.invalid_resend_key": "Ключ не принят Resend - проверьте, что скопирован целиком и не отозван.",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

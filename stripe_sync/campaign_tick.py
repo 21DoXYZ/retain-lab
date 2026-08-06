@@ -130,13 +130,14 @@ def _save(client, tenant: str, camp_id: str, row: dict) -> None:
 
 
 def _log_send(client, tenant: str, camp_id: str, identity: str, step_idx: int,
-              action: str, detail: str, status: str, reason: str = "") -> None:
+              action: str, detail: str, status: str, reason: str = "",
+              provider_id: str = "") -> None:
     client.insert(
         "retention.campaign_send_log",
         [[tenant, camp_id, identity, step_idx, action, detail, status, reason,
-          _fmt(_now_dt())]],
+          provider_id, _fmt(_now_dt())]],
         column_names=["tenant_id", "campaign_id", "identity_id", "step_idx",
-                      "action", "detail", "status", "reason", "ts"],
+                      "action", "detail", "status", "reason", "provider_id", "ts"],
     )
 
 
@@ -167,6 +168,12 @@ def tick(client, tenant: str) -> dict[str, int]:
 
     stages = {r[0]: (r[1], r[2], r[3]) for r in client.query(
         "SELECT identity_id, stage, email_norm, client_user_id FROM retention.user_actions "
+        "WHERE tenant_id = %(t)s", parameters={"t": tenant}).result_rows}
+
+    # Подавление email: кому писать НЕЛЬЗЯ (отписался, пожаловался, баунс).
+    # Fail-closed: сомнений нет - адрес в списке, значит письма не будет.
+    suppressed = {r[0] for r in client.query(
+        "SELECT address FROM retention.email_suppressions_current "
         "WHERE tenant_id = %(t)s", parameters={"t": tenant}).result_rows}
 
     # контакты не-email каналов: (client_user_id, channel) -> (address, consent)
@@ -227,6 +234,9 @@ def tick(client, tenant: str) -> dict[str, int]:
                         if not address:
                             _log_send(client, tenant, cid, identity, i, channel,
                                       step.get("subject", ""), "rejected", "no_contact")
+                        elif channel == "email" and address.lower() in suppressed:
+                            _log_send(client, tenant, cid, identity, i, channel,
+                                      step.get("subject", ""), "rejected", "suppressed")
                         elif not consent:
                             _log_send(client, tenant, cid, identity, i, channel,
                                       step.get("subject", ""), "rejected", "no_consent")
@@ -234,9 +244,13 @@ def tick(client, tenant: str) -> dict[str, int]:
                             ok, detail = route_message(
                                 channel, address, step.get("subject", ""),
                                 step["body"], email_cfg, msg_cfg)
+                            # detail успешной отправки = id письма у провайдера:
+                            # по нему вебхуки доставки находят это касание
+                            pid = detail if (ok and detail != "dry_run") else ""
                             _log_send(client, tenant, cid, identity, i, channel,
-                                      step.get("subject", ""), detail if ok else "rejected",
-                                      "" if ok else detail)
+                                      step.get("subject", ""),
+                                      "dry_run" if detail == "dry_run" else ("sent" if ok else "rejected"),
+                                      "" if ok else detail, pid)
                     elif step["action"] == "inapp":
                         # Баннер в продукте тенанта - касание, поэтому уважает
                         # dry-run (autopilot=false -> в очередь не пишем).

@@ -34,6 +34,8 @@ services:
       # статус платформенного dry-run для /saas/campaigns (честность UI)
       SIGNALS_DRY_RUN: ${SIGNALS_DRY_RUN:-1}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      UNSUB_SECRET: ${UNSUB_SECRET:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       DECISION_API_KEY: ${DECISION_API_KEY:-}
       DECISION_SMS_SENDER: ${DECISION_SMS_SENDER:-}

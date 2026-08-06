@@ -603,3 +603,46 @@ CREATE TABLE IF NOT EXISTS retention.cancel_reasons
 )
 ENGINE = ReplacingMergeTree(created_at)
 ORDER BY (tenant_id, event_id);
+
+-- ============================================================================
+-- Email-канал: доставляемость и закон. Без этих трёх таблиц отправка «в
+-- никуда»: не видно баунсов, нельзя выполнить отписку, можно спамить в
+-- жалующихся (домен уходит в чёрные списки).
+-- ============================================================================
+
+-- События доставки от Resend (webhook): sent/delivered/opened/clicked/
+-- bounced/complained/delivery_delayed. Первичный ключ - id письма провайдера.
+CREATE TABLE IF NOT EXISTS retention.email_events
+(
+    `tenant_id`   LowCardinality(String),
+    `provider_id` String,                   -- id письма в Resend
+    `event_type`  LowCardinality(String),
+    `address`     String,
+    `campaign_id` LowCardinality(String),
+    `step_idx`    Int32,
+    `detail`      String,                   -- причина баунса и т.п.
+    `ts`          DateTime64(3)
+)
+ENGINE = MergeTree
+ORDER BY (tenant_id, provider_id, event_type, ts);
+
+-- Список подавления: кому больше НЕ пишем никогда. Причины: отписка юзера,
+-- жалоба на спам, жёсткий баунс (адрес не существует).
+CREATE TABLE IF NOT EXISTS retention.email_suppressions
+(
+    `tenant_id`  LowCardinality(String),
+    `address`    String,
+    `reason`     LowCardinality(String),    -- unsubscribed | complained | bounced
+    `detail`     String,
+    `created_at` DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (tenant_id, address);
+
+CREATE OR REPLACE VIEW retention.email_suppressions_current AS
+SELECT tenant_id, address,
+       argMax(reason, created_at) AS reason,
+       argMax(detail, created_at) AS detail,
+       max(created_at)            AS suppressed_at
+FROM retention.email_suppressions
+GROUP BY tenant_id, address;

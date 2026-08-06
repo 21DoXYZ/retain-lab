@@ -21,6 +21,9 @@ import os
 from flask import Blueprint, request
 
 from .core import api_json
+
+import logging
+logger = logging.getLogger('api.public')
 from player_board import q
 
 bp = Blueprint('api_public', __name__, url_prefix='/public')
@@ -128,3 +131,127 @@ def inbox():
     return api_json({'messages': [
         {'message_id': r[0], 'title': r[1], 'body': r[2],
          'cta_label': r[3], 'cta_url': r[4]} for r in rows]})
+
+# ── Email: отписка и вебхуки доставки Resend ─────────────────────────────────
+
+def _ch_client():
+    import clickhouse_connect
+    return clickhouse_connect.get_client(
+        host=os.environ.get('CH_HOST', 'clickhouse'),
+        port=int(os.environ.get('CH_PORT', '8123')),
+        username=os.environ.get('CH_USER', 'default'),
+        password=os.environ.get('CH_PASSWORD', ''),
+        database=os.environ.get('CH_DB', 'retention'))
+
+
+def _suppress(tenant: str, address: str, reason: str, detail: str = '') -> None:
+    from datetime import datetime, timezone
+    now = datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    _ch_client().insert(
+        'retention.email_suppressions',
+        [[tenant, address.strip().lower(), reason, detail[:300], now]],
+        column_names=['tenant_id', 'address', 'reason', 'detail', 'created_at'])
+
+
+_UNSUB_PAGE = (
+    '<!doctype html><html><head><meta charset="utf-8">'
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    '<title>Unsubscribed</title></head>'
+    '<body style="margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;'
+    'background:#f6f7f9;display:grid;place-items:center;min-height:100vh">'
+    '<div style="background:#fff;border-radius:12px;padding:32px 28px;max-width:420px;'
+    'text-align:center;color:#101828">'
+    '<div style="font-size:17px;font-weight:600;margin-bottom:8px">{title}</div>'
+    '<div style="font-size:14px;color:#667085;line-height:1.5">{text}</div>'
+    '</div></body></html>')
+
+
+def _unsub_page(title: str, text: str, code: int = 200):
+    from flask import Response
+    return Response(_UNSUB_PAGE.format(title=title, text=text), status=code,
+                    mimetype='text/html; charset=utf-8')
+
+
+@bp.route('/unsubscribe', methods=['GET', 'POST'])
+def unsubscribe():
+    """Отписка по подписанной ссылке из письма. GET - страница подтверждения,
+    POST - one-click (List-Unsubscribe-Post, так делают Gmail/Outlook).
+    Подпись обязательна: иначе можно было бы отписать любого чужого."""
+    from stripe_sync.email_delivery import unsub_token_valid
+
+    tenant = (request.args.get('t') or '').strip()
+    address = (request.args.get('a') or '').strip().lower()
+    sig = (request.args.get('s') or '').strip()
+    if not tenant or not address or not unsub_token_valid(tenant, address, sig):
+        return _unsub_page('Link is not valid',
+                           'This unsubscribe link is broken or incomplete.', 400)
+    try:
+        _suppress(tenant, address, 'unsubscribed', 'user request')
+    except Exception as exc:  # noqa: BLE001
+        logger.error('unsubscribe: не записалось: %s', exc)
+        return _unsub_page('Something went wrong',
+                           'Please try again in a minute.', 503)
+    print(f'[unsubscribe] {tenant}: {address}', flush=True)
+    return _unsub_page('You are unsubscribed',
+                       'You will not receive marketing emails from this product '
+                       'again. Billing and account notices may still arrive.')
+
+
+@bp.post('/resend/webhook')
+def resend_webhook():
+    """События доставки от Resend (Svix-подпись). Fail-closed: без секрета
+    RESEND_WEBHOOK_SECRET или с плохой подписью - 400, ничего не пишем.
+    Баунс и жалоба сразу кладут адрес в список подавления."""
+    from stripe_sync.email_delivery import parse_webhook, verify_svix
+
+    secret = os.environ.get('RESEND_WEBHOOK_SECRET', '').strip()
+    raw = request.get_data() or b''
+    ok = verify_svix(secret,
+                     request.headers.get('svix-id', ''),
+                     request.headers.get('svix-timestamp', ''),
+                     raw,
+                     request.headers.get('svix-signature', ''))
+    if not ok:
+        return api_json(None, 400, 'bad_signature')
+
+    import json as _json
+    try:
+        doc = _json.loads(raw.decode() or '{}')
+    except ValueError:
+        return api_json(None, 400, 'invalid_json')
+
+    ev = parse_webhook(doc)
+    if not ev:
+        return api_json({'status': 'ignored'})
+
+    tenant = str(request.args.get('tenant') or '').strip()
+    if not tenant:
+        # tenant в query вебхука (у каждого тенанта свой endpoint-URL)
+        return api_json(None, 400, 'tenant_required')
+
+    from datetime import datetime, timezone
+    now = datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    client = _ch_client()
+
+    # к какому касанию относится письмо - ищем по id письма провайдера
+    camp, step = '', -1
+    if ev['provider_id']:
+        rows = client.query(
+            "SELECT campaign_id, step_idx FROM retention.campaign_send_log "
+            "WHERE tenant_id = %(t)s AND provider_id = %(p)s LIMIT 1",
+            parameters={'t': tenant, 'p': ev['provider_id']}).result_rows
+        if rows:
+            camp, step = rows[0][0], int(rows[0][1])
+
+    client.insert(
+        'retention.email_events',
+        [[tenant, ev['provider_id'], ev['event_type'], ev['address'], camp,
+          step, ev['detail'], now]],
+        column_names=['tenant_id', 'provider_id', 'event_type', 'address',
+                      'campaign_id', 'step_idx', 'detail', 'ts'])
+
+    if ev['suppress_reason'] and ev['address']:
+        _suppress(tenant, ev['address'], ev['suppress_reason'], ev['detail'])
+        print(f"[resend] {tenant}: {ev['address']} -> {ev['suppress_reason']}", flush=True)
+
+    return api_json({'status': 'ok'})

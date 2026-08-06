@@ -298,6 +298,13 @@ export const saas: Partial<Messages> = {
   "saas.ws.tokenNo": "no token",
   "saas.ws.onboarded": "onboarded",
 
+  "saas.channels.email.acct.title": "Sending account",
+  "saas.channels.email.acct.platform": "Emails currently go through the platform account. You can connect YOUR own Resend account - then the domain, reputation, limits and sending costs are fully yours. Sign up at resend.com, create an API key (Full access) and paste it here.",
+  "saas.channels.email.acct.own": "Your own Resend account is connected: emails go through it, domain reputation and stats are yours. Detach to fall back to the platform account.",
+  "saas.channels.email.acct.connect": "Connect key",
+  "saas.channels.email.acct.detach": "Detach",
+  "saas.channels.err.invalid_resend_key": "Resend rejected the key - check it is copied in full and not revoked.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

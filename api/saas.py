@@ -607,6 +607,12 @@ import secrets as _secrets
 from stripe_sync import channels_admin as ca
 
 
+def _tenant_resend_key(tenant: str) -> str:
+    """Ключ Resend для тенанта: свой аккаунт клиента > платформенный."""
+    own = str((ca.load_tenants().get(tenant, {}) or {}).get('resend_api_key') or '').strip()
+    return own or _os.environ.get('RESEND_API_KEY', '').strip()
+
+
 def _platform(name: str) -> bool:
     return bool(_os.environ.get(name, '').strip())
 
@@ -676,7 +682,7 @@ def _channels_payload(tenant: str) -> dict:
         """, {'t': tenant})[1]}
 
     tch = ca.load_tenants().get(tenant, {}) or {}
-    resend_key = _platform('RESEND_API_KEY')
+    resend_key = bool(_tenant_resend_key(tenant))
     dt_key = _platform('DECISION_API_KEY')
     bot_user = str(tch.get('telegram_bot_username', ''))
 
@@ -696,6 +702,7 @@ def _channels_payload(tenant: str) -> dict:
          'contacts': email_users, 'consented': email_users,
          'email': {'domain': tch.get('email_domain', ''),
                    'from': tch.get('email_from', ''),
+                   'own_account': bool(tch.get('resend_api_key')),
                    'dns_records': tch.get('email_dns_records', [])}},
         {'channel': 'inapp', 'provider': 'Site snippet',
          'state': 'active' if snippet_alive and identified else 'not_connected',
@@ -1102,7 +1109,7 @@ def channels_email_domain():
     if not ca.DOMAIN_RE.match(domain):
         return _bad('invalid_domain')
 
-    key = _os.environ.get('RESEND_API_KEY', '').strip()
+    key = _tenant_resend_key(tenant)
     if not key:
         ca.update_tenant(tenant, {'email_domain': domain,
                                   'email_domain_status': 'awaiting_provider',
@@ -1133,7 +1140,7 @@ def channels_email_verify():
     domain = str(tch.get('email_domain', ''))
     if not domain:
         return _bad('no_domain')
-    key = _os.environ.get('RESEND_API_KEY', '').strip()
+    key = _tenant_resend_key(tenant)
     if not key:
         return _bad('resend_not_configured', 409)
 
@@ -1177,6 +1184,43 @@ def channels_email_sender():
         return _bad('email_not_on_domain')
     email_from = f'{name} <{addr}>' if name else addr
     ca.update_tenant(tenant, {'email_from': email_from})
+    return api_json(_channels_payload(tenant))
+
+
+@bp.post('/saas/channels/email/key')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def channels_email_key():
+    """Свой аккаунт Resend: клиент вставляет ключ re_..., проверяем его живым
+    запросом и сохраняем. Пустая строка - вернуться на платформенный аккаунт."""
+    import urllib.error as _ue
+    import urllib.request as _ur
+
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    key = str((request.get_json(silent=True) or {}).get('api_key', '')).strip()
+
+    if not key:
+        ca.update_tenant(tenant, {'resend_api_key': None})
+        return api_json(_channels_payload(tenant))
+    if not key.startswith('re_') or len(key) < 20:
+        return _bad('invalid_resend_key')
+
+    # живая проверка: ключ должен уметь читать домены аккаунта
+    req = _ur.Request('https://api.resend.com/domains',
+                      headers={'Authorization': f'Bearer {key}'})
+    try:
+        with _ur.urlopen(req, timeout=20) as resp:
+            if not (200 <= resp.status < 300):
+                return _bad(f'resend_http_{resp.status}', 502)
+    except _ue.HTTPError as exc:
+        return _bad('invalid_resend_key' if exc.code in (401, 403) else f'resend_http_{exc.code}',
+                    400 if exc.code in (401, 403) else 502)
+    except Exception as exc:  # noqa: BLE001
+        return _bad(f'resend_{type(exc).__name__}', 502)
+
+    ca.update_tenant(tenant, {'resend_api_key': key})
+    print(f'[channels] {tenant}: подключён собственный аккаунт Resend', flush=True)
     return api_json(_channels_payload(tenant))
 
 

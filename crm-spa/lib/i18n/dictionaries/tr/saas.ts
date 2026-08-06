@@ -291,6 +291,13 @@ export const saas: Partial<Messages> = {
   "saas.ws.tokenNo": "",
   "saas.ws.onboarded": "",
 
+  "saas.channels.email.acct.title": "",
+  "saas.channels.email.acct.platform": "",
+  "saas.channels.email.acct.own": "",
+  "saas.channels.email.acct.connect": "",
+  "saas.channels.email.acct.detach": "",
+  "saas.channels.err.invalid_resend_key": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",
