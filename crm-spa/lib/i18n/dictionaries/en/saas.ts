@@ -336,8 +336,8 @@ export const saas: Partial<Messages> = {
   "saas.channels.name.viber": "Viber",
   "saas.channels.name.telegram": "Telegram",
   "saas.channels.name.inapp": "In-app",
-  "saas.channels.inapp.activeNote": "Banners show right inside your product via the installed snippet - the highest-converting channel for dunning. No extra setup.",
-  "saas.channels.inapp.setupNote": "Activates automatically once the snippet is installed and users are identified (ra.identify).",
+  "saas.channels.inapp.activeNote": "Live. A touch appears as a slim bar at the top of your product while the user is working: one short line, an action button and a close X. Clicked or dismissed - we never show it again; when the stage changes (card fixed, for example) the banner clears itself. No provider and no consent needed, it all runs through your snippet.",
+  "saas.channels.inapp.setupNote": "Off for now. Two things are needed: the snippet on your site and ra.identify(userId, email) after the user logs in. Then the channel turns itself on - a touch shows as a slim bar at the top of your product with an action button and a close X. No provider account required.",
   "saas.channels.name.whatsapp": "WhatsApp",
 
   "saas.channels.state.active": "connected",
