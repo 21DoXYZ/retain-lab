@@ -198,13 +198,32 @@ def run_stitch(client, tenant_id: str, now_ts: str) -> dict[str, int]:
         ).result_rows
     ]
 
+    # первая встреча - это ПЕРВАЯ, а не время последнего прогона джоба
+    seen_before = {r[0]: str(r[1]) for r in client.query(
+        "SELECT identity_id, toString(min(first_seen)) FROM retention.identities "
+        "WHERE tenant_id = %(t)s GROUP BY identity_id",
+        parameters={"t": tenant_id}).result_rows}
+
     identities, unmatched = build_identities(tenant_id, customers, event_keys)
 
     if identities:
+        # ЧИСТКА УСТАРЕВШИХ. Джоб пересобирает картину заново, но раньше только
+        # ДОПИСЫВАЛ: временная личность анонима (cuid:) оставалась в таблице и
+        # после того, как человек представился и получил каноническую личность
+        # по email. Итог: у одного человека две строки с ОДНИМ client_user_id,
+        # а значит каждое его событие попадало в аналитику ДВАЖДЫ - удваивался
+        # расход, ломался burn_rate (ложная стадия «упёрся в лимит»), человек
+        # дублировался в списке и заводился в цепочки двумя копиями.
+        alive = [i.identity_id for i in identities]
+        client.command(
+            "ALTER TABLE retention.identities DELETE "
+            "WHERE tenant_id = %(t)s AND identity_id NOT IN %(alive)s",
+            parameters={"t": tenant_id, "alive": alive})
         client.insert(
             "retention.identities",
             [[i.tenant_id, i.identity_id, i.email_hash, i.email_norm,
-              i.stripe_customer_id, i.client_user_id, i.sources, now_ts, now_ts]
+              i.stripe_customer_id, i.client_user_id, i.sources,
+              seen_before.get(i.identity_id) or now_ts, now_ts]
              for i in identities],
             column_names=["tenant_id", "identity_id", "email_hash", "email_norm",
                           "stripe_customer_id", "client_user_id", "sources",
@@ -226,7 +245,7 @@ def main() -> None:
     from datetime import datetime, timezone
 
     tenant_id = os.environ.get("TENANT_ID", "").strip()
-    if not tenant_id_id:
+    if not tenant_id:
         raise SystemExit("нужен TENANT_ID: джоб работает в пространстве клиента")
     client = clickhouse_connect.get_client(
         host=os.environ.get("CH_HOST", "clickhouse"),

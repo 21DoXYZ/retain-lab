@@ -105,3 +105,35 @@ def test_r4_yields_to_email_identity_when_hash_appears():
         EventKey(client_user_id="u1", email_hash="h1", last_ts="2026-08-05 11:00:00"),
     ])
     assert len(ids) == 1 and ids[0].email_hash == "h1"
+
+
+def test_every_job_entrypoint_is_runnable():
+    """Джобы запускаются подпроцессом из планировщика: опечатка в main() не
+    видна ни импортом, ни линтером - падает только в проде. Здесь проверяем,
+    что каждый вход компилируется и не ссылается на несуществующие имена."""
+    import pathlib
+    import py_compile
+    import symtable
+
+    jobs = ["stitch", "scoring", "contacts_sync", "plans_sync", "campaign_tick",
+            "uplift_report", "ai_analyst", "cancel_reasons", "issue", "backfill"]
+    root = pathlib.Path(__file__).resolve().parent.parent
+    for name in jobs:
+        path = root / f"{name}.py"
+        py_compile.compile(str(path), doraise=True)
+        src = path.read_text()
+        table = symtable.symtable(src, str(path), "exec")
+        main = next((c for c in table.get_children() if c.get_name() == "main"), None)
+        if main is None:
+            continue
+        local = {sym.get_name() for sym in main.get_symbols() if sym.is_assigned()}
+        module = {sym.get_name() for sym in table.get_symbols()}
+        import builtins
+        for sym in main.get_symbols():
+            if not sym.is_referenced() or sym.is_assigned() or sym.is_imported():
+                continue
+            n = sym.get_name()
+            if n.startswith("__") and n.endswith("__"):
+                continue          # __file__ и прочая магия модуля
+            assert n in local or n in module or hasattr(builtins, n), \
+                f"{name}.main(): имя {n!r} нигде не определено"

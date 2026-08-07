@@ -324,7 +324,18 @@ SELECT
     maxIf(ts, event_type = 'billing.invoice_paid')                       AS last_invoice_paid,
     maxIf(ts, event_type = 'billing.subscription_cancel_scheduled')      AS last_cancel_scheduled,
     maxIf(ts, event_type NOT LIKE 'billing.%')                           AS last_product_seen
-FROM retention.saas_events_resolved
+FROM (
+    -- ДЕДУПЛИКАЦИЯ. Сниппет повторяет отправку при сбое сети, Stripe
+    -- перепосылает вебхук на любой не-2xx - одно и то же событие приходит
+    -- дважды. Без схлопывания по event_id удваивался расход юнитов (ложная
+    -- стадия «упёрся в лимит») и число моментов ценности.
+    SELECT tenant_id, identity_id, event_id,
+           any(ts)           AS ts,
+           any(event_type)   AS event_type,
+           any(tokens_spent) AS tokens_spent
+    FROM retention.saas_events_resolved
+    GROUP BY tenant_id, identity_id, event_id
+)
 GROUP BY tenant_id, identity_id;
 
 -- Последний снимок подписки per customer.
@@ -338,6 +349,7 @@ SELECT tenant_id, customer_id,
        argMax(trial_end, updated_at)        AS trial_end,
        argMax(cancel_at, updated_at)        AS cancel_at,
        argMax(canceled_at, updated_at)      AS canceled_at,
+       argMax(current_period_start, updated_at) AS current_period_start,
        argMax(current_period_end, updated_at) AS current_period_end
 FROM retention.stripe_subscriptions
 GROUP BY tenant_id, customer_id;
@@ -349,6 +361,27 @@ GROUP BY tenant_id, customer_id;
 -- Лестница тарифов: для каждого плана - цена СЛЕДУЮЩЕГО по величине. Нужна,
 -- чтобы «недобор апгрейдов» считался реальной разницей цен, а не выдуманным
 -- процентом от текущего платежа.
+-- Расход юнитов ЗА ТЕКУЩИЙ ОПЛАЧЕННЫЙ ПЕРИОД человека. Лимит тарифа
+-- обновляется в дату его платежа, а не 1-го числа: у клиента с оплатой 20-го
+-- календарный счётчик обнулялся посреди периода, burn_rate падал в пол и
+-- стадия «упёрся в лимит» пропадала ровно тогда, когда человек у лимита.
+CREATE OR REPLACE VIEW retention.user_period_usage AS
+SELECT e.tenant_id                AS tenant_id,
+       e.identity_id              AS identity_id,
+       sum(e.tokens_spent)        AS tokens_spent_period
+FROM (
+    SELECT tenant_id, identity_id, event_id,
+           any(ts) AS ts, any(tokens_spent) AS tokens_spent
+    FROM retention.saas_events_resolved
+    GROUP BY tenant_id, identity_id, event_id
+) e
+JOIN retention.identities_current i
+  ON i.tenant_id = e.tenant_id AND i.identity_id = e.identity_id
+JOIN retention.stripe_subscriptions_current s
+  ON s.tenant_id = i.tenant_id AND s.customer_id = i.stripe_customer_id
+WHERE e.ts >= s.current_period_start
+GROUP BY e.tenant_id, e.identity_id;
+
 CREATE OR REPLACE VIEW retention.tenant_plan_ladder AS
 SELECT p.tenant_id                                   AS tenant_id,
        p.plan_id                                     AS plan_id,
@@ -361,7 +394,9 @@ GROUP BY p.tenant_id, p.plan_id, p.mrr;
 CREATE OR REPLACE VIEW retention.user_actions AS
 WITH
     if(s.bill_interval = 'year', round(s.amount / 12, 2), s.amount) AS sub_mrr,
-    if(p.monthly_tokens > 0, f.tokens_spent_month / p.monthly_tokens, 0) AS burn_rate_calc,
+    if(p.monthly_tokens > 0,
+       coalesce(u.tokens_spent_period, f.tokens_spent_month) / p.monthly_tokens,
+       0)                                                               AS burn_rate_calc,
     s.status IN ('active', 'past_due') AS is_paying,
     (f.last_payment_failed > f.last_invoice_paid) OR (s.status = 'past_due') AS dunning_now,
     s.status = 'canceled' AS is_canceled,
@@ -417,6 +452,8 @@ LEFT JOIN retention.tenant_plans_current p
     ON i.tenant_id = p.tenant_id AND s.plan_id = p.plan_id
 LEFT JOIN retention.tenant_plan_ladder l
     ON i.tenant_id = l.tenant_id AND s.plan_id = l.plan_id
+LEFT JOIN retention.user_period_usage u
+    ON i.tenant_id = u.tenant_id AND i.identity_id = u.identity_id
 LEFT JOIN retention.user_scores_current sc
     ON i.tenant_id = sc.tenant_id AND i.identity_id = sc.identity_id;
 
