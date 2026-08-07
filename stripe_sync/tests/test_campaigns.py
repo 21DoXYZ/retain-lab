@@ -165,8 +165,10 @@ class _Res:
 class FakeCH:
     """Минимальный клиент: отвечает по фрагменту запроса, копит вставки."""
 
-    def __init__(self, stages, retry_rows=0):
+    def __init__(self, stages, retry_rows=0, touches=None):
         self.stages, self.retry_rows = stages, retry_rows
+        # [identity, касаний за сутки, за неделю] - частотный предохранитель
+        self.touches = touches or []
         self.inserts = []
 
     def query(self, sql, parameters=None):
@@ -178,6 +180,8 @@ class FakeCH:
             return _Res([])
         if "campaign_enrollments_current" in sql:
             return _Res([])
+        if "campaign_send_log" in sql and "GROUP BY identity_id" in sql:
+            return _Res(self.touches)
         if "campaign_send_log" in sql:
             return _Res([[self.retry_rows]])
         raise AssertionError("неожиданный запрос: " + sql[:80])
@@ -200,7 +204,8 @@ class FakeCH:
         return out
 
 
-def _live_tick(monkeypatch, tmp_path, sender, retry_rows=0, users=None):
+def _live_tick(monkeypatch, tmp_path, sender, retry_rows=0, users=None,
+               touches=None):
     """Тик с боевым (не dry-run) режимом и подменённой отправкой."""
     import campaign_tick as ct
     import overrides as ov_mod
@@ -214,7 +219,7 @@ def _live_tick(monkeypatch, tmp_path, sender, retry_rows=0, users=None):
     monkeypatch.setenv("EMAIL_FROM", "Probe <care@probe.test>")
     monkeypatch.setattr(ct, "route_message", sender)
     users = users or [["id1", "DUNNING", "user1@probe.test", "u1"]]
-    client = FakeCH(users, retry_rows=retry_rows)
+    client = FakeCH(users, retry_rows=retry_rows, touches=touches)
     return client, ct.tick(client, "probe")
 
 
@@ -290,3 +295,88 @@ def test_sms_length_respects_the_alphabet():
     assert len(fit_sms(ru)) <= 140 and fit_sms(ru).endswith("…")
     assert len(fit_sms(en)) <= 320 and fit_sms(en).endswith("…")
     assert fit_sms("Коротко") == "Коротко"        # короткое не трогаем
+
+
+# ── Частота и форма цепочек: сверено с публичными бенчмарками ────────────────
+
+def test_frequency_cap_is_a_rule_about_the_person_not_the_campaign():
+    """Причина отписок №1 - количество писем, а не их текст.
+
+    Отдельная цепочка не видит соседей, поэтому лимит стоит НАД кампаниями.
+    """
+    from campaign_tick import frequency_block
+    assert frequency_block("K1_activation", 0, 0) == ""
+    assert frequency_block("K1_activation", 1, 1) == "freq_cap_day"
+    assert frequency_block("K1_activation", 0, 3) == "freq_cap_week"
+
+
+def test_dunning_ignores_the_frequency_cap():
+    """Сломанная оплата - не рассылка. Молчать про неё ради частоты нельзя."""
+    from campaign_tick import frequency_block
+    assert frequency_block("K3_payment_recovery", 5, 20) == ""
+
+
+def test_frequency_cap_holds_the_touch_instead_of_burning_it(monkeypatch, tmp_path):
+    """Придержанный шаг обязан созреть снова, а не пропасть.
+
+    Иначе соседняя кампания молча съедала бы касание навсегда.
+    """
+    import campaign_tick as ct
+    sent = []
+    client, _ = _live_tick(monkeypatch, tmp_path,
+                           lambda *a, **k: (sent.append(a) or (True, "id")),
+                           users=[["id1", "ACTIVATE", "u@probe.test", "u1"]],
+                           touches=[["id1", 1, 1]])
+    assert not sent                                  # письмо не ушло
+    logged = client.logged()
+    assert logged and logged[0]["reason"] == "freq_cap_day"
+    saved = client.saved()
+    assert not saved or saved[0]["step_idx"] == 0    # шаг не сдвинут
+
+
+def _chain(campaign_id):
+    import json
+    from campaign_tick import CAMPAIGNS_PATH
+    conf = json.loads(CAMPAIGNS_PATH.read_text())["_default"]
+    camp = next(c for c in conf["campaigns"] if c["campaign_id"] == campaign_id)
+    days, total = [], 0.0
+    for s in camp["steps"]:
+        total += float(s.get("delay_h", 0)) / 24.0
+        days.append(round(total, 1))
+    return camp, days
+
+
+def test_dunning_runs_for_weeks_because_late_touches_still_recover():
+    """Нулевой день возвращает ~13% платежей, но и тридцатый ещё ~4%.
+
+    Цепочка на три дня дарила эти проценты никому.
+    """
+    camp, days = _chain("K3_payment_recovery")
+    assert days[-1] >= 14, "дуннинг обрывается раньше двух недель"
+    emails = [s for s in camp["steps"] if s["action"] == "email"]
+    assert len(emails) >= 4, "меньше четырёх писем - ниже бенчмарка"
+
+
+def test_winback_waits_before_the_first_word_and_pays_late():
+    """Первое касание на 14-й день даёт больше возвратов, чем письмо вдогонку.
+
+    А глубина скидки решает меньше, чем момент: деньги предлагаем последними,
+    иначе возвращаются те, кто уйдёт снова, как только скидка кончится.
+    """
+    camp, days = _chain("K6_winback")
+    assert days[0] >= 14, "пишем вдогонку, не дав человеку соскучиться"
+    actions = [s["action"] for s in camp["steps"]]
+    assert actions[0] != "offer", "винбэк начинается с денег"
+    assert days[actions.index("offer")] >= 30, "подарок раньше 30-го дня"
+    assert days[-1] >= 60
+
+
+def test_no_chain_opens_with_a_gift():
+    """Верх лестницы уступок: сначала слово, деньги потом.
+
+    Подарок первым шагом - это плата раньше, чем мы вообще попросили.
+    """
+    import json
+    from campaign_tick import CAMPAIGNS_PATH
+    for camp in json.loads(CAMPAIGNS_PATH.read_text())["_default"]["campaigns"]:
+        assert camp["steps"][0]["action"] != "offer", camp["campaign_id"]

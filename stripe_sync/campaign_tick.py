@@ -105,6 +105,32 @@ INAPP_COLUMNS = ["tenant_id", "message_id", "client_user_id", "identity_id",
 
 MAX_SEND_RETRIES = 3
 
+# ЧАСТОТНЫЙ ПРЕДОХРАНИТЕЛЬ. Главная причина отписок - не содержание письма, а
+# их количество: около 44% отписавшихся называют частоту первой причиной.
+# Ни одна отдельная кампания не может её нарушить, потому что она не знает о
+# других: цепочка видит только свои шаги. Поэтому лимит стоит НАД кампаниями.
+MAX_TOUCHES_PER_DAY = 1
+MAX_TOUCHES_PER_WEEK = 3
+
+# Дуннинг - исключение и единственное. Это не рассылка, а сообщение о том, что
+# у человека сломалась оплата: молчать про это ради красивой частоты нельзя.
+FREQ_EXEMPT = ("K3_payment_recovery",)
+
+
+def frequency_block(campaign_id: str, sent_24h: int, sent_7d: int) -> str:
+    """Можно ли писать этому человеку сейчас. '' - можно, иначе причина.
+
+    Отдельная функция, потому что это правило про ЧЕЛОВЕКА, а не про кампанию,
+    и его надо проверять одинаково из любой цепочки.
+    """
+    if campaign_id in FREQ_EXEMPT:
+        return ""
+    if sent_24h >= MAX_TOUCHES_PER_DAY:
+        return "freq_cap_day"
+    if sent_7d >= MAX_TOUCHES_PER_WEEK:
+        return "freq_cap_week"
+    return ""
+
 
 def _retry_count(client, tenant: str, campaign_id: str, identity: str,
                  step_idx: int) -> int:
@@ -215,6 +241,19 @@ def tick(client, tenant: str) -> dict[str, int]:
         "SELECT address FROM retention.email_suppressions_current "
         "WHERE tenant_id = %(t)s", parameters={"t": tenant}).result_rows}
 
+    # Сколько касаний человек уже получил - СО ВСЕХ кампаний сразу. Считаем
+    # один раз за тик: отдельная цепочка не видит соседей и сама по себе
+    # частоту не удержит.
+    touches = {}
+    for r in client.query(
+        "SELECT identity_id, countIf(ts > now() - INTERVAL 1 DAY), "
+        "       countIf(ts > now() - INTERVAL 7 DAY) "
+        "FROM retention.campaign_send_log "
+        "WHERE tenant_id = %(t)s AND status IN ('sent', 'dry_run') "
+        "AND ts > now() - INTERVAL 7 DAY GROUP BY identity_id",
+            parameters={"t": tenant}).result_rows:
+        touches[r[0]] = (int(r[1]), int(r[2]))
+
     # контакты не-email каналов: (client_user_id, channel) -> (address, consent)
     contacts = {(r[0], r[1]): (r[2], int(r[3])) for r in client.query(
         "SELECT client_user_id, channel, address, consent "
@@ -281,7 +320,19 @@ def tick(client, tenant: str) -> dict[str, int]:
                             elif not consent:
                                 _log_send(client, tenant, cid, identity, i, channel,
                                           step.get("subject", ""), "rejected", "no_consent")
+                            elif frequency_block(cid, *touches.get(identity, (0, 0))):
+                                # Шаг НЕ отработан: он созреет снова, когда
+                                # частота позволит. Иначе касание пропадало бы
+                                # навсегда из-за соседней кампании.
+                                _log_send(client, tenant, cid, identity, i, channel,
+                                          step.get("subject", ""), "rejected",
+                                          frequency_block(cid, *touches.get(identity, (0, 0))))
+                                retry_step = True
                             else:
+                                # счётчик растёт СРАЗУ: за один тик могут созреть
+                                # два шага, и второй обязан увидеть первый
+                                day, week = touches.get(identity, (0, 0))
+                                touches[identity] = (day + 1, week + 1)
                                 ok, detail = route_message(
                                     channel, address, step.get("subject", ""),
                                     step["body"], email_cfg, msg_cfg)
