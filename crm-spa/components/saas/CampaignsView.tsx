@@ -20,6 +20,8 @@ interface Step {
   subject: string;
   body: string;
   offer_id: string;
+  /** человеческое название подарка - машинный id владельцу не показываем */
+  offer_title: string;
   cta_label: string;
   cta_url: string;
   edited: boolean;
@@ -131,7 +133,10 @@ function StepRow({
             <span className="mr-2 inline-block rounded-md border border-hair2 bg-surface px-1.5 py-0.5 font-mono text-[11px] text-slate">
               {step.action === "email" || step.action === "message" ? step.channel || "email" : step.action}
             </span>
-            {step.subject || (step.offer_id ? `${t("saas.camp.offer")}: ${step.offer_id}` : "")}
+            {step.subject ||
+              (step.offer_id
+                ? `${t("saas.camp.offer")}: ${step.offer_title || step.offer_id}`
+                : "")}
             <SourceBadge source={step.source} />
           </div>
           {!editing && (

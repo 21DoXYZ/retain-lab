@@ -1136,6 +1136,20 @@ def _autopilot_resolved(conf: dict, tenant: str) -> bool:
 def _campaigns_payload(tenant: str) -> dict:
     conf = _campaigns_conf(tenant)
 
+    # Названия офферов: шаг цепочки хранит машинный id (AI_discount20_1mo),
+    # а владелец должен видеть человеческое название подарка.
+    import json as _json2
+    import os as _os2
+    from stripe_sync import overrides as _ovr
+    _path = _os2.path.join(_os2.path.dirname(_os2.path.dirname(_os2.path.abspath(__file__))),
+                           'stripe_sync', 'offers_catalog.json')
+    _cbase = _json2.load(open(_path))
+    _cat = _ovr.merge_catalog({**(_cbase.get('_default') or {}),
+                               **(_cbase.get(tenant) or {})},
+                              _ovr.load_tenant(tenant))
+    offer_titles = {o['offer_id']: str(o.get('title') or o['offer_id'])
+                    for o in _cat.get('offers', [])}
+
     enr = {r[0]: {'enrolled': int(r[1]), 'active': int(r[2]), 'holdout': int(r[3]),
                   'done': int(r[4]), 'exited': int(r[5])} for r in q(
         """
@@ -1162,6 +1176,7 @@ def _campaigns_payload(tenant: str) -> dict:
                    'channel': s.get('channel', 'email' if s.get('action') == 'email' else ''),
                    'subject': s.get('subject', ''), 'body': s.get('body', ''),
                    'offer_id': s.get('offer_id', ''),
+                   'offer_title': offer_titles.get(s.get('offer_id', ''), ''),
                    'cta_label': s.get('cta_label', ''),
                    'cta_url': s.get('cta_url', ''),
                    'edited': bool(s.get('_edited')),
