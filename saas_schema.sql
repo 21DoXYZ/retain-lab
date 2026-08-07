@@ -278,6 +278,24 @@ GROUP BY tenant_id, identity_id;
 
 -- Каждое событие → identity по старшему доступному ключу (ровно один матч):
 -- client_user_id > stripe_customer_id > email_hash.
+-- Отбитые события: приходят с сайта клиента, но ключ не подходит. Такое
+-- случается после перевыпуска токена - на сайте остаётся старый код, и всё
+-- молча уходит в 401. Без этой таблицы клиент видит только «событий нет» и
+-- часами ищет ошибку у себя. tenant_id берём из ТЕЛА запроса (заявка клиента,
+-- не доверенная) - его хватает, чтобы показать подсказку нужному пространству.
+CREATE TABLE IF NOT EXISTS retention.ingest_rejects
+(
+    `tenant_id`    LowCardinality(String),
+    `origin`       String,
+    `token_prefix` String,
+    `reason`       LowCardinality(String),
+    `ts`           DateTime DEFAULT now()
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (tenant_id, ts)
+TTL ts + INTERVAL 30 DAY;
+
 CREATE OR REPLACE VIEW retention.saas_events_resolved AS
 SELECT i.identity_id AS identity_id, e.*
 FROM retention.saas_events e

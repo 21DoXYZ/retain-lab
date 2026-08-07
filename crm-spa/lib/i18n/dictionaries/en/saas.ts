@@ -392,6 +392,9 @@ export const saas: Partial<Messages> = {
 
   "saas.ob.snippet.noToken": "No code yet: this workspace has no ingest key. Write to us and we will issue one in a minute. We will not substitute someone else's key - events sent with it get rejected anyway.",
 
+  "saas.ob.snippet.badKey.title": "The code is on your site, but the key does not match",
+  "saas.ob.snippet.badKey.body": "In the last 24 hours we rejected {n} requests from {origin}: they arrive with a key starting {prefix}, which is no longer valid. This usually happens when the key was reissued after the code was installed. Copy the code below again and replace the old one - the status turns green within a minute.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

@@ -317,6 +317,18 @@ def saas_onboarding():
         "SELECT count() FROM saas_events WHERE tenant_id = {t:String} AND source = 'snippet'",
         {'t': tenant})[1][0][0])
 
+    # Событий нет, но с сайта СТУЧАТСЯ с неподходящим ключом? Это почти всегда
+    # старый код на сайте после перевыпуска токена. Молчать про это - обречь
+    # клиента искать ошибку у себя.
+    rejects = q(
+        "SELECT count(), max(ts), any(origin), any(token_prefix) "
+        "FROM ingest_rejects WHERE tenant_id = {t:String} "
+        "AND ts >= now() - INTERVAL 24 HOUR", {'t': tenant})[1][0]
+    reject_info = ({'count': int(rejects[0]), 'last_seen': str(rejects[1]),
+                    'origin': str(rejects[2] or ''),
+                    'token_prefix': str(rejects[3] or '')}
+                   if int(rejects[0]) > 0 and snippet_events == 0 else None)
+
     ch = _channels_payload(tenant)['channels']
     camp_conf = _campaigns_conf(tenant)
 
@@ -336,7 +348,7 @@ def saas_onboarding():
             'autopilot': _autopilot_resolved(camp_conf, tenant),
         },
         'offers': offers_list,
-        'snippet': {'token': token, 'html': snippet_html,
+        'snippet': {'token': token, 'html': snippet_html, 'rejects': reject_info,
                     'ingest_url': f'https://{host}/ingest/saas/events' if host else ''},
         'stripe': {
             # URL СВОЙ у каждого пространства: без хвоста события некуда класть

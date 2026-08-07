@@ -10,6 +10,8 @@
 import os
 from datetime import datetime, timedelta, timezone
 import json
+import urllib.parse
+import urllib.request
 import hmac
 import ipaddress
 from flask import Flask, request, jsonify
@@ -149,11 +151,17 @@ def _auth_ok():
 def ingest():
     if not _ip_allowed():
         return jsonify(error="forbidden (ip not allowed)"), 403
-    if not _auth_ok():
-        return jsonify(error="unauthorized"), 401
     try:
         body = request.get_json(force=True)
     except Exception:
+        body = None
+    if not _auth_ok():
+        # Ключ не подошёл. Запоминаем факт: на сайте клиента мог остаться старый
+        # код после перевыпуска токена, и без этой отметки он видит только
+        # «событий нет» и ищет ошибку у себя.
+        _record_reject(body, "unknown_token")
+        return jsonify(error="unauthorized"), 401
+    if body is None:
         return jsonify(error="invalid json"), 400
 
     events = body if isinstance(body, list) else [body]
@@ -212,16 +220,57 @@ def ingest_saas_preflight():
     return "", 204
 
 
+CH_URL = "http://{}:{}/".format(os.environ.get("CH_HOST", "clickhouse"),
+                                os.environ.get("CH_PORT", "8123"))
+
+
+def _record_reject(body, reason: str) -> None:
+    """След отбитого события: кто стучался, с каким ключом и откуда.
+
+    Пишем напрямую в ClickHouse (одна строка, без зависимостей и без своего
+    топика). Диагностика НЕ ИМЕЕТ ПРАВА мешать приёму - любая ошибка гасится.
+    """
+    try:
+        first = body[0] if isinstance(body, list) and body else body
+        claim = str((first or {}).get("tenant_id") or "")[:64]
+        auth = request.headers.get("Authorization", "")
+        row = {
+            "tenant_id": claim,
+            "origin": (request.headers.get("Origin")
+                       or request.headers.get("Referer") or "")[:200],
+            "token_prefix": auth.replace("Bearer ", "").strip()[:8],
+            "reason": reason,
+        }
+        req = urllib.request.Request(
+            CH_URL + "?" + urllib.parse.urlencode({
+                "database": os.environ.get("CH_DB", "retention"),
+                "query": "INSERT INTO ingest_rejects (tenant_id, origin, "
+                         "token_prefix, reason) FORMAT JSONEachRow",
+                "user": os.environ.get("CH_USER", "default"),
+                "password": os.environ.get("CH_PASSWORD", ""),
+            }),
+            data=json.dumps(row).encode(), method="POST")
+        urllib.request.urlopen(req, timeout=2).read()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 @app.post("/ingest/saas/events")
 def ingest_saas():
     """События продукта (сниппет/API) → топик saas.events. Auth/лимиты — как /ingest/events."""
     if not _ip_allowed():
         return jsonify(error="forbidden (ip not allowed)"), 403
-    if not _auth_ok():
-        return jsonify(error="unauthorized"), 401
     try:
         body = request.get_json(force=True)
     except Exception:
+        body = None
+    if not _auth_ok():
+        # Ключ не подошёл. Запоминаем факт: на сайте клиента мог остаться старый
+        # код после перевыпуска токена, и без этой отметки он видит только
+        # «событий нет» и ищет ошибку у себя.
+        _record_reject(body, "unknown_token")
+        return jsonify(error="unauthorized"), 401
+    if body is None:
         return jsonify(error="invalid json"), 400
 
     events = body if isinstance(body, list) else [body]

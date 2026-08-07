@@ -389,6 +389,9 @@ export const saas: Partial<Messages> = {
 
   "saas.ob.snippet.noToken": "",
 
+  "saas.ob.snippet.badKey.title": "",
+  "saas.ob.snippet.badKey.body": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

@@ -15,7 +15,10 @@ import { NoTenant, isNoTenant } from "./NoTenant";
 
 interface Payload {
   steps: { snippet: boolean; stripe: boolean; channels: boolean; offers: boolean; autopilot: boolean };
-  snippet: { token: string; html: string; ingest_url: string };
+  snippet: {
+    token: string; html: string; ingest_url: string;
+    rejects: { count: number; last_seen: string; origin: string; token_prefix: string } | null;
+  };
   stripe: { webhook_url: string; events: string[]; secret_set: boolean; api_key_set: boolean };
   channels: { channel: string; state: string }[];
   offers: { offer_id: string; title: string; max_per_user_30d: number; edited: boolean }[];
@@ -335,6 +338,23 @@ export function OnboardingView() {
               <StepBadge done={data.steps.snippet} waitKey="saas.ob.snippet.waiting" />
             </div>
             <p className="text-[13.5px] leading-relaxed text-slate">{t("saas.ob.snippet.desc")}</p>
+            {/* Сайт стучится, но ключ не тот - самая частая причина «поставил,
+                а статус не меняется». Говорим прямо, а не оставляем в тишине. */}
+            {data.snippet.rejects && (
+              <div className="rounded-ctl border border-[#fecdca] bg-[#fef3f2] p-3.5">
+                <div className="text-[13px] font-semibold text-ink">
+                  {t("saas.ob.snippet.badKey.title")}
+                </div>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-slate">
+                  {t("saas.ob.snippet.badKey.body", {
+                    n: data.snippet.rejects.count,
+                    origin: data.snippet.rejects.origin || "-",
+                    prefix: data.snippet.rejects.token_prefix || "-",
+                  })}
+                </p>
+              </div>
+            )}
+
             {data.snippet.html ? (
               <>
                 <pre className="overflow-x-auto rounded-ctl bg-sb p-3.5 font-mono text-[12px] leading-relaxed text-sb-text2 whitespace-pre">

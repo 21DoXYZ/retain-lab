@@ -103,6 +103,7 @@ services:
     build: ./ingest
     depends_on:
       - redpanda
+      - clickhouse
     environment:
       KAFKA_BROKER: redpanda:9092
       KAFKA_TOPIC: casino.events
@@ -110,6 +111,12 @@ services:
       SASL_PASS: ${INGEST_KAFKA_PASS:?set INGEST_KAFKA_PASS in .env}
       INGEST_TOKEN: ${INGEST_TOKEN:-}   # фолбэк, если secrets/tokens.json недоступен
       DEBUG_FIELDS: ${DEBUG_FIELDS:-0}   # 1 = логировать поля игрового события (диагностика)
+      # след отбитых событий (старый ключ на сайте клиента) - строка в CH
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DB: retention
+      CH_USER: ${CH_USER:-default}
+      CH_PASSWORD: ${CH_PASSWORD:-}
     volumes:
       - ./secrets:/secrets:ro          # токены (общий источник с дашбордом, hot-reload)
     # порт наружу не публикуем — доступ только через caddy (https://cas.21do.xyz/ingest/*)
