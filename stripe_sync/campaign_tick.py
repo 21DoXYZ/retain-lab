@@ -116,6 +116,27 @@ MAX_TOUCHES_PER_WEEK = 3
 # у человека сломалась оплата: молчать про это ради красивой частоты нельзя.
 FREQ_EXEMPT = ("K3_payment_recovery",)
 
+# ТИХИЕ ЧАСЫ. Ночное промо-сообщение раздражает везде, а кое-где оно ещё и
+# незаконно: в ОАЭ промо разрешено только с 07:00 до 21:00 местного времени
+# (политика TDRA о нежелательных электронных сообщениях). Часовой пояс - в
+# tenants.json ("timezone": "Asia/Dubai"); без него берём UTC и НЕ угадываем.
+# Дуннинг - сервисное сообщение о сломанной оплате, ограничение не про него.
+QUIET_START, QUIET_END = 21, 7          # [21:00, 07:00) - молчим
+
+
+def quiet_hours_block(campaign_id: str, now_utc: datetime, tz_name: str) -> str:
+    """Можно ли слать промо СЕЙЧАС по местному времени тенанта. '' - можно."""
+    if campaign_id in FREQ_EXEMPT:
+        return ""
+    try:
+        from zoneinfo import ZoneInfo
+        local_hour = now_utc.astimezone(ZoneInfo(tz_name or "UTC")).hour
+    except Exception:                    # кривая зона в конфиге - не роняем тик
+        local_hour = now_utc.hour
+    if local_hour >= QUIET_START or local_hour < QUIET_END:
+        return "quiet_hours"
+    return ""
+
 
 def frequency_block(campaign_id: str, sent_24h: int, sent_7d: int) -> str:
     """Можно ли писать этому человеку сейчас. '' - можно, иначе причина.
@@ -228,6 +249,8 @@ def tick(client, tenant: str) -> dict[str, int]:
     # исполнитель бонусов = вебхук клиента из опросника (tenants.json)
     from executors import tenant_exec_config
     exec_cfg = tenant_exec_config(tenant, exec_cfg)
+    # часовой пояс аудитории тенанта - для тихих часов
+    tenant_tz = str(load_tenant_channels(tenant).get("timezone") or "UTC")
     now = _now_dt()
     stats = {"enrolled": 0, "control": 0, "steps": 0, "done": 0, "exited": 0}
 
@@ -320,6 +343,13 @@ def tick(client, tenant: str) -> dict[str, int]:
                             elif not consent:
                                 _log_send(client, tenant, cid, identity, i, channel,
                                           step.get("subject", ""), "rejected", "no_consent")
+                            elif quiet_hours_block(cid, now, tenant_tz):
+                                # ночь у аудитории: шаг НЕ отработан, созреет
+                                # утром. В ОАЭ ночное промо ещё и незаконно.
+                                _log_send(client, tenant, cid, identity, i, channel,
+                                          step.get("subject", ""), "rejected",
+                                          "quiet_hours")
+                                retry_step = True
                             elif frequency_block(cid, *touches.get(identity, (0, 0))):
                                 # Шаг НЕ отработан: он созреет снова, когда
                                 # частота позволит. Иначе касание пропадало бы

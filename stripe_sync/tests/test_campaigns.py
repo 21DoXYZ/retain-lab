@@ -205,15 +205,24 @@ class FakeCH:
 
 
 def _live_tick(monkeypatch, tmp_path, sender, retry_rows=0, users=None,
-               touches=None):
-    """Тик с боевым (не dry-run) режимом и подменённой отправкой."""
+               touches=None, tenant_extra=None, at=None):
+    """Тик с боевым (не dry-run) режимом и подменённой отправкой.
+
+    Время фиксируется на полдень UTC: иначе тест, запущенный ночью, попадает
+    в тихие часы и проверяет не то, что собирался.
+    """
+    from datetime import datetime, timezone
     import campaign_tick as ct
+    monkeypatch.setattr(ct, "_now_dt",
+                        lambda: at or datetime(2026, 8, 7, 12, 0, tzinfo=timezone.utc))
     import overrides as ov_mod
     import saas_senders as sn
     # пути читаются в МОМЕНТ ИМПОРТА, env после этого уже не влияет
     monkeypatch.setattr(ov_mod, "OVERRIDES_FILE", str(tmp_path / "ov.json"))
     monkeypatch.setattr(sn, "TENANTS_FILE", str(tmp_path / "tenants.json"))
-    (tmp_path / "tenants.json").write_text('{"probe": {"autopilot": true}}')
+    import json as _json
+    (tmp_path / "tenants.json").write_text(
+        _json.dumps({"probe": {"autopilot": True, **(tenant_extra or {})}}))
     monkeypatch.setenv("SIGNALS_DRY_RUN", "0")
     monkeypatch.setenv("RESEND_API_KEY", "re_probe")
     monkeypatch.setenv("EMAIL_FROM", "Probe <care@probe.test>")
@@ -328,21 +337,29 @@ def test_frequency_cap_holds_the_touch_instead_of_burning_it(monkeypatch, tmp_pa
                            users=[["id1", "ACTIVATE", "u@probe.test", "u1"]],
                            touches=[["id1", 1, 1]])
     assert not sent                                  # письмо не ушло
-    logged = client.logged()
-    assert logged and logged[0]["reason"] == "freq_cap_day"
+    reasons = [r["reason"] for r in client.logged()]
+    assert "freq_cap_day" in reasons
+    # баннер В ПРОДУКТЕ уходит даже при придержанном письме: он не вторжение,
+    # человек видит его только придя сам - и это единственный канал для тех,
+    # у кого нет почты
+    assert any(t == "retention.inapp_inbox" for t, _, _ in client.inserts)
     saved = client.saved()
     assert not saved or saved[0]["step_idx"] == 0    # шаг не сдвинут
 
 
 def _chain(campaign_id):
+    """delay_h - АБСОЛЮТНОЕ время от входа (семантика due_steps).
+
+    Первая версия этого хелпера складывала задержки как интервалы - и тесты
+    зелёно подтверждали расписание, которого не существовало: дуннинг реально
+    кончался на 14-й день вместо 28-го.
+    """
     import json
     from campaign_tick import CAMPAIGNS_PATH
     conf = json.loads(CAMPAIGNS_PATH.read_text())["_default"]
     camp = next(c for c in conf["campaigns"] if c["campaign_id"] == campaign_id)
-    days, total = [], 0.0
-    for s in camp["steps"]:
-        total += float(s.get("delay_h", 0)) / 24.0
-        days.append(round(total, 1))
+    days = [round(float(s.get("delay_h", 0)) / 24.0, 1) for s in camp["steps"]]
+    assert days == sorted(days), f"{campaign_id}: шаги идут назад во времени"
     return camp, days
 
 
@@ -380,3 +397,116 @@ def test_no_chain_opens_with_a_gift():
     from campaign_tick import CAMPAIGNS_PATH
     for camp in json.loads(CAMPAIGNS_PATH.read_text())["_default"]["campaigns"]:
         assert camp["steps"][0]["action"] != "offer", camp["campaign_id"]
+
+
+def test_quiet_hours_hold_promo_for_the_tenants_night():
+    """В ОАЭ промо разрешено 07:00-21:00 местного: ночью шаг ждёт утра.
+
+    Дуннинг - сервисное сообщение о сломанной оплате, его тихие часы не
+    держат. Кривая зона в конфиге не роняет тик, а откатывается к UTC.
+    """
+    from datetime import datetime, timezone
+    from campaign_tick import quiet_hours_block
+    night_dubai = datetime(2026, 8, 7, 20, 0, tzinfo=timezone.utc)   # 00:00 Dubai
+    day_dubai = datetime(2026, 8, 7, 8, 0, tzinfo=timezone.utc)      # 12:00 Dubai
+    assert quiet_hours_block("K1_activation", night_dubai, "Asia/Dubai") == "quiet_hours"
+    assert quiet_hours_block("K1_activation", day_dubai, "Asia/Dubai") == ""
+    assert quiet_hours_block("K3_payment_recovery", night_dubai, "Asia/Dubai") == ""
+    # граница окна: 21:00 уже нельзя, 07:00 уже можно
+    at21 = datetime(2026, 8, 7, 17, 0, tzinfo=timezone.utc)          # 21:00 Dubai
+    at7 = datetime(2026, 8, 7, 3, 0, tzinfo=timezone.utc)            # 07:00 Dubai
+    assert quiet_hours_block("K1_activation", at21, "Asia/Dubai") == "quiet_hours"
+    assert quiet_hours_block("K1_activation", at7, "Asia/Dubai") == ""
+    assert quiet_hours_block("K1_activation", day_dubai, "No/Zone") in ("", "quiet_hours")
+
+
+def test_quiet_hours_hold_the_touch_instead_of_burning_it(monkeypatch, tmp_path):
+    """Придержанный ночью шаг обязан уйти утром, а не пропасть."""
+    from datetime import datetime, timezone
+    sent = []
+    client, _ = _live_tick(monkeypatch, tmp_path,
+                           lambda *a, **k: (sent.append(a) or (True, "id")),
+                           users=[["id1", "ACTIVATE", "u@probe.test", "u1"]],
+                           tenant_extra={"timezone": "Asia/Dubai"},
+                           at=datetime(2026, 8, 7, 22, 30, tzinfo=timezone.utc))
+    assert not sent
+    reasons = [r["reason"] for r in client.logged()]
+    assert "quiet_hours" in reasons
+    # ночь держит ПИСЬМО, но не баннер: баннер покажется, когда человек сам
+    # откроет продукт - хоть ночью
+    assert any(t == "retention.inapp_inbox" for t, _, _ in client.inserts)
+    saved = client.saved()
+    assert not saved or saved[0]["step_idx"] == 0
+
+
+def test_exact_schedule_of_every_chain():
+    """Полное расписание, день в день. Ловит и сдвиг, и смену семантики delay_h."""
+    expected = {
+        "K1_activation": [0.0, 0.0, 1.0, 3.0, 8.0],
+        "K2_trial_conversion": [0.0, 0.0, 1.0, 2.0, 5.0],
+        "K3_payment_recovery": [0.0, 0.0, 3.0, 7.0, 14.0, 28.0],
+        "K4_save": [0.0, 0.0, 2.0, 5.0],
+        "K5_upgrade": [0.0, 0.0, 2.0, 4.0],
+        "K6_winback": [14.0, 30.0, 60.0, 90.0],
+    }
+    for cid, days in expected.items():
+        assert _chain(cid)[1] == days, cid
+
+
+def test_every_visiting_stage_chain_opens_with_a_banner():
+    """In-app - единственный канал, достающий людей без почты.
+
+    Каждая цепочка, чью аудиторию МОЖНО застать в продукте, начинается с
+    баннера. Винбэк - нет: ушедший в продукт не заходит.
+    """
+    for cid in ("K1_activation", "K2_trial_conversion", "K3_payment_recovery",
+                "K4_save", "K5_upgrade"):
+        camp, _ = _chain(cid)
+        assert camp["steps"][0]["action"] == "inapp", cid
+        assert camp["steps"][0].get("cta_label"), cid
+    camp, _ = _chain("K6_winback")
+    assert all(s["action"] != "inapp" for s in camp["steps"])
+
+
+def test_override_migration_puts_bindings_back_on_the_offer_step():
+    """Перестройка каркаса сдвинула правки: привязка оффера лежала на письме
+    (и молча игнорировалась - оффер отвязан), текст письма - на шаге-оффере."""
+    from migrate_step_overrides import remap_campaign
+    # новый K4: inapp(0), email(1), offer(2), email(3); старые правки 0..2
+    steps = [{"action": "inapp"}, {"action": "email"},
+             {"action": "offer"}, {"action": "email"}]
+    old = {"0": {"offer_id": "AI_x", "src": "generated"},
+           "1": {"subject": "s1", "body": "b1", "src": "generated"},
+           "2": {"subject": "s2", "body": "b2", "src": "generated"}}
+    new, notes = remap_campaign("K4_save", steps, old)
+    assert new["2"] == {"offer_id": "AI_x", "src": "generated"}
+    assert new["1"]["subject"] == "s1" and new["3"]["subject"] == "s2"
+    assert notes
+    # повторный прогон ничего не меняет: типы мигрированных ключей уже не
+    # совпадают с ожиданиями таблицы
+    again, _ = remap_campaign("K4_save", steps, new)
+    assert again == new
+
+
+def test_override_migration_leaves_aligned_campaigns_alone():
+    """K3 не перестраивался в голове: его правка «0» - текст БАННЕРА.
+
+    Универсальное правило «тексты по порядку на письма» ломало именно это -
+    отличить текст баннера от текста письма по содержимому нельзя.
+    """
+    from migrate_step_overrides import remap_campaign
+    steps = [{"action": "inapp"}] + [{"action": "email"}] * 5
+    old = {"0": {"subject": "banner", "body": "b"},
+           "1": {"subject": "mail1", "body": "b"}}
+    new, notes = remap_campaign("K3_payment_recovery", steps, old)
+    assert new == old and notes == []
+
+
+def test_override_migration_drops_what_no_longer_fits():
+    from migrate_step_overrides import remap_campaign
+    # каркас без offer-шага: привязке некуда встать
+    steps = [{"action": "inapp"}, {"action": "email"}, {"action": "email"},
+             {"action": "email"}]
+    old = {"1": {"offer_id": "X"}}
+    new, notes = remap_campaign("K5_upgrade", steps, old)
+    assert new == {} and any("отброшена" in n for n in notes)

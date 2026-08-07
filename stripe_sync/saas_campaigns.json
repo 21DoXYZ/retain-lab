@@ -10,6 +10,15 @@
         "steps": [
           {
             "delay_h": 0,
+            "action": "inapp",
+            "subject": "Your first result is minutes away",
+            "body": "One small step to see the product work for you - it takes just a few minutes.",
+            "cta_label": "Start now",
+            "cta_url": "{{app_url}}",
+            "ttl_days": 7
+          },
+          {
+            "delay_h": 0,
             "action": "email",
             "subject": "Your first result is minutes away",
             "body": "Hi! You signed up for the product but have not tried it yet - the first result takes just a few minutes: {{app_url}}"
@@ -21,12 +30,12 @@
             "body": "Most people start with the basics - open {{app_url}} and make your first one. Reply to this email if anything is unclear."
           },
           {
-            "delay_h": 48,
+            "delay_h": 72,
             "action": "offer",
             "offer_id": ""
           },
           {
-            "delay_h": 120,
+            "delay_h": 192,
             "action": "email",
             "subject": "Still worth five minutes",
             "body": "Your account is set up but unused. If something blocked you, reply to this email - a person reads it: {{app_url}}"
@@ -44,6 +53,15 @@
         "steps": [
           {
             "delay_h": 0,
+            "action": "inapp",
+            "subject": "Your trial ends soon - keep your work",
+            "body": "Everything you made stays with you on any paid plan.",
+            "cta_label": "Pick a plan",
+            "cta_url": "{{app_url}}",
+            "ttl_days": 7
+          },
+          {
+            "delay_h": 0,
             "action": "email",
             "subject": "Your trial ends soon - keep your work",
             "body": "Your trial ends in a few days. Upgrade to keep access: {{app_url}}"
@@ -54,13 +72,13 @@
             "offer_id": ""
           },
           {
-            "delay_h": 24,
+            "delay_h": 48,
             "action": "email",
             "subject": "We added extra trial days",
             "body": "Need more time to decide? Your trial got extended. Meanwhile, try the advanced features: {{app_url}}"
           },
           {
-            "delay_h": 72,
+            "delay_h": 120,
             "action": "email",
             "subject": "Your trial has ended - your work is still saved",
             "body": "The trial is over, but nothing was deleted. Pick a plan and everything is back: {{app_url}}"
@@ -99,19 +117,19 @@
             "body": "Quick reminder to update your payment method: {{card_update_url}}. We retry automatically once it is updated."
           },
           {
-            "delay_h": 96,
+            "delay_h": 168,
             "action": "email",
             "subject": "Your access pauses soon - card still declined",
             "body": "We have tried your card a few times since it was declined. Updating it takes 30 seconds and everything picks up where it left off: {{card_update_url}}"
           },
           {
-            "delay_h": 168,
+            "delay_h": 336,
             "action": "email",
             "subject": "Two weeks without payment - your data is still here",
             "body": "Your subscription is on hold, but nothing has been deleted. One card update brings it all back: {{card_update_url}}"
           },
           {
-            "delay_h": 336,
+            "delay_h": 672,
             "action": "email",
             "subject": "Last reminder before we close the invoice",
             "body": "This is the final reminder about the payment that did not go through. If it was deliberate, ignore this - otherwise your account restarts in one click: {{card_update_url}}"
@@ -130,6 +148,15 @@
         "steps": [
           {
             "delay_h": 0,
+            "action": "inapp",
+            "subject": "Need a break? Pause instead of canceling",
+            "body": "Keep your history and data, pay nothing for a month.",
+            "cta_label": "Pause my plan",
+            "cta_url": "{{app_url}}",
+            "ttl_days": 7
+          },
+          {
+            "delay_h": 0,
             "action": "email",
             "subject": "Need a break? Pause instead of cancel",
             "body": "You can pause your subscription for a month - keep your history, pay nothing: {{app_url}}"
@@ -140,7 +167,7 @@
             "offer_id": ""
           },
           {
-            "delay_h": 72,
+            "delay_h": 120,
             "action": "email",
             "subject": "What is new in the product",
             "body": "Here is what changed since you last visited: {{app_url}}"
@@ -159,6 +186,15 @@
         "steps": [
           {
             "delay_h": 0,
+            "action": "inapp",
+            "subject": "You are close to your plan limit",
+            "body": "On the next tier each unit costs less - worth a look this month.",
+            "cta_label": "Compare plans",
+            "cta_url": "{{app_url}}",
+            "ttl_days": 7
+          },
+          {
+            "delay_h": 0,
             "action": "email",
             "subject": "You are hitting your plan limit",
             "body": "You used most of your plan this month. On the higher tier the unit economics are better: {{app_url}}"
@@ -169,7 +205,7 @@
             "offer_id": ""
           },
           {
-            "delay_h": 48,
+            "delay_h": 96,
             "action": "email",
             "subject": "Lock in a discount on annual",
             "body": "Heavy months like this one are cheaper on annual - see the numbers: {{app_url}}"
@@ -192,18 +228,18 @@
             "body": "Here is what is new since you canceled - worth a fresh look: {{app_url}}"
           },
           {
-            "delay_h": 384,
+            "delay_h": 720,
             "action": "email",
             "subject": "Your account is still here",
             "body": "Your history is saved. Come back anytime: {{app_url}}"
           },
           {
-            "delay_h": 720,
+            "delay_h": 1440,
             "action": "offer",
             "offer_id": ""
           },
           {
-            "delay_h": 720,
+            "delay_h": 2160,
             "action": "email",
             "subject": "Last note from us",
             "body": "We will stop writing after this one. Your account and history are still saved, and you can pick up where you left off any time: {{app_url}}"

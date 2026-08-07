@@ -352,9 +352,14 @@ def compose_campaign_copy(answers: dict) -> dict:
     units = f" and your {unit}" if unit else ""
     app = str(answers.get("app_url") or "").strip() or "{{app_url}}"
 
+    # Индексы = позиции шагов в saas_campaigns.json (после inapp-шагов).
+    # In-app баннер - единственный канал, достающий людей без почты, поэтому
+    # у него свой текст, а не копия письма: три строки, один глагол.
     return {
         "K1_activation": {
-            0: {"subject": "Your first result is minutes away",
+            0: {"subject": f"Your first {unit or 'result'} is minutes away",
+                "body": "One small step to see it work - takes a few minutes."},
+            1: {"subject": "Your first result is minutes away",
                 "body": f"Hi! You signed up for {name} but have not tried it yet - "
                         f"the first result takes just a few minutes: {app}"},
             2: {"subject": "A quick way to start",
@@ -363,8 +368,10 @@ def compose_campaign_copy(answers: dict) -> dict:
         },
         "K2_trial_conversion": {
             0: {"subject": "Your trial ends soon - keep your work",
+                "body": "Everything you made stays with you on any paid plan."},
+            1: {"subject": "Your trial ends soon - keep your work",
                 "body": f"Your trial ends in a few days. Upgrade to keep access{units}: {app}"},
-            2: {"subject": "We added extra trial days",
+            3: {"subject": "We added extra trial days",
                 "body": f"Need more time to decide? Your trial got extended. "
                         f"Meanwhile, try the advanced features: {app}"},
         },
@@ -385,25 +392,30 @@ def compose_campaign_copy(answers: dict) -> dict:
                         "to keep full access: {{card_update_url}}"},
         },
         "K4_save": {
+            0: {"subject": "Need a break? Pause instead of canceling",
+                "body": f"Keep your history{units}, pay nothing for a month."},
             1: {"subject": "Need a break? Pause instead of cancel",
                 "body": f"You can pause your subscription for a month - keep your "
                         f"history{units}, pay nothing: {app}"},
-            2: {"subject": f"What is new in {name}",
+            3: {"subject": f"What is new in {name}",
                 "body": f"Here is what changed since you last visited: {app}"},
         },
         "K6_winback": {
             0: {"subject": f"A lot changed in {name} since you left",
                 "body": f"Here is what is new since you canceled - worth a "
                         f"fresh look: {app}"},
-            2: {"subject": "Your account is still here",
+            3: {"subject": "Your account is still here",
                 "body": f"Your history{units} {'are' if units else 'is'} saved. "
                         f"Come back anytime: {app}"},
         },
         "K5_upgrade": {
-            0: {"subject": "You are hitting your plan limit",
+            0: {"subject": "You are close to your plan limit",
+                "body": f"On the next tier each {unit or 'unit'} costs less - "
+                        "worth a look this month."},
+            1: {"subject": "You are hitting your plan limit",
                 "body": f"You used most of your plan this month. On the higher tier "
                         f"the unit economics are better: {app}"},
-            2: {"subject": "Lock in a discount on annual",
+            3: {"subject": "Lock in a discount on annual",
                 "body": f"Heavy months like this one are cheaper on annual - "
                         f"see the numbers: {app}"},
         },

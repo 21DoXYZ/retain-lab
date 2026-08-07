@@ -152,10 +152,14 @@ def test_compose_campaign_copy_any_product():
     from stripe_sync.compose import compose_campaign_copy
     c = compose_campaign_copy({"product_name": "PicSeat", "value_unit": "seats",
                                "app_url": "https://app.picseat.io"})
-    assert "PicSeat" in c["K1_activation"][0]["body"]
-    assert "https://app.picseat.io" in c["K2_trial_conversion"][0]["body"]
+    # индекс 0 - inapp-баннер: коротко, без ссылок; письма - с индекса 1
+    assert "seats" in c["K1_activation"][0]["subject"]
+    assert "PicSeat" in c["K1_activation"][1]["body"]
+    assert "https://app.picseat.io" in c["K2_trial_conversion"][1]["body"]
+    assert "{{" not in c["K2_trial_conversion"][0]["body"]     # баннер без ссылок
     assert "{{card_update_url}}" in c["K3_payment_recovery"][1]["body"]
     assert "seats" in c["K3_payment_recovery"][1]["body"]
+    assert "seats" in c["K5_upgrade"][0]["body"]
 
 
 def test_default_campaigns_block_is_neutral():

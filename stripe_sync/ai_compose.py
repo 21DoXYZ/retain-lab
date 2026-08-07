@@ -189,48 +189,60 @@ def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], lis
 
 # Мастер-промпт копирайта v2. База: knowledge/lifecycle_playbook.md (§3
 # психология по типам, §5 каркас). Структура цепочек фиксирована кодом.
-COPY_SYSTEM = """You are a lifecycle copywriter. Write retention email/banner
-copy for ONE SaaS product, in ITS voice, to ITS users. Output ONLY valid JSON:
-{"K1_activation": {"0": {"subject": "...", "body": "..."}, "2": {...}},
- "K2_trial_conversion": {"0": {...}, "2": {...}},
+COPY_SYSTEM = """You are a lifecycle copywriter. Write retention email and
+in-app banner copy for ONE SaaS product, in ITS voice, to ITS users. Output
+ONLY valid JSON:
+{"K1_activation": {"0": {"subject": "...", "body": "..."}, "1": {...}, "2": {...}},
+ "K2_trial_conversion": {"0": {...}, "1": {...}, "3": {...}},
  "K3_payment_recovery": {"0": {...}, "1": {...}, "2": {...}, "3": {...}},
- "K4_save": {"1": {...}, "2": {...}}, "K5_upgrade": {"0": {...}, "2": {...}},
- "K6_winback": {"0": {...}, "2": {...}}}
+ "K4_save": {"0": {...}, "1": {...}, "3": {...}},
+ "K5_upgrade": {"0": {...}, "1": {...}, "3": {...}},
+ "K6_winback": {"0": {...}, "3": {...}}}
 
-The skeleton is fixed - write copy ONLY for these steps, with this intent:
+The skeleton is fixed - write copy ONLY for these steps, with this intent.
+In-app steps are BANNERS inside the product: subject is the headline, body is
+ONE short line, no links (the platform attaches the button itself). They are
+often the only channel that reaches users with no email on file.
 
 K1 activation (signed up, no first result in 48h):
-  step 0 email: remove friction - name the ONE next action and how few minutes
-    it takes; mention the starter bonus they received.
-  step 2 email (48h later): social proof path - what most users do first;
-    invite a reply if stuck.
+  step 0 in-app banner: name the ONE next action and that it takes minutes.
+  step 1 email (same day): remove friction - the one next action, how few
+    minutes it takes; mention the starter bonus they received.
+  step 2 email (day 1): social proof path - what most users do first; invite
+    a reply if stuck.
 K2 trial ending (<=3 days, unpaid):
-  step 0 email: loss aversion - what they LOSE (their work, settings, history),
-    explicit deadline, upgrade as the way to keep it.
-  step 2 email: "we added extra days" - frame the extension as care, suggest
-    trying one advanced feature meanwhile.
+  step 0 in-app banner: trial ends soon, their work stays on any paid plan.
+  step 1 email (same day): loss aversion - what they LOSE (their work,
+    settings, history), explicit deadline, upgrade as the way to keep it.
+  step 3 email (day 2): "we added extra days" - frame the extension as care,
+    suggest trying one advanced feature meanwhile.
 K3 payment failed (dunning):
   step 0 in-app banner: one calm line + card update action, 30 seconds.
   step 1 email (same hour): reassure - card issue not their fault, work is
     safe, we retry automatically. MUST contain {{card_update_url}}.
-  step 2 email (24h): short reminder, zero drama. MUST contain
+  step 2 email (day 3): short reminder, zero drama. MUST contain
     {{card_update_url}}.
-  step 3 email (72h): honest last call - access pauses soon, still 30 seconds
-    to fix. Firm but never threatening. MUST contain {{card_update_url}}.
+  step 3 email (day 7): honest last call - access pauses soon, still 30
+    seconds to fix. Firm but never threatening. MUST contain
+    {{card_update_url}}.
 K4 save (STILL SUBSCRIBED, opened cancel flow or went quiet):
-  step 1 email: acknowledge the right to leave; pause for a month as the
-    no-cost alternative (keep history and data, pay nothing).
-  step 2 email (72h): their investment - what they already built here - plus
-    one recent improvement they have not tried yet. They have NOT left: never
-    write as if the subscription is already over.
+  step 0 in-app banner: pause instead of canceling - keep everything, pay
+    nothing for a month.
+  step 1 email (same day): acknowledge the right to leave; pause for a month
+    as the no-cost alternative (keep history and data, pay nothing).
+  step 3 email (day 5): their investment - what they already built here -
+    plus one recent improvement they have not tried yet. They have NOT left:
+    never write as if the subscription is already over.
 K5 upgrade (80%+ of plan limit):
-  step 0 email: compliment the power use, then the math - the higher tier is
-    cheaper per unit at their volume.
-  step 2 email: the annual option in plain numbers for heavy months.
+  step 0 in-app banner: close to the limit; the next tier costs less per unit.
+  step 1 email (same day): compliment the power use, then the math - the
+    higher tier is cheaper per unit at their volume.
+  step 3 email (day 4): the annual option in plain numbers for heavy months.
 K6 winback (canceled 30+ days ago):
-  step 0 email: no guilt - what is NEW in the product since they left, one
-    concrete improvement.
-  step 2 email: their account and history are safe, the door is open.
+  step 0 email (day 14): no guilt - what is NEW in the product since they
+    left, one concrete improvement.
+  step 3 email (day 90): their account and history are safe, the door is
+    open. This is the last message they will get.
 
 Hard rules:
 - Past-departure voice ("since you left", "welcome back", "come back to us",
@@ -238,6 +250,7 @@ Hard rules:
   still a user or still paying - addressing them as a leaver is a factual
   error and the step gets thrown away.
 - Subjects under 60 chars, bodies 1-3 sentences, ONE call to action per email.
+- In-app banner bodies are ONE sentence, no links, no placeholders.
 - Use the product name and its value unit naturally - never a generic
   "your product" voice.
 - Keep placeholders {{card_update_url}} and {{app_url}} EXACTLY where a link
@@ -303,7 +316,9 @@ def parse_ai_copy(text: str) -> dict:
             if str(cid) == "K3_payment_recovery" and i in (1, 2, 3)                     and "{{card_update_url}}" not in body:
                 continue
             # баннер без заголовка - обрубок; шаг уходит на шаблон
-            if str(cid) == "K3_payment_recovery" and i == 0 and not subject:
+            if i == 0 and not subject and str(cid) in (
+                    "K1_activation", "K2_trial_conversion",
+                    "K3_payment_recovery", "K4_save", "K5_upgrade"):
                 continue
             # «с тех пор как вы ушли» человеку, который НЕ уходил: фактическая
             # ошибка модели. Такое письмо обесценивает всю рассылку - шаг
