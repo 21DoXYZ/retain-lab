@@ -431,6 +431,8 @@ export const saas: Partial<Messages> = {
   "saas.src.file.emailWarn": "",
   "saas.src.noEmails": "",
 
+  "saas.q.missing": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

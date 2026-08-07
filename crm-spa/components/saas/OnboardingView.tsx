@@ -91,6 +91,17 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
           if (p.trial_days) { next.has_trial = "yes"; filled.push("has_trial"); }
           return next;
         });
+        // сервер отдаёт разбор: описание оттуда понятнее фразы с лендинга
+        const pre = (d as unknown as { prefill?: Record<string, unknown> }).prefill || {};
+        setA((prev) => {
+          const next = { ...prev };
+          for (const [k, v] of Object.entries(pre)) {
+            if (v === null || v === undefined || v === "") continue;
+            next[k] = typeof v === "boolean" ? (v ? "yes" : "no") : String(v);
+            if (!filled.includes(k)) filled.push(k);
+          }
+          return next;
+        });
         setFromSite(new Set(filled));
         setPlans(Array.isArray(p.plans) ? (p.plans as typeof plans) : []);
         setPhase("review");
@@ -105,6 +116,11 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
   const inputCls =
     "h-[38px] w-full rounded-ctl border border-hair2 bg-canvas px-3 text-[13px] " +
     "text-ink outline-none transition-[border-color] duration-150 focus:border-primary";
+
+  // Обязательный минимум: без него правила офферов посчитать не из чего
+  const REQUIRED = ["product_name", "client_api", "has_trial", "can_pause",
+                    "max_discount_pct"];
+  const missing = REQUIRED.filter((k) => !String(a[k] ?? "").trim());
 
   // ── Шаг 1: спрашиваем ТОЛЬКО сайт. Всё остальное система достанет сама ──
   if (phase === "site") {
@@ -209,12 +225,20 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
       </div>
       {scanNote && <p className="text-[12px] text-primary">{scanNote}</p>}
       {err && <p className="text-[12px] text-neg">{err}</p>}
+      {/* Серая кнопка без объяснения - худший вид отказа: человек видит, что
+          «не работает», и не знает, что от него хотят. */}
+      {missing.length > 0 && (
+        <p className="text-[12.5px] leading-relaxed text-[#b54708]">
+          {t("saas.q.missing")}{" "}
+          {missing.map((k) => t(`saas.q.${k}` as MessageKey)).join(" · ")}
+        </p>
+      )}
       <div>
         <Button
           variant="brand"
           size="sm"
           loading={busy}
-          disabled={!a.product_name || !a.client_api || !a.has_trial || !a.can_pause || a.max_discount_pct === undefined || a.max_discount_pct === ""}
+          disabled={missing.length > 0}
           onClick={() => {
             setBusy(true);
             setErr("");

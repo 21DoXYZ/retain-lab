@@ -434,6 +434,8 @@ export const saas: Partial<Messages> = {
   "saas.src.file.emailWarn": "Only {with} of {total} have an email. The rest cannot be written to - they will show up in the system, but no letter will reach them. If your export has an address column, add it and upload again.",
   "saas.src.noEmails": "Note: {n} people have no email - they cannot be written to.",
 
+  "saas.q.missing": "To compose offers, please answer:",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",
