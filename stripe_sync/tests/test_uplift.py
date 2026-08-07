@@ -75,3 +75,19 @@ def test_site_plans_seed_the_ladder_before_billing():
     assert [r[3] for r in rows] == [29.0, 99.0]
     assert rows[0][2] == 500      # лимит со страницы тарифов
     assert rows[1][2] == 100      # не указан - берём ответ клиента
+
+
+def test_site_plans_complete_the_ladder_from_billing():
+    """Биллинг видит только занятые тарифы: у нового клиента это одна ступенька
+    и апгрейд невозможен. Дополняем лестницу его же страницей цен, но цены,
+    известные из Stripe, не дублируем."""
+    from stripe_sync.plans_sync import plan_rows, site_plan_rows
+    now = "2026-08-07 00:00:00.000"
+    billing = plan_rows([("price_pro", 99, "month")], 0, "t", now)
+    site = site_plan_rows([{"name": "Creator", "price_usd": 39, "units_included": 800},
+                           {"name": "Pro", "price_usd": 99, "units_included": 2000}],
+                          0, "t", now)
+    known = {round(float(r[3]), 2) for r in billing}
+    merged = billing + [r for r in site if round(float(r[3]), 2) not in known]
+    assert sorted(round(float(r[3]), 2) for r in merged) == [39.0, 99.0]
+    assert len(merged) == 2      # Pro не задвоился

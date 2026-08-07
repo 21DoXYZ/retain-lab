@@ -77,14 +77,16 @@ def sync_plans(client, tenant: str, monthly_units: int) -> int:
 
     now = _now()
     rows = plan_rows(subs, monthly_units, tenant, now)
+    site = site_plan_rows(_site_plans(tenant), monthly_units, tenant, now)
     if rows:
-        # Пришли настоящие планы из биллинга - временные «сайтовые» больше не
-        # нужны и не должны путаться в лестнице тарифов.
-        client.command(
-            "ALTER TABLE retention.tenant_plans DELETE WHERE tenant_id = %(t)s "
-            "AND startsWith(plan_id, 'site:')", parameters={"t": tenant})
+        # Биллинг знает ТОЛЬКО те тарифы, на которых уже кто-то сидит. У нового
+        # клиента это один план - и лестница апгрейда получается из одной
+        # ступеньки, то есть апгрейд невозможен в принципе. Дополняем её
+        # тарифами с его же страницы цен, но не дублируем известные из Stripe.
+        known_prices = {round(float(r[3]), 2) for r in rows}
+        rows += [r for r in site if round(float(r[3]), 2) not in known_prices]
     else:
-        rows = site_plan_rows(_site_plans(tenant), monthly_units, tenant, now)
+        rows = site
     if rows:
         client.insert(
             "retention.tenant_plans", rows,

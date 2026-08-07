@@ -278,6 +278,30 @@ GROUP BY tenant_id, identity_id;
 
 -- Каждое событие → identity по старшему доступному ключу (ровно один матч):
 -- client_user_id > stripe_customer_id > email_hash.
+-- ЗНАНИЕ О КЛИЕНТЕ, отдельно от его секретов. Разбор продукта и экономика
+-- подарков - это данные с историей: тарифы меняются, и надо видеть, что именно
+-- поменялось. Ключи и токены сюда НЕ кладутся, они живут в secrets/tenants.json.
+CREATE TABLE IF NOT EXISTS retention.tenant_knowledge
+(
+    `tenant_id`  LowCardinality(String),
+    `kind`       LowCardinality(String),   -- brief | economics | ...
+    `version`    UInt32,
+    `payload`    String,                   -- JSON, схему держит модуль-владелец
+    `source`     String,                   -- откуда собрано (адрес сайта и т.п.)
+    `created_at` DateTime64(3)
+)
+ENGINE = MergeTree
+ORDER BY (tenant_id, kind, version);
+
+CREATE OR REPLACE VIEW retention.tenant_knowledge_current AS
+SELECT tenant_id, kind,
+       argMax(payload, version)    AS payload,
+       argMax(source, version)     AS source,
+       max(version)                AS version_max,
+       argMax(created_at, version) AS updated_at
+FROM retention.tenant_knowledge
+GROUP BY tenant_id, kind;
+
 -- Отбитые события: приходят с сайта клиента, но ключ не подходит. Такое
 -- случается после перевыпуска токена - на сайте остаётся старый код, и всё
 -- молча уходит в 401. Без этой таблицы клиент видит только «событий нет» и

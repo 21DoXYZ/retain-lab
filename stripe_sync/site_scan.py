@@ -349,6 +349,49 @@ def typical_plan(plans: list) -> dict:
     return paid[len(paid) // 2] if len(paid) >= 3 else paid[0]
 
 
+def analyse(url_raw: str) -> tuple[dict, dict, list, str]:
+    """(факты, разбор, страницы, note). Два прохода по одному тексту сайта.
+
+    Первый - извлечение фактов (что написано). Второй - разбор: за что платят,
+    когда наступает активация, почему уходят и какой рычаг удержания уместен.
+    Без второго прохода в анкету попадала маркетинговая фраза с лендинга.
+    """
+    try:                                    # борд импортирует пакетом, джобы - плоско
+        from client_brief import SYSTEM as BRIEF_SYSTEM, parse_brief
+    except ImportError:
+        from stripe_sync.client_brief import SYSTEM as BRIEF_SYSTEM, parse_brief
+
+    url = normalize_url(url_raw)
+    if not url:
+        return {}, {}, [], "invalid_url"
+    blob, visited = collect_text(url)
+    if not blob:
+        return {}, {}, [], "site_unreachable"
+    provider, api_key = resolve_provider()
+    if not provider:
+        return {}, {}, visited, "ai_not_configured"
+    call = _call_anthropic if provider == "anthropic" else _call_openai
+
+    try:
+        facts = parse_profile(call(
+            api_key, SYSTEM,
+            f"Website text of {url}:\n{blob}\n\nExtract the profile now."))
+    except Exception as exc:  # noqa: BLE001
+        return {}, {}, visited, f"ai_{type(exc).__name__}"
+
+    brief = {}
+    try:
+        brief = parse_brief(call(
+            api_key, BRIEF_SYSTEM,
+            f"Website text of {url}:\n{blob}\n\n"
+            f"Facts already extracted: {json.dumps(facts, ensure_ascii=False)}\n\n"
+            f"Work out the retention picture now."))
+    except Exception as exc:  # noqa: BLE001 - разбор не обязателен, факты важнее
+        print(f"[scan] разбор не удался: {type(exc).__name__}", flush=True)
+
+    return facts, brief, visited, ("" if facts else "ai_empty")
+
+
 def scan(url_raw: str) -> tuple[dict, list, str]:
     """(профиль, просмотренные страницы, note). Профиль пуст при любой беде."""
     url = normalize_url(url_raw)

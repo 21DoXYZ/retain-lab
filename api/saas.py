@@ -17,6 +17,8 @@
 """
 from __future__ import annotations
 
+import datetime as _dt
+
 from flask import Blueprint, request
 
 from .core import require_auth, api_json, current_tenant_scope
@@ -415,17 +417,52 @@ def saas_scan_site():
     tenant, _err = _tenant_arg_write()
     if _err:
         return _err
-    url = str((request.get_json(silent=True) or {}).get('url', ''))
-    profile, visited, note = scan(url)
+    from stripe_sync.client_brief import (BRIEF_VERSION, answers_from_brief,
+                                          diff_briefs)
+    from stripe_sync.site_scan import analyse
+
+    body = request.get_json(silent=True) or {}
+    url = str(body.get('url', ''))
+    tc = ca.load_tenants().get(tenant, {}) or {}
+    if not url:
+        # «Проанализировать заново» - берём адрес из прошлого разбора
+        url = str((tc.get('client_brief') or {}).get('site_url')
+                  or (tc.get('onboarding_answers') or {}).get('app_url') or '')
+    if not url:
+        return _bad('invalid_url')
+
+    facts, brief, visited, note = analyse(url)
     if note in ('invalid_url', 'site_unreachable'):
         return _bad(note)
-    if profile:
-        # профиль сайта пригодится промптам офферов/копирайта
-        ca.update_tenant(tenant, {'site_profile': profile,
+
+    from stripe_sync import knowledge as kb
+    from stripe_sync.economics import build as build_economics
+
+    ch = _ch_direct()
+    prev = kb.load(ch, tenant, 'brief')
+    prev_snapshot = {**(prev.get('analysis') or {}),
+                     'plans': (prev.get('facts') or {}).get('plans') or []}
+    now_snapshot = {**brief, 'plans': facts.get('plans') or []}
+    changes = diff_briefs(prev_snapshot, now_snapshot) if prev else []
+
+    answers = tc.get('onboarding_answers') or {}
+    prefill = answers_from_brief(brief, facts)
+    econ = build_economics(facts.get('plans') or [], {**prefill, **answers})
+
+    if facts or brief:
+        # ЗНАНИЕ - в своё хранилище с версиями (секреты туда не попадают),
+        # факты дополнительно в конфиг: их читают промпты офферов и текстов.
+        kb.save(ch, tenant, 'brief',
+                {'version': BRIEF_VERSION, 'site_url': url,
+                 'facts': facts, 'analysis': brief, 'pages': visited}, url)
+        kb.save(ch, tenant, 'economics', econ, url)
+        ca.update_tenant(tenant, {'site_profile': facts,
                                   'site_scanned_pages': visited})
-    print(f'[scan] {tenant}: {url} -> {"ok" if profile else note} '
-          f'({len(visited)} страниц)', flush=True)
-    return api_json({'profile': profile, 'pages': visited, 'note': note})
+    print(f'[scan] {tenant}: {url} -> {"ok" if facts else note} '
+          f'({len(visited)} страниц, изменений: {len(changes)})', flush=True)
+    return api_json({'profile': facts, 'brief': brief, 'pages': visited,
+                     'note': note, 'changes': changes, 'economics': econ,
+                     'prefill': prefill})
 
 
 @bp.get('/saas/questionnaire')
@@ -1371,9 +1408,12 @@ def channels_email_domain():
         if not existing:
             return _bad(f'resend_{status}', 502)
         data = existing
+    # Статус берём У RESEND, а не ставим «ждём DNS» вслепую: домен клиента
+    # часто УЖЕ подтверждён в его аккаунте, и требовать от него заново ставить
+    # записи - выдумывать работу на ровном месте.
     ca.update_tenant(tenant, {'email_domain': domain,
                               'email_domain_id': str(data.get('id', '')),
-                              'email_domain_status': 'pending_dns',
+                              'email_domain_status': str(data.get('status') or 'pending_dns'),
                               'email_dns_records': ca.dns_rows(data)})
     print(f'[channels] {tenant}: email domain {domain} создан в Resend', flush=True)
     return api_json(_channels_payload(tenant))
