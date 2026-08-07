@@ -18,7 +18,8 @@ def test_csv_with_arbitrary_headers():
     )
     rows = parse_rows(csv_text)
     events, report = to_events(rows, "t")
-    assert report == {"parsed": 2, "imported": 2, "skipped": 0}
+    assert report["parsed"] == 2 and report["imported"] == 2 and report["skipped"] == 0
+    assert report["with_email"] == 2
     assert events[0][4] == "u_1" and events[0][6] == "ann@example.com"
     assert events[0][3].startswith("2026-01-15")
     assert events[1][3].startswith("2026-02-15")
@@ -84,3 +85,19 @@ def test_preview_shows_what_we_understood_before_loading():
     assert p["mapping"]["id"] == "User ID" and p["mapping"]["email"] == "E-Mail"
     assert p["rows"] == 3 and p["usable"] == 2 and p["unusable"] == 1
     assert p["sample"][0]["created_at"].startswith("2026-01-15")
+
+
+def test_import_reports_how_many_people_are_reachable():
+    """Загрузили 200 человек без почты - база наполнится, а письма не уйдут
+    никому. Отчёт обязан сказать это прямо, а не радовать числом строк."""
+    rows = parse_rows("id,email\nu_1,a@b.co\nu_2,\nu_3,\n")
+    _events, report = to_events(rows, "t")
+    assert report["imported"] == 3
+    assert report["with_email"] == 1 and report["without_email"] == 2
+
+
+def test_email_column_aliases_are_wide():
+    from users_import import preview
+    for header in ("User Email", "e_mail", "primary_email", "contact_email", "Адрес"):
+        rows = parse_rows(f"id,{header}\nu_1,a@b.co\n")
+        assert preview(rows)["with_email"] == 1, header

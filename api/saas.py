@@ -220,7 +220,8 @@ def home():
     # Онбординг: демо-данные или живой Stripe; сниппет уже шлёт события?
     live_customers = int(q(
         "SELECT count() FROM stripe_customers WHERE tenant_id = {t:String} "
-        "AND customer_id NOT LIKE 'cus_mock%' AND customer_id NOT LIKE 'cus_demo%'",
+        "AND NOT startsWith(customer_id, 'cus_mock') "
+        "AND NOT startsWith(customer_id, 'cus_demo')",
         {'t': tenant})[1][0][0])
     snippet_events = int(q(
         "SELECT count() FROM saas_events WHERE tenant_id = {t:String} AND source = 'snippet'",
@@ -329,7 +330,8 @@ def saas_onboarding():
 
     live_customers = int(q(
         "SELECT count() FROM stripe_customers WHERE tenant_id = {t:String} "
-        "AND customer_id NOT LIKE 'cus_mock%' AND customer_id NOT LIKE 'cus_demo%'",
+        "AND NOT startsWith(customer_id, 'cus_mock') "
+        "AND NOT startsWith(customer_id, 'cus_demo')",
         {'t': tenant})[1][0][0])
     snippet_events = int(q(
         "SELECT count() FROM saas_events WHERE tenant_id = {t:String} AND source = 'snippet'",
@@ -671,7 +673,8 @@ def saas_users():
     # чем подключил биллинг.
     mock_customers = int(q(
         "SELECT count() FROM stripe_customers WHERE tenant_id = {t:String} "
-        "AND (customer_id LIKE 'cus_mock%' OR customer_id LIKE 'cus_demo%')",
+        "AND (startsWith(customer_id, 'cus_mock') "
+        "OR startsWith(customer_id, 'cus_demo'))",
         {'t': tenant})[1][0][0])
     demo = mock_customers > 0
 
@@ -1225,8 +1228,21 @@ def saas_users_source():
         return _bad(f'source_{reason}', 400)
 
     ca.update_tenant(tenant, {'users_source': cfg})
+    # первая синхронизация сразу, не дожидаясь часового расписания
+    people = 0
+    try:
+        from stripe_sync.connectors import fetch_users
+        from stripe_sync.users_import import COLUMNS as UCOLS, to_events
+        rows, _report = to_events(fetch_users(cfg), tenant)
+        if rows:
+            ch = _ch_direct()
+            ch.insert('retention.saas_events', rows, column_names=UCOLS)
+            people = _restitch(ch, tenant)
+    except Exception as exc:  # noqa: BLE001
+        print(f'[users_source] {tenant}: первая синхронизация позже: {exc}', flush=True)
     print(f'[users_source] {tenant}: подключён {kind}, видно юзеров: {seen}', flush=True)
-    return api_json({'tenant': tenant, 'connected': True, 'kind': kind, 'users_seen': seen})
+    return api_json({'tenant': tenant, 'connected': True, 'kind': kind,
+                     'users_seen': seen, 'people': people})
 
 
 @bp.post('/saas/users/import')
@@ -1261,8 +1277,23 @@ def saas_users_import():
 
     ch = _ch_direct()
     ch.insert('retention.saas_events', events, column_names=COLUMNS)
-    print(f'[import] {tenant}: {report}', flush=True)
-    return api_json({'tenant': tenant, **report})
+    # СРАЗУ СОБИРАЕМ ЛИЧНОСТИ. Иначе человек загрузил базу, открыл экран юзеров
+    # и увидел пустоту: сборка идёт по расписанию раз в час, и выглядит это как
+    # «ничего не приняли».
+    stitched = _restitch(ch, tenant)
+    print(f'[import] {tenant}: {report}, личностей собрано: {stitched}', flush=True)
+    return api_json({'tenant': tenant, **report, 'people': stitched})
+
+
+def _restitch(ch, tenant: str) -> int:
+    """Пересборка личностей пространства здесь и сейчас (после загрузки базы)."""
+    try:
+        from stripe_sync.stitch import run_stitch
+        now = _dt.datetime.now(tz=_dt.timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        return int(run_stitch(ch, tenant, now).get('identities', 0))
+    except Exception as exc:  # noqa: BLE001 - данные уже приняты, сборка догонит по расписанию
+        print(f'[import] {tenant}: сборка личностей не удалась: {exc}', flush=True)
+        return 0
 
 
 def _ch_direct():

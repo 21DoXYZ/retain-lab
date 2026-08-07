@@ -25,7 +25,9 @@ import re
 from datetime import datetime, timezone
 
 ID_KEYS = ("client_user_id", "user_id", "userid", "id", "uuid", "external_id")
-EMAIL_KEYS = ("email", "e-mail", "mail", "почта", "email_address")
+EMAIL_KEYS = ("email", "e-mail", "e_mail", "mail", "почта", "email_address",
+              "user_email", "useremail", "primary_email", "contact_email",
+              "login", "username_email", "адрес", "почта_пользователя")
 CREATED_KEYS = ("created_at", "created", "signup_at", "registered_at",
                 "registration_date", "date_joined", "дата регистрации")
 CUSTOMER_KEYS = ("stripe_customer_id", "customer_id", "stripe_id")
@@ -106,7 +108,11 @@ def to_events(rows: list[dict], tenant: str) -> tuple[list[list], dict]:
         event_id = "import:" + hashlib.sha256(f"{tenant}|{key}".encode()).hexdigest()[:24]
         out.append([tenant, event_id, "signup", ts, uid, ehash, email, "import",
                     _pick(row, CUSTOMER_KEYS), ""])
-    return out, {"parsed": len(rows), "imported": len(out), "skipped": skipped}
+    with_email = sum(1 for r in out if r[6])
+    return out, {"parsed": len(rows), "imported": len(out), "skipped": skipped,
+                 # БЕЗ ПОЧТЫ ЧЕЛОВЕКУ НЕЛЬЗЯ НАПИСАТЬ. Молчать об этом нечестно:
+                 # база загрузится, экран наполнится, а письма никому не уйдут.
+                 "with_email": with_email, "without_email": len(out) - with_email}
 
 
 COLUMNS = ["tenant_id", "event_id", "event_type", "ts", "client_user_id",
@@ -142,5 +148,8 @@ def preview(rows: list[dict], limit: int = 5) -> dict:
         if len(sample) < limit:
             sample.append({"id": uid, "email": email,
                            "created_at": _ts(_pick(row, CREATED_KEYS))})
+    with_email = sum(1 for r in rows
+                     if isinstance(r, dict) and _pick(r, EMAIL_KEYS))
     return {"columns": list(first.keys())[:20], "mapping": mapping,
-            "rows": len(rows), "usable": good, "unusable": bad, "sample": sample}
+            "rows": len(rows), "usable": good, "unusable": bad,
+            "with_email": with_email, "sample": sample}

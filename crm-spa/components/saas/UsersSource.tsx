@@ -24,6 +24,7 @@ interface Preview {
   rows: number;
   usable: number;
   unusable: number;
+  with_email: number;
   sample: { id: string; email: string; created_at: string }[];
 }
 
@@ -76,12 +77,13 @@ export function UsersSource({ onImported }: { onImported?: () => void }) {
   const load = () => {
     setBusy(true);
     setErr("");
-    flaskFetch<{ imported: number; skipped: number }>("/api/v1/saas/users/import", {
+    flaskFetch<{ imported: number; skipped: number; without_email: number }>("/api/v1/saas/users/import", {
       method: "POST",
       body: { data: raw },
     })
       .then((r) => {
-        setDone(t("saas.src.loaded", { n: r.imported, skipped: r.skipped }));
+        setDone(t("saas.src.loaded", { n: r.imported, skipped: r.skipped })
+                + (r.without_email ? " " + t("saas.src.noEmails", { n: r.without_email }) : ""));
         setPrev(null);
         setRaw("");
         onImported?.();
@@ -141,6 +143,14 @@ export function UsersSource({ onImported }: { onImported?: () => void }) {
                 rows: prev.rows, usable: prev.usable, bad: prev.unusable,
               })}
             </div>
+            {prev.usable > 0 && prev.with_email < prev.usable && (
+              /* Без почты человеку нельзя написать - сказать это ДО загрузки */
+              <p className="mt-1.5 rounded-ctl border border-[#fedf89] bg-[#fffcf5] p-2 text-[12px] leading-relaxed text-[#b54708]">
+                {t("saas.src.file.emailWarn", {
+                  with: prev.with_email, total: prev.usable,
+                })}
+              </p>
+            )}
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {Object.entries(prev.mapping).map(([field, column]) => (
                 <span key={field} className="rounded-full border border-[#abefc6] bg-[#ecfdf3] px-2 py-0.5 font-mono text-[11px] text-pos">

@@ -428,6 +428,9 @@ export const saas: Partial<Messages> = {
   "saas.src.live.connect": "",
   "saas.src.connected": "",
 
+  "saas.src.file.emailWarn": "",
+  "saas.src.noEmails": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",
