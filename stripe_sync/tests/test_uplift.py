@@ -60,3 +60,18 @@ def test_invert_goal_counts_staying_not_leaving():
     r = uplift_math(100, 100, 10, 25, 50.0, invert=True)
     assert r["conv_target"] == 0.9 and r["conv_control"] == 0.75
     assert r["incremental_usd"] == 750.0
+
+
+def test_site_plans_seed_the_ladder_before_billing():
+    """Пока Stripe не подключён, лестницу тарифов даёт страница цен клиента -
+    иначе «недобор апгрейдов» и экономика подарков молчат неделями."""
+    from stripe_sync.plans_sync import site_plan_rows
+    rows = site_plan_rows(
+        [{"name": "Free", "price_usd": 0, "units_included": None},
+         {"name": "Pro", "price_usd": 29, "units_included": 500},
+         {"name": "Scale", "price_usd": 99, "units_included": None}],
+        monthly_units=100, tenant="t", now="2026-08-06 00:00:00.000")
+    assert [r[1] for r in rows] == ["site:pro", "site:scale"]   # бесплатный не в счёт
+    assert [r[3] for r in rows] == [29.0, 99.0]
+    assert rows[0][2] == 500      # лимит со страницы тарифов
+    assert rows[1][2] == 100      # не указан - берём ответ клиента

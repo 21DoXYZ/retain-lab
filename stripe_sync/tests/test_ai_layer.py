@@ -115,3 +115,34 @@ def test_leaver_detector_ignores_case_and_spacing():
     from stripe_sync.ai_compose import _talks_to_leaver
     assert _talks_to_leaver("Welcome   BACK to the product")
     assert not _talks_to_leaver("Come back to the dashboard when ready")
+
+
+# ── Скрапер сайта: линейка тарифов ───────────────────────────────────────────
+
+def test_plans_normalised_to_months_and_sorted():
+    """Годовую цену приводим к месяцу, бесплатный тариф оставляем, дубли по
+    цене схлопываем, «по запросу» без числа выбрасываем."""
+    from stripe_sync.site_scan import parse_plans
+    plans = parse_plans([
+        {"name": "Enterprise", "price_usd": None},
+        {"name": "Pro yearly", "price_usd": 120, "interval": "year", "units_included": 500},
+        {"name": "Pro monthly", "price_usd": 10, "interval": "month"},
+        {"name": "Free", "price_usd": 0, "interval": "month"},
+        {"name": "Scale", "price_usd": 99, "interval": "month", "units_included": "2000"},
+    ])
+    assert [p["price_usd"] for p in plans] == [0, 10, 99]
+    assert plans[1]["units_included"] == 500
+    assert plans[2]["units_included"] == 2000
+
+
+def test_typical_plan_skips_free_and_enterprise():
+    """«Обычный» тариф - не бесплатный и не топовый: на нём считается экономика
+    офферов, поэтому край линейки исказил бы все подарки."""
+    from stripe_sync.site_scan import typical_plan
+    ladder = [{"name": "Free", "price_usd": 0, "units_included": None},
+              {"name": "Starter", "price_usd": 9, "units_included": 100},
+              {"name": "Pro", "price_usd": 29, "units_included": 500},
+              {"name": "Scale", "price_usd": 99, "units_included": 2000}]
+    assert typical_plan(ladder)["name"] == "Pro"
+    assert typical_plan([{"name": "Solo", "price_usd": 19, "units_included": 50}])["name"] == "Solo"
+    assert typical_plan([{"name": "Free", "price_usd": 0, "units_included": None}]) == {}

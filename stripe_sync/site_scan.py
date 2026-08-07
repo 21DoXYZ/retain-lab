@@ -52,19 +52,28 @@ SYSTEM = """You extract a product profile from a SaaS website's own text.
 Output ONLY valid JSON:
 {"product_name": "...", "product_desc": "...", "value_unit": "...",
  "monthly_units": <number|null>, "avg_plan_price": <number|null>,
- "trial_days": <number|null>, "audience": "...", "aha_moment": "..."}
+ "trial_days": <number|null>, "audience": "...", "aha_moment": "...",
+ "pricing_model": "flat|per_seat|usage|unknown", "free_tier": <true|false|null>,
+ "plans": [{"name": "...", "price_usd": <number|null>,
+            "interval": "month|year|unknown", "units_included": <number|null>}]}
 
 Rules:
 - Use ONLY what the text actually says. If something is not stated, use null
   (numbers) or "" (strings). NEVER guess a price, a limit or a trial length.
+- plans: EVERY paid tier the pricing page lists, in the order shown, with the
+  price exactly as stated and the interval it is billed on. Include a free tier
+  only with price_usd 0. Skip "contact us" tiers with no number. Max 6.
+- units_included: the monthly allowance that tier states (10 videos, 2000
+  credits, unlimited -> null). Same countable thing as value_unit.
+- pricing_model: per_seat when the price is per user/seat/channel/member;
+  usage when it scales with consumed credits/minutes/requests; flat otherwise.
 - value_unit: the countable thing the product delivers, in the product's own
   wording, plural lowercase (videos, renders, exports, minutes, seats, posts).
-- monthly_units: the monthly allowance of a typical PAID plan (not the free
-  tier, not the top enterprise one) if the page states it.
-- avg_plan_price: the monthly USD price of that same typical paid plan. If
-  prices are yearly only, divide by 12. If a currency other than USD is shown,
-  still return the number as stated.
-- trial_days: only if the site states a free trial length.
+  If the product does not meter anything countable, use "".
+- monthly_units and avg_plan_price describe the TYPICAL PAID plan - the one a
+  normal customer picks (not the free tier, not the enterprise one).
+- trial_days: only if the site states a free trial length. A free plan is NOT
+  a trial: in that case trial_days is null and free_tier is true.
 - audience: who it is for, max 12 words. aha_moment: the first valuable action
   a new user takes, max 12 words, phrased as an action.
 - No emoji, no em-dash, no marketing fluff in desc: one factual phrase."""
@@ -196,22 +205,49 @@ def fallback_reader(url: str) -> str:
         return ""
 
 
+# Куда класть тарифы принято у всех - пробуем напрямую, если ссылки с главной
+# нет (её часто прячут в футер или рисуют скриптом).
+PRICING_PATHS = ("/pricing", "/plans", "/pricing/plans", "/en/pricing", "/price")
+
+
+def page_text(url: str) -> str:
+    """Текст страницы своим запросом, а если пусто/мало - через ридер."""
+    txt = html_to_text(fetch(url))
+    if len(txt) >= MIN_USEFUL_TEXT:
+        return txt
+    via = fallback_reader(url)
+    return via if len(via) > len(txt) else txt
+
+
 def collect_text(url: str) -> tuple[str, list]:
-    """Текст главной + страниц тарифов. ('', []) если сайт недоступен.
-    Если свой запрос дал пусто/мало - пробуем фолбэк-ридер."""
-    home = fetch(url)
-    if len(html_to_text(home)) < MIN_USEFUL_TEXT:
+    """Текст главной + страниц тарифов. ('', []) если сайт недоступен."""
+    home_raw = fetch(url)
+    home_txt = html_to_text(home_raw)
+    used_reader = False
+    if len(home_txt) < MIN_USEFUL_TEXT:
         via_reader = fallback_reader(url)
         if len(via_reader) >= MIN_USEFUL_TEXT:
-            return via_reader[: _MAX_TEXT * 2], [url + " (reader)"]
-    if not home:
+            home_txt, used_reader = via_reader, True
+    if not home_txt:
         return "", []
-    pages = [("home", html_to_text(home)[:_MAX_TEXT])]
-    visited = [url]
-    for link in pricing_links(home, url):
-        raw = fetch(link)
-        if raw:
-            pages.append(("pricing", html_to_text(raw)[:_MAX_TEXT]))
+
+    pages = [("home", home_txt[:_MAX_TEXT])]
+    visited = [url + (" (reader)" if used_reader else "")]
+
+    # 1) ссылки «pricing/plans» с главной; 2) если их нет - типовые адреса.
+    # Раньше сайт, рисующий главную скриптом, оставался вообще без цен: как
+    # раз тех данных, ради которых клиента и просят дать адрес сайта.
+    candidates = pricing_links(home_raw, url) if home_raw else []
+    if not candidates:
+        base = urllib.parse.urlsplit(url)
+        root = urllib.parse.urlunsplit((base.scheme, base.netloc, "", "", ""))
+        candidates = [root + path for path in PRICING_PATHS]
+    for link in candidates:
+        if len(visited) > 3:
+            break
+        txt = page_text(link)
+        if len(txt) >= MIN_USEFUL_TEXT:
+            pages.append(("pricing", txt[:_MAX_TEXT]))
             visited.append(link)
     blob = "\n\n".join(f"--- {name} ---\n{txt}" for name, txt in pages)
     return blob[: _MAX_TEXT * 2], visited
@@ -241,7 +277,11 @@ def parse_profile(text: str) -> dict:
             return None
         return None if not (lo <= n <= hi) else (int(n) if float(n).is_integer() else n)
 
-    return {
+    model = _str("pricing_model", 20).lower()
+    if model not in ("flat", "per_seat", "usage"):
+        model = "unknown"
+    free = doc.get("free_tier")
+    profile = {
         "product_name": _str("product_name", 120),
         "product_desc": _str("product_desc", 200),
         "value_unit": _str("value_unit", 40).lower(),
@@ -250,7 +290,63 @@ def parse_profile(text: str) -> dict:
         "trial_days": _num("trial_days", 1, 90),
         "audience": _str("audience", 120),
         "aha_moment": _str("aha_moment", 120),
+        "pricing_model": model,
+        "free_tier": bool(free) if isinstance(free, bool) else None,
+        "plans": parse_plans(doc.get("plans")),
     }
+    # Цена «типичного» тарифа - не мнение модели, а арифметика по линейке:
+    # берём самый дешёвый ПЛАТНЫЙ, а при трёх и более - средний по счёту.
+    typical = typical_plan(profile["plans"])
+    if typical:
+        profile["avg_plan_price"] = typical["price_usd"]
+        if typical.get("units_included"):
+            profile["monthly_units"] = typical["units_included"]
+    return profile
+
+
+def parse_plans(raw) -> list:
+    """Линейка тарифов из ответа модели: чистим, приводим к месяцу, сортируем."""
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for item in raw[:6]:
+        if not isinstance(item, dict):
+            continue
+        try:
+            price = float(item.get("price_usd"))
+        except (TypeError, ValueError):
+            continue
+        if not 0 <= price <= 100_000:
+            continue
+        interval = str(item.get("interval") or "").lower()
+        if interval == "year":          # в системе всё живёт в месяцах
+            price = round(price / 12, 2)
+        units = item.get("units_included")
+        try:
+            units = int(units) if units not in (None, "", "null") else None
+        except (TypeError, ValueError):
+            units = None
+        out.append({"name": str(item.get("name") or "")[:60],
+                    "price_usd": int(price) if float(price).is_integer() else price,
+                    "units_included": units if (units and units > 0) else None})
+    out.sort(key=lambda p: p["price_usd"])
+    # дубли по цене (одно и то же в месячном/годовом виде) схлопываем
+    dedup, seen = [], set()
+    for p in out:
+        if p["price_usd"] in seen:
+            continue
+        seen.add(p["price_usd"])
+        dedup.append(p)
+    return dedup
+
+
+def typical_plan(plans: list) -> dict:
+    """Тариф, который берёт обычный клиент: самый дешёвый платный, а если
+    платных три и больше - средний по счёту (края - это фри и энтерпрайз)."""
+    paid = [p for p in plans if p["price_usd"] > 0]
+    if not paid:
+        return {}
+    return paid[len(paid) // 2] if len(paid) >= 3 else paid[0]
 
 
 def scan(url_raw: str) -> tuple[dict, list, str]:
