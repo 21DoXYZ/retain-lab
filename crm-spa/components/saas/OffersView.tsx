@@ -273,7 +273,9 @@ function OfferCard({ o, onEdit }: { o: OfferRow; onEdit: () => void }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="text-[15px] font-semibold text-ink">{o.title}</div>
         <div className="flex items-center gap-2">
-          {o.custom && <span className="rounded-full border border-hair2 px-2 py-0.5 text-[11px] text-steel">{t("saas.offers.custom")}</span>}
+          <span className="rounded-full border border-hair2 px-2 py-0.5 text-[11px] text-steel">
+            {o.offer_id.startsWith("C_") ? t("saas.offers.byOwner") : t("saas.offers.bySystem")}
+          </span>
           {o.edited && <span className="rounded-full border border-[#b2ddff] bg-[#eff8ff] px-2 py-0.5 text-[11px] font-semibold text-primary">{t("saas.offers.editedTag")}</span>}
           <button type="button" onClick={onEdit}
                   className="cursor-pointer rounded-md border border-hair2 px-2 py-0.5 text-[11.5px] text-steel transition-[color,border-color] duration-150 hover:border-primary hover:text-primary">
@@ -291,9 +293,15 @@ function OfferCard({ o, onEdit }: { o: OfferRow; onEdit: () => void }) {
 
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-steel">
         <span className={o.economics?.ok === false ? "text-[#b54708]" : ""}>
-          {o.economics?.note
-            ? t("saas.offers.card.cost", { cost: `$${o.economics.cost}`, note: o.economics.note })
-            : t("saas.offers.card.costUnknown")}
+          {o.economics?.cost === 0
+            ? t("saas.offers.card.free")
+            : o.economics?.cost != null && o.economics?.share != null
+              ? t("saas.offers.card.costLine", {
+                  cost: `$${o.economics.cost}`,
+                  share: Math.round((o.economics.share ?? 0) * 100),
+                  payback: o.economics.payback_months ?? 0,
+                })
+              : t("saas.offers.card.costUnknown")}
         </span>
         <span>{t("saas.offers.card.cap", { n: o.max_per_user_30d || 1 })}</span>
         {o.stats.issued + o.stats.dry_run > 0 && (

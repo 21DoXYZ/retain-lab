@@ -448,6 +448,11 @@ export const saas: Partial<Messages> = {
   "saas.offers.editedTag": "",
   "saas.offers.custom": "",
 
+  "saas.offers.card.costLine": "",
+  "saas.offers.card.free": "",
+  "saas.offers.bySystem": "",
+  "saas.offers.byOwner": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

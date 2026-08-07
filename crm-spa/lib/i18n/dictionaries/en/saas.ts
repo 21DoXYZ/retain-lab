@@ -451,6 +451,11 @@ export const saas: Partial<Messages> = {
   "saas.offers.editedTag": "edited",
   "saas.offers.custom": "custom",
 
+  "saas.offers.card.costLine": "Costs {cost} - that is {share}% of a monthly payment, paid back by {payback} months of subscription.",
+  "saas.offers.card.free": "Costs nothing: the person has not paid yet.",
+  "saas.offers.bySystem": "composed by the system",
+  "saas.offers.byOwner": "yours",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

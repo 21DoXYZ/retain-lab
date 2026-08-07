@@ -450,6 +450,11 @@ export const saas = {
   "saas.offers.editedTag": "правлено",
   "saas.offers.custom": "свой",
 
+  "saas.offers.card.costLine": "Стоит {cost} - это {share}% месячного платежа, окупается за {payback} мес. подписки.",
+  "saas.offers.card.free": "Ничего не стоит: человек ещё не платил.",
+  "saas.offers.bySystem": "собрано системой",
+  "saas.offers.byOwner": "ваш",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",
