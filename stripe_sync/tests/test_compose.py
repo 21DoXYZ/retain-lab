@@ -54,6 +54,64 @@ def test_compose_zero_ceiling_kills_monetary():
     assert "client_callback" in execs      # бонус юнитами остаётся
 
 
+THIN = {**FULL, "monthly_units": 15000, "unit_cost_usd": 0.005916,
+        "topup_price": 94.66, "topup_units": 10000, "max_discount_pct": 20}
+
+
+def test_gift_size_is_set_by_the_margin_it_comes_out_of():
+    """«20% от лимита» в тонкой марже - подарок дороже самого клиента.
+
+    Тариф $99 при себестоимости $0.0059 за юнит приносит ~$10 маржи в месяц.
+    Раздать 3000 юнитов значит потратить $17.75 живых денег ради $10 дохода.
+    """
+    offers = {o["offer_id"]: o for o in compose_offers(THIN, avg_price=99.0)}
+    bonus = offers["A_bonus_tokens"]
+    assert bonus["params"]["amount"] == 433          # не 3000
+    assert bonus["cost_estimate"] == 2.56            # четверть месячной маржи
+
+
+def test_discount_never_sells_the_subscription_below_cost():
+    """При валовой марже 10% скидка в 20% делает удержанный месяц убыточным."""
+    offers = {o["offer_id"]: o for o in compose_offers(THIN, avg_price=99.0)}
+    assert "A_discount20" not in offers
+    assert "A_discount5" in offers                   # половина маржи, не больше
+    # там, где маржа широкая, ограничение не мешает
+    wide = compose_offers({**THIN, "unit_cost_usd": 0.001}, avg_price=99.0)
+    assert any(o["offer_id"] == "A_discount20" for o in wide)
+
+
+def test_topup_discount_is_composed_and_goes_first():
+    """К шагу цепочки привязывается ПЕРВЫЙ оффер роли - им должен быть дешёвый."""
+    offers = compose_offers(THIN, avg_price=99.0)
+    upgrade = [o["offer_id"] for o in offers if o["role"] == "upgrade"]
+    assert upgrade[0] == "A_topup18"
+    pack = next(o for o in offers if o["offer_id"] == "A_topup18")
+    assert pack["params"]["command"] == "topup_discount"
+    assert pack["cost_estimate"] == 17.04            # только маржа пакета
+    for o in offers:                                 # схема исполнителя соблюдена
+        assert validate_offer(o)[1] == ""
+
+
+def test_limits_apply_to_an_assumed_margin_too():
+    """Предположение по типу бизнеса обязано ОГРАНИЧИВАТЬ, а не только украшать.
+
+    Иначе оно живёт на экране, а подарок собирается по-старому - «20% от
+    лимита» и «20% скидки», как будто маржа стопроцентная.
+    """
+    guessed = {**FULL, "monthly_units": 15000, "cost_archetype": "ai_usage"}
+    offers = {o["offer_id"]: o for o in compose_offers(guessed, avg_price=99.0)}
+    assert offers["A_bonus_tokens"]["params"]["amount"] == 1249     # не 3000
+    assert "A_discount20" not in offers and "A_discount12" in offers
+
+
+def test_archetype_survives_the_questionnaire_submit():
+    """Тип экономики выведен из сайта, а не спрошен - и обязан пережить сабмит."""
+    a, r = validate_answers({**FULL, "cost_archetype": "ai_usage"})
+    assert r == "" and a["cost_archetype"] == "ai_usage"
+    a, _ = validate_answers({**FULL, "cost_archetype": "не существует"})
+    assert "cost_archetype" not in a
+
+
 def test_compose_no_api_no_bonus():
     offers = compose_offers({**FULL, "client_api": False}, avg_price=50.0)
     assert all(o["executor"] != "client_callback" for o in offers)

@@ -124,6 +124,19 @@ QUESTIONS = [
     {"key": "max_discount_pct", "type": "num", "required": True, "min": 0, "max": 80},
     {"key": "can_pause", "type": "bool", "required": True},
     {"key": "avg_plan_price", "type": "num", "required": False, "min": 1},
+    # ── Себестоимость. Без неё стоимость подарка считается по ЦЕНЕ, а это
+    # разные числа: в продукте с валовой маржой 10% подаренный юнит стоит
+    # почти столько же, сколько за него платит клиент.
+    {"key": "gross_margin_pct", "type": "num", "required": False, "min": 1, "max": 100,
+     "example": "сколько остаётся со $100 выручки после оплаты провайдеров"},
+    {"key": "unit_cost_usd", "type": "num", "required": False, "min": 0, "max": 10000,
+     "example": "во сколько вам обходится один юнит"},
+    {"key": "fixed_monthly_cost", "type": "num", "required": False, "min": 0},
+    {"key": "trial_units", "type": "num", "required": False, "min": 0},
+    # ── Докупка сверх тарифа: обычно именно там лежит маржа, и скидка на неё
+    # не уносит живых денег.
+    {"key": "topup_price", "type": "num", "required": False, "min": 1},
+    {"key": "topup_units", "type": "num", "required": False, "min": 1},
 ]
 
 AUTO_PREFIX = "A_"
@@ -155,6 +168,15 @@ def validate_answers(raw: dict) -> tuple[dict, str]:
         out["client_api"] = out["client_api"]  # допустимо: просто не будет бонуса
     if out.get("has_trial") and not out.get("trial_days"):
         out["trial_days"] = 14
+    # Тип экономики не вопрос владельцу - он выведен из сайта. Но он управляет
+    # всей арифметикой подарков, поэтому обязан пережить сабмит анкеты.
+    try:
+        from archetypes import ARCHETYPES
+    except ImportError:
+        from stripe_sync.archetypes import ARCHETYPES  # type: ignore
+    kind = str(raw.get("cost_archetype") or "").strip()
+    if kind in ARCHETYPES:
+        out["cost_archetype"] = kind
     return out, ""
 
 
@@ -186,27 +208,73 @@ def dedupe_offers(offers: list) -> list:
 
 def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
     """Ответы -> список офферов. Чистая функция, правила из докстринга модуля.
-    avg_price - средний чек из Stripe-планов (важнее ручного ответа)."""
+    avg_price - средний чек из Stripe-планов (важнее ручного ответа).
+
+    Каждый подарок соразмеряется с МАРЖОЙ, из которой он оплачивается. Пока
+    себестоимость неизвестна, поведение прежнее: считаем по цене - но тогда
+    экономика помечена basis='price' и владелец видит, что число условное.
+    """
+    try:                                # борд импортирует пакетом, джобы плоско
+        from economics import (affordable_units, gross_margin, safe_discount_pct,
+                               topup_discount_pct, topup_pack, unit_cost, unit_price)
+    except ImportError:
+        from stripe_sync.economics import (affordable_units, gross_margin,  # type: ignore
+                                           safe_discount_pct, topup_discount_pct,
+                                           topup_pack, unit_cost, unit_price)
+
     price = float(avg_price or answers.get("avg_plan_price") or 0)
     ceiling = float(answers.get("max_discount_pct") or 0)
     unit = str(answers.get("value_unit") or "").strip()
+    units = float(answers.get("monthly_units") or 0)
+
+    u_price = unit_price(price, units)
+    u_cost, cost_basis = unit_cost(answers, u_price)
+    margin = gross_margin(answers)
+    # ...в том числе когда себестоимость ПРЕДПОЛОЖЕНА по типу бизнеса: иначе
+    # ограничения на размер подарка и глубину скидки молча не применяются
+    if margin is None and cost_basis in ("stated", "assumed") \
+            and u_price and u_cost is not None:
+        margin = max(0.0, 1.0 - u_cost / u_price)
+    monthly_margin = (price * margin) if (price and margin) else None
+    margin_pct = round(margin * 100, 1) if margin else None
     out: list[dict] = []
 
-    if answers.get("client_api") and unit and answers.get("monthly_units"):
-        bonus = max(1, round(float(answers["monthly_units"]) * 0.2))
-        unit_cost = (price / float(answers["monthly_units"])) if price else 0.0
+    if answers.get("client_api") and unit and units:
+        # размер подарка задаёт маржа, а не лимит тарифа
+        bonus = affordable_units(monthly_margin, u_cost, round(units * 0.2))
+        per_unit = u_cost if u_cost is not None else 0.0
         out.append({
             "offer_id": f"{AUTO_PREFIX}bonus_{_slug(unit)}", "role": "activation",
             "title": f"+{bonus} bonus {unit} (14d TTL)",
             "executor": "client_callback", "monetary": True,
-            "cost_estimate": round(bonus * unit_cost, 2),
+            "cost_estimate": round(bonus * per_unit, 2),
             "max_per_user_30d": 2,
             "params": {"command": f"{_slug(unit)}_credit", "amount": bonus,
                        "unit": unit, "expires_days": 14},
         })
 
-    if ceiling > 0:
-        pct = int(min(20, ceiling))
+    # СКИДКА НА ДОКУПКУ - ПЕРВОЙ. Там, где подписка продана почти по
+    # себестоимости, вся маржа лежит в пакетах сверх тарифа: скидка на пакет
+    # не уносит живых денег и остаётся прибыльной. Порядок здесь не косметика -
+    # к шагу цепочки привязывается ПЕРВЫЙ оффер роли, и это должен быть
+    # самый дешёвый рычаг, а не самый привычный.
+    pack = topup_pack(answers)
+    if pack and answers.get("client_api") and ceiling > 0:
+        pack_pct = topup_discount_pct(pack, ceiling)
+        if pack_pct >= 5:
+            out.append({
+                "offer_id": f"{AUTO_PREFIX}topup{pack_pct}", "role": "upgrade",
+                "title": f"{pack_pct}% off your next {unit or 'credit'} pack",
+                "executor": "client_callback", "monetary": True,
+                "cost_estimate": round(pack["price"] * pack_pct / 100, 2),
+                "max_per_user_30d": 1,
+                "params": {"command": "topup_discount", "amount": pack_pct,
+                           "unit": "percent", "expires_days": 14},
+            })
+
+    # Скидка на подписку - только пока она не уводит месяц в убыток
+    pct = safe_discount_pct(ceiling, margin_pct, want=20) if ceiling > 0 else 0
+    if pct > 0:
         out.append({
             "offer_id": f"{AUTO_PREFIX}discount{pct}", "role": "upgrade",
             "title": f"{pct}% off for 2 months",
