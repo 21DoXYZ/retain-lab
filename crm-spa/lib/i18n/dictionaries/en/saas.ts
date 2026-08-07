@@ -400,6 +400,15 @@ export const saas: Partial<Messages> = {
   "saas.ob.snippet.verdict.silence": "Nothing has arrived from your site yet. Open a page where the code is installed and press check again - events show up within seconds.",
   "saas.ob.snippet.verdict.badKey": "Requests are arriving, but with key {prefix}, which is not valid. Replace the code on your site with the one below.",
 
+  "saas.q.stage1.lead": "Start with your site: the system reads the homepage and the pricing page, pulls out the product name, what it does, the unit of value, the plan ladder and whether there is a trial - and fills the form in for you. Then you only review and correct.",
+  "saas.q.stage1.cta": "Analyse the site",
+  "saas.q.stage1.skip": "fill in manually",
+  "saas.q.stage1.working": "Reading the site: homepage, finding the pricing page, parsing prices. Usually 5-20 seconds.",
+  "saas.q.stage2.lead": "Filled from your site: {n} fields. A green mark means we found it, an amber one means we did not - please fill it in. Everything can be corrected.",
+  "saas.q.plansFound": "Found on your pricing page",
+  "saas.q.fromSite": "from site",
+  "saas.q.checkThis": "check",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

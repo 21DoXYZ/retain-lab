@@ -26,6 +26,7 @@
     endpoint: (s.dataset && s.dataset.endpoint) || w.endpoint || "",
     token: (s.dataset && s.dataset.token) || w.token || "",
     tenant: (s.dataset && s.dataset.tenant) || w.tenant || "",
+    // страницы, которые важны сами по себе (их помечаем отдельным типом)
     pages: /\/(pricing|plans|cancel)/i,
   };
   var K = "ra_uid", KH = "ra_eh", KS = "ra_sess";
@@ -303,7 +304,8 @@
     function onRoute() {
       if (location.pathname === last) return;
       last = location.pathname;
-      if (cfg.pages.test(last)) send("page_view");
+      send("page_view");
+      if (cfg.pages.test(last)) send("paywall_viewed");
     }
     ["pushState", "replaceState"].forEach(function (name) {
       var orig = history[name];
@@ -319,7 +321,10 @@
 
   try {
     sessionId();
-    if (cfg.pages.test(location.pathname)) send("page_view");
+    // Просмотр страницы шлём ВСЕГДА: иначе на сайте с трафиком мы видим одно
+    // событие на сессию, и клиенту честно кажется, что ничего не работает.
+    send("page_view");
+    if (cfg.pages.test(location.pathname)) send("paywall_viewed");
     watchSpaRoutes();
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", checkInbox);

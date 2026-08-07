@@ -61,6 +61,12 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
   const [err, setErr] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState("");
+  // Что мы САМИ нашли на сайте - чтобы поле честно говорило, откуда значение
+  const [fromSite, setFromSite] = useState<Set<string>>(new Set());
+  const [plans, setPlans] = useState<{ name: string; price_usd: number; units_included: number | null }[]>([]);
+  // Пока сайт не разобран и ответов нет - показываем ОДНО поле, а не стену
+  const [phase, setPhase] = useState<"site" | "review">(
+    Object.keys(prefill || {}).length ? "review" : "site");
 
   const scanSite = () => {
     setScanning(true);
@@ -69,7 +75,7 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
       "/api/v1/saas/scan", { method: "POST", body: { url: a.app_url } },
     )
       .then((d) => {
-        const p = d.profile || {};
+        const p = (d.profile || {}) as Record<string, unknown>;
         const filled: string[] = [];
         setA((prev) => {
           const next = { ...prev };
@@ -80,9 +86,12 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
             next[k] = String(v);
             filled.push(k);
           }
-          if (p.trial_days) next.has_trial = "yes";
+          if (p.trial_days) { next.has_trial = "yes"; filled.push("has_trial"); }
           return next;
         });
+        setFromSite(new Set(filled));
+        setPlans(Array.isArray(p.plans) ? (p.plans as typeof plans) : []);
+        setPhase("review");
         setScanNote(filled.length
           ? t("saas.q.scan.done", { n: filled.length, pages: (d.pages || []).length })
           : t("saas.q.scan.empty"));
@@ -95,12 +104,72 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
     "h-[38px] w-full rounded-ctl border border-hair2 bg-canvas px-3 text-[13px] " +
     "text-ink outline-none transition-[border-color] duration-150 focus:border-primary";
 
+  // ── Шаг 1: спрашиваем ТОЛЬКО сайт. Всё остальное система достанет сама ──
+  if (phase === "site") {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="max-w-[640px] text-[13.5px] leading-relaxed text-slate">
+          {t("saas.q.stage1.lead")}
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            className={inputCls + " sm:max-w-[420px]"}
+            placeholder={t("saas.q.app_url.ph")}
+            value={a.app_url ?? ""}
+            onChange={(e) => setA((p) => ({ ...p, app_url: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === "Enter" && a.app_url) scanSite(); }}
+          />
+          <Button variant="brand" size="sm" loading={scanning}
+                  disabled={!(a.app_url || "").trim()} onClick={scanSite}>
+            {t("saas.q.stage1.cta")}
+          </Button>
+          <button type="button" className="cursor-pointer text-[12.5px] text-steel underline"
+                  onClick={() => setPhase("review")}>
+            {t("saas.q.stage1.skip")}
+          </button>
+        </div>
+        {scanning && <p className="text-[12.5px] text-steel">{t("saas.q.stage1.working")}</p>}
+        {scanNote && !scanning && <p className="text-[12.5px] text-steel">{scanNote}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
+      {/* Что мы вычитали с сайта - показываем как доказательство, а не на веру */}
+      {plans.length > 0 && (
+        <div className="rounded-ctl border border-hair bg-surface p-3">
+          <div className="text-[12.5px] font-medium text-ink">{t("saas.q.plansFound")}</div>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {plans.map((pl, i) => (
+              <span key={i} className="rounded-full border border-hair2 bg-canvas px-2.5 py-0.5 font-mono text-[11.5px] text-slate">
+                {pl.name || "-"}: ${pl.price_usd}
+                {pl.units_included ? ` / ${pl.units_included}` : ""}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {fromSite.size > 0 && (
+        <p className="text-[12.5px] leading-relaxed text-steel">
+          {t("saas.q.stage2.lead", { n: fromSite.size })}
+        </p>
+      )}
       <div className="grid gap-2.5 sm:grid-cols-2">
         {Q_FIELDS.filter((f) => !f.showIf || f.showIf(a)).map((f) => (
           <label key={f.key} className="flex flex-col gap-1 text-[12px] text-steel">
-            {t(`saas.q.${f.key}` as MessageKey)}
+            <span className="flex items-center gap-1.5">
+              {t(`saas.q.${f.key}` as MessageKey)}
+              {fromSite.has(f.key) ? (
+                <span className="rounded-full border border-[#abefc6] bg-[#ecfdf3] px-1.5 py-0.5 text-[10px] font-semibold text-pos">
+                  {t("saas.q.fromSite")}
+                </span>
+              ) : phase === "review" && fromSite.size > 0 && !a[f.key] ? (
+                <span className="rounded-full border border-[#fedf89] bg-[#fffcf5] px-1.5 py-0.5 text-[10px] font-semibold text-[#b54708]">
+                  {t("saas.q.checkThis")}
+                </span>
+              ) : null}
+            </span>
             {f.kind === "bool" ? (
               <select
                 className={inputCls + " cursor-pointer"}

@@ -336,6 +336,20 @@ def saas_onboarding():
         "SELECT toString(max(ts)) FROM saas_events "
         "WHERE tenant_id = {t:String} AND source = 'snippet'", {'t': tenant})[1][0][0]
 
+    # РАЗБОР ПО СИГНАЛАМ. «События идут» - ещё не значит «продукт подключён»:
+    # без identify мы видим визиты, но не людей; без момента ценности мертвы
+    # стадии «не начал пользоваться» и «затих». Показываем это отдельно,
+    # чтобы клиент видел, чего именно не хватает, а не гадал.
+    sig = q(
+        "SELECT countIf(client_user_id != '') AS identified, "
+        "countIf(event_type IN ('value_moment', 'generation_completed')) AS vm, "
+        "countIf(event_type = 'page_view') AS pv, "
+        "countIf(event_type = 'cancel_flow_started') AS cf "
+        "FROM saas_events WHERE tenant_id = {t:String} AND source = 'snippet'",
+        {'t': tenant})[1][0]
+    signals = {'identified': int(sig[0]), 'value_moments': int(sig[1]),
+               'page_views': int(sig[2]), 'cancel_flow': int(sig[3])}
+
     ch = _channels_payload(tenant)['channels']
     camp_conf = _campaigns_conf(tenant)
 
@@ -357,6 +371,7 @@ def saas_onboarding():
         'offers': offers_list,
         'snippet': {'token': token, 'html': snippet_html, 'rejects': reject_info,
                     'events': snippet_events, 'last_event': str(last_event or ''),
+                    'signals': signals,
                     'ingest_url': f'https://{host}/ingest/saas/events' if host else ''},
         'stripe': {
             # URL СВОЙ у каждого пространства: без хвоста события некуда класть

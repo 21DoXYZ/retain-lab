@@ -15,6 +15,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -48,6 +49,10 @@ def load_env_key():
                     os.environ[name] = value
 
 
+class TransportError(Exception):
+    """Соединение не состоялось (TLS/сеть) — ответа от API вообще не было."""
+
+
 def auth_header(key, auth_mode):
     return f"Authorization: Bearer {key}" if auth_mode == "bearer" else f"X-API-Key: {key}"
 
@@ -67,7 +72,7 @@ def fetch_curl(full_url, header):
     proc = subprocess.run(["curl", "--config", "-"], input=config,
                           capture_output=True, text=True)
     if proc.returncode != 0:
-        sys.exit(f"curl не смог сходить к API: {proc.stderr.strip()[:400]}")
+        raise TransportError(f"curl: {proc.stderr.strip()[:300]}")
     body, _, status = proc.stdout.rpartition("\n")
     return body, int(status or 0)
 
@@ -81,15 +86,35 @@ def fetch_urllib(full_url, header):
     except urllib.error.HTTPError as e:
         return e.read().decode(errors="replace"), e.code
     except urllib.error.URLError as e:
-        sys.exit(f"Сеть недоступна: {e.reason}")
+        raise TransportError(f"python: {e.reason}")
 
 
-def fetch(url, key, auth_mode, params, transport):
+def fetch(url, key, auth_mode, params, transport, attempts=6):
+    """Хост периодически отвечает на рукопожатие TLS-алертом (curl 35), поэтому
+    повторяем и чередуем транспорты — то, что упало на curl, обычно проходит
+    следующей попыткой."""
     query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
     full_url = f"{url}?{query}"
     header = auth_header(key, auth_mode)
-    use_curl = transport == "curl" or (transport == "auto" and shutil.which("curl"))
-    body, status = (fetch_curl if use_curl else fetch_urllib)(full_url, header)
+    if transport == "curl":
+        chain = [fetch_curl]
+    elif transport == "python":
+        chain = [fetch_urllib]
+    elif shutil.which("curl"):
+        chain = [fetch_curl, fetch_urllib]
+    else:
+        chain = [fetch_urllib]
+
+    last = None
+    for attempt in range(attempts):
+        try:
+            body, status = chain[attempt % len(chain)](full_url, header)
+            break
+        except TransportError as e:
+            last = e
+            time.sleep(min(2 ** attempt, 8) * 0.25)
+    else:
+        sys.exit(f"Соединение с API не поднялось за {attempts} попыток: {last}")
     if status != 200:
         hint = ""
         if status == 401:
@@ -102,24 +127,39 @@ def fetch(url, key, auth_mode, params, transport):
 
 
 def unwrap(payload, dataset):
-    """Достаёт список строк и курсор, не завязываясь на точное имя обёртки."""
+    """Достаёт список строк и курсор.
+
+    Фактическая обёртка API: {"ok": true, "data": {"dataset", "rows", "count", "cursor"}}.
+    У summary внутри data лежит не список, а один объект со счётчиками."""
     if isinstance(payload, list):
         return payload, None
-    cursor = None
-    for key in ("cursor", "next_cursor", "nextCursor"):
-        if isinstance(payload.get(key), (str, int)):
-            cursor = payload[key]
-            break
-    if cursor is None and isinstance(payload.get("meta"), dict):
-        meta = payload["meta"]
-        cursor = meta.get("cursor") or meta.get("next_cursor")
-    for key in ("data", "rows", "items", "results", dataset):
-        value = payload.get(key)
+    if not isinstance(payload, dict):
+        return [payload], None
+
+    inner = payload.get("data")
+    node = inner if isinstance(inner, dict) else payload
+    if isinstance(inner, list):
+        return inner, find_cursor(payload)
+
+    cursor = find_cursor(node) or find_cursor(payload)
+    for key in ("rows", "items", "results", dataset):
+        value = node.get(key)
         if isinstance(value, list):
             return value, cursor
-        if isinstance(value, dict):
-            return [value], cursor
-    return [payload], cursor
+    return [node], cursor
+
+
+def find_cursor(node):
+    if not isinstance(node, dict):
+        return None
+    for key in ("cursor", "next_cursor", "nextCursor"):
+        value = node.get(key)
+        if isinstance(value, (str, int)) and value != "":
+            return value
+    meta = node.get("meta")
+    if isinstance(meta, dict):
+        return meta.get("cursor") or meta.get("next_cursor")
+    return None
 
 
 def pull(dataset, args, key):
