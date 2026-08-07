@@ -279,20 +279,19 @@ def _snippet_token(tenant: str = '') -> str:
     сайта клиента, как write-key у Segment/Amplitude) - показывать его в UI
     онбординга можно и нужно; маски - для казино-легаси /keys."""
     import json as _json
+    if not tenant:
+        return ''
     try:
         with open(_os.environ.get('TOKENS_FILE', '/secrets/tokens.json')) as fh:
             data = _json.load(fh)
-        if isinstance(data, dict):
-            # ключ файла = id тенанта; берём токен ЭТОГО рабочего пространства
-            own = data.get(tenant)
-            if own:
-                return str(own)
-            vals = [v for v in data.values() if v]
-        else:
-            vals = list(data)
-        return str(vals[0]) if vals else ''
     except Exception:
-        return _os.environ.get('INGEST_TOKEN', '').split(',')[0].strip()
+        return ''
+    # ТОЛЬКО свой токен. Раньше при отсутствии ключа подставлялся ПЕРВЫЙ
+    # ПОПАВШИЙСЯ токен из файла - то есть ЧУЖОЙ: клиент вставлял такой
+    # сниппет на сайт, ingest отбивал события как чужое пространство (403),
+    # и человек часами не понимал, почему «поставил, а данных нет».
+    own = data.get(tenant) if isinstance(data, dict) else None
+    return str(own) if own else ''
 
 
 @bp.get('/saas/onboarding')

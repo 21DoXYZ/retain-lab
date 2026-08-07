@@ -389,6 +389,8 @@ export const saas = {
 
   "saas.camp.goalOf.billing.subscription_upgraded": "человек переходит на тариф дороже",
 
+  "saas.ob.snippet.noToken": "Код пока не выдан: у этого пространства нет ключа приёма событий. Напишите нам - выпустим за минуту. Чужой ключ подставлять нельзя: события с ним всё равно будут отклонены.",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

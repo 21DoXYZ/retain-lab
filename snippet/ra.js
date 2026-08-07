@@ -29,23 +29,63 @@
     pages: /\/(pricing|plans|cancel)/i,
   };
   var K = "ra_uid", KH = "ra_eh", KS = "ra_sess";
+  var debug = (s.dataset && s.dataset.debug === "1") || !!w.debug;
+
+  function warn(msg) { if (debug && window.console) console.warn("[ra] " + msg); }
+
+  // ХРАНИЛИЩЕ МОЖЕТ БРОСАТЬ. Приватный режим Safari, запрет сторонних данных,
+  // корпоративные политики, iframe без прав - localStorage.getItem кидает
+  // исключение. Раньше оно вылетало из ra.track() прямо в код клиента, а на
+  // старте роняло весь сниппет: window.ra не создавался и вызов ra.identify
+  // валил приложение клиента. Наш код НЕ ИМЕЕТ ПРАВА ломать чужой продукт.
+  var mem = {};
+
+  function store(kind) {
+    try { return kind === "s" ? window.sessionStorage : window.localStorage; }
+    catch (_) { return null; }
+  }
+
+  function get(key, kind) {
+    var st = store(kind);
+    if (st) { try { return st.getItem(key); } catch (_) {} }
+    return Object.prototype.hasOwnProperty.call(mem, key) ? mem[key] : null;
+  }
+
+  function set(key, value, kind) {
+    mem[key] = value;                       // память - всегда, переживёт запрет
+    var st = store(kind);
+    if (st) { try { st.setItem(key, value); } catch (_) {} }
+  }
 
   function iso(d) { return d.toISOString().slice(0, 23).replace("T", " "); }
 
+  function uuid() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (_) {}
+    return "e_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
+
   function send(type, props) {
-    if (!cfg.endpoint || !cfg.tenant) return;
+    if (!cfg.endpoint || !cfg.tenant) {
+      warn("не задан data-endpoint или data-tenant - событие " + type + " никуда не ушло");
+      return;
+    }
     var e = {
-      event_id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+      event_id: uuid(),
       tenant_id: cfg.tenant,
       event_type: type,
       ts: iso(new Date()),
       source: "snippet",
-      client_user_id: localStorage.getItem(K) || "",
-      email_hash: localStorage.getItem(KH) || "",
+      client_user_id: get(K) || "",
+      email_hash: get(KH) || "",
       session_id: sessionId(),
       page: location.pathname,
     };
-    if (props) for (var k in props) if (!(k in e)) e[k] = props[k];
+    if (props) {
+      for (var k in props) {
+        // только свои поля: у объекта из чужого кода бывает грязный прототип
+        if (Object.prototype.hasOwnProperty.call(props, k) && !(k in e)) e[k] = props[k];
+      }
+    }
     post(e, 1);
   }
 
@@ -67,24 +107,37 @@
 
   function sessionId() {
     var now = Date.now();
-    var raw = (sessionStorage.getItem(KS) || "").split("|");
+    var raw = (get(KS, "s") || "").split("|");
     if (raw.length === 2 && now - Number(raw[1]) < 30 * 60 * 1000) {
-      sessionStorage.setItem(KS, raw[0] + "|" + now);
+      set(KS, raw[0] + "|" + now, "s");
       return raw[0];
     }
     var sid = "s_" + now.toString(36) + Math.random().toString(36).slice(2, 8);
-    sessionStorage.setItem(KS, sid + "|" + now);
+    set(KS, sid + "|" + now, "s");
     setTimeout(function () { send("session_start"); }, 0);
     return sid;
   }
 
+  // Хеш адреса считается ТОЛЬКО в защищённом контексте: на http-странице
+  // crypto.subtle отсутствует и обращение к нему бросало исключение прямо в
+  // ra.identify(). Теперь на http событие уходит без хеша (склейка сработает
+  // по client_user_id), а в отладке об этом честно предупреждаем.
   function sha256hex(text) {
-    var data = new TextEncoder().encode(text.trim().toLowerCase());
-    return crypto.subtle.digest("SHA-256", data).then(function (buf) {
-      return Array.prototype.map.call(new Uint8Array(buf), function (b) {
-        return b.toString(16).padStart(2, "0");
-      }).join("");
-    });
+    var subtle = (window.crypto && crypto.subtle) || null;
+    if (!subtle || typeof TextEncoder === "undefined") {
+      warn("страница не в защищённом контексте (нужен https) - email не хешируется");
+      return Promise.resolve("");
+    }
+    try {
+      var data = new TextEncoder().encode(String(text).trim().toLowerCase());
+      return subtle.digest("SHA-256", data).then(function (buf) {
+        return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+          return b.toString(16).padStart(2, "0");
+        }).join("");
+      }).catch(function () { return ""; });
+    } catch (_) {
+      return Promise.resolve("");
+    }
   }
 
   // ── In-app виджет: баннеры кампаний (dunning и т.п.) внутри продукта ───────
@@ -100,17 +153,21 @@
   }
 
   function hiddenIds() {
-    try { return JSON.parse(localStorage.getItem(KD) || "[]"); } catch (_) { return []; }
+    try { return JSON.parse(get(KD) || "[]"); } catch (_) { return []; }
   }
 
   function hideId(id) {
     var ids = hiddenIds();
     if (ids.indexOf(id) < 0) ids.push(id);
-    localStorage.setItem(KD, JSON.stringify(ids.slice(-50)));
+    set(KD, JSON.stringify(ids.slice(-50)));
   }
 
   function renderBanner(msg) {
     if (document.getElementById("ra-inapp")) return;
+    if (!document.body) {                    // сниппет позвали до <body>
+      document.addEventListener("DOMContentLoaded", function () { renderBanner(msg); });
+      return;
+    }
     var reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
     var bar = document.createElement("div");
     bar.id = "ra-inapp";
@@ -170,7 +227,7 @@
   var tgBot = "";
 
   function telegramLink() {
-    var uid = localStorage.getItem(K);
+    var uid = get(K);
     return (tgBot && uid) ? "https://t.me/" + tgBot + "?start=" + encodeURIComponent(uid) : "";
   }
 
@@ -199,7 +256,7 @@
   }
 
   function checkInbox() {
-    var uid = localStorage.getItem(K);
+    var uid = get(K);
     var base = inboxBase();
     if (!uid || !base || !cfg.token || !cfg.tenant) { applyTelegram(); return; }
     fetch(base + "/public/saas/inbox?tenant=" + encodeURIComponent(cfg.tenant) +
@@ -218,25 +275,58 @@
 
   window.ra = {
     identify: function (userId, email) {
-      var hadUser = !!localStorage.getItem(K);
-      if (userId) localStorage.setItem(K, String(userId));
-      var done = email
-        ? sha256hex(email).then(function (h) { localStorage.setItem(KH, h); })
-        : Promise.resolve();
-      done.then(function () {
-        if (!hadUser && userId) send("login");
-        checkInbox();
-      });
+      try {
+        var hadUser = !!get(K);
+        if (userId) set(K, String(userId));
+        var done = email
+          ? sha256hex(email).then(function (h) { if (h) set(KH, h); })
+          : Promise.resolve();
+        done.then(function () {
+          if (!hadUser && userId) send("login");
+          checkInbox();
+        }).catch(function () {});
+      } catch (err) { warn("identify: " + err); }
     },
-    track: function (type, props) { send(type, props); },
-    telegramLink: telegramLink,
+    track: function (type, props) {
+      try { send(type, props); } catch (err) { warn("track: " + err); }
+    },
+    telegramLink: function () {
+      try { return telegramLink(); } catch (_) { return ""; }
+    },
   };
 
-  sessionId();
-  if (cfg.pages.test(location.pathname)) send("page_view");
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", checkInbox);
-  } else {
-    checkInbox();
+  // Одностраничные приложения меняют адрес без перезагрузки: без этого хука
+  // переход на страницу тарифов внутри SPA не давал события, и «смотрел цены»
+  // как сигнал не работал вообще.
+  function watchSpaRoutes() {
+    var last = location.pathname;
+    function onRoute() {
+      if (location.pathname === last) return;
+      last = location.pathname;
+      if (cfg.pages.test(last)) send("page_view");
+    }
+    ["pushState", "replaceState"].forEach(function (name) {
+      var orig = history[name];
+      if (typeof orig !== "function") return;
+      history[name] = function () {
+        var out = orig.apply(this, arguments);
+        setTimeout(onRoute, 0);
+        return out;
+      };
+    });
+    window.addEventListener("popstate", onRoute);
+  }
+
+  try {
+    sessionId();
+    if (cfg.pages.test(location.pathname)) send("page_view");
+    watchSpaRoutes();
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", checkInbox);
+    } else {
+      checkInbox();
+    }
+  } catch (err) {
+    warn("init: " + err);      // сайт клиента продолжает работать в любом случае
   }
 })();

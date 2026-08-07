@@ -335,13 +335,22 @@ export function OnboardingView() {
               <StepBadge done={data.steps.snippet} waitKey="saas.ob.snippet.waiting" />
             </div>
             <p className="text-[13.5px] leading-relaxed text-slate">{t("saas.ob.snippet.desc")}</p>
-            <pre className="overflow-x-auto rounded-ctl bg-sb p-3.5 font-mono text-[12px] leading-relaxed text-sb-text2 whitespace-pre">
-              {data.snippet.html || "-"}
-            </pre>
-            <div className="flex items-center gap-3">
-              <CopyBtn text={data.snippet.html} label={t("saas.ob.copyCode")} copied={t("saas.channels.copied")} />
-              <span className="text-[12.5px] text-steel">{t("saas.ob.snippet.identify")}</span>
-            </div>
+            {data.snippet.html ? (
+              <>
+                <pre className="overflow-x-auto rounded-ctl bg-sb p-3.5 font-mono text-[12px] leading-relaxed text-sb-text2 whitespace-pre">
+                  {data.snippet.html}
+                </pre>
+                <div className="flex items-center gap-3">
+                  <CopyBtn text={data.snippet.html} label={t("saas.ob.copyCode")} copied={t("saas.channels.copied")} />
+                  <span className="text-[12.5px] text-steel">{t("saas.ob.snippet.identify")}</span>
+                </div>
+              </>
+            ) : (
+              /* Лучше честно сказать, что кода нет, чем показать чужой токен */
+              <p className="rounded-ctl border border-[#fedf89] bg-[#fffcf5] p-3 text-[13px] text-slate">
+                {t("saas.ob.snippet.noToken")}
+              </p>
+            )}
             <p className="text-[12.5px] text-steel">
               {data.steps.snippet ? t("saas.ob.snippet.okNote") : t("saas.ob.snippet.checkNote")}
             </p>

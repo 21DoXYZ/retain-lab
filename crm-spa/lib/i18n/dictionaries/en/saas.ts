@@ -390,6 +390,8 @@ export const saas: Partial<Messages> = {
 
   "saas.camp.goalOf.billing.subscription_upgraded": "the person moves to a more expensive plan",
 
+  "saas.ob.snippet.noToken": "No code yet: this workspace has no ingest key. Write to us and we will issue one in a minute. We will not substitute someone else's key - events sent with it get rejected anyway.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

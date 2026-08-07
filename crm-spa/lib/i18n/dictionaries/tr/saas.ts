@@ -387,6 +387,8 @@ export const saas: Partial<Messages> = {
 
   "saas.camp.goalOf.billing.subscription_upgraded": "",
 
+  "saas.ob.snippet.noToken": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",
