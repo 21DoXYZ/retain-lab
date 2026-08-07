@@ -162,24 +162,41 @@ def find_cursor(node):
     return None
 
 
+def row_key(row):
+    if isinstance(row, dict) and row.get("id") is not None:
+        return row["id"]
+    return json.dumps(row, sort_keys=True, ensure_ascii=False)
+
+
 def pull(dataset, args, key):
+    """Страницы: cursor в ответе — это created_at последней строки, его надо
+    отдать обратно параметром since (параметр cursor сервер игнорирует).
+    Граница since включающая, поэтому строки дедуплицируем по id."""
     url = os.environ.get("HUBCONTENT_EXPORT_URL", DEFAULT_URL)
-    rows, cursor, pages = [], None, 0
+    limit = min(args.limit, MAX_LIMIT)
+    rows, seen, since, pages = [], set(), args.since, 0
     while True:
         payload = fetch(url, key, args.auth, {
             "dataset": dataset,
-            "since": args.since,
-            "limit": min(args.limit, MAX_LIMIT),
-            "cursor": cursor,
+            "since": since,
+            "limit": limit,
         }, args.transport)
         page, cursor = unwrap(payload, dataset)
-        rows.extend(page)
         pages += 1
-        if dataset == "summary" or not cursor or not page or pages >= args.max_pages:
-            if cursor and pages >= args.max_pages:
-                print(f"  ! остановился на {args.max_pages} страницах, курсор ещё есть: {cursor}",
+        if dataset == "summary":
+            return page
+
+        fresh = [r for r in page if row_key(r) not in seen]
+        seen.update(row_key(r) for r in fresh)
+        rows.extend(fresh)
+
+        exhausted = not fresh or not cursor or cursor == since or len(page) < limit
+        if exhausted or pages >= args.max_pages:
+            if not exhausted:
+                print(f"  ! {dataset}: остановился на {args.max_pages} стр., курсор ещё есть ({cursor})",
                       file=sys.stderr)
             break
+        since = cursor
     return rows
 
 

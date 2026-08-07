@@ -80,6 +80,24 @@ def mock_world(tenant: str, n: int, seed: int) -> dict[str, list[list]]:
 
 # ── РЕАЛЬНЫЙ STRIPE (read-only) ──────────────────────────────────────────────
 
+def _sub_period(sub, edge: str) -> str:
+    """Период подписки: с самой подписки или с её позиции.
+
+    В актуальных версиях Stripe поле переехало внутрь items - на верхнем уровне
+    его нет, и загрузка истории молча теряла бы все подписки (та же поломка,
+    что была в приёме вебхуков).
+    """
+    key = f"current_period_{edge}"
+    value = sub.get(key) if hasattr(sub, "get") else getattr(sub, key, None)
+    if not value:
+        items = (sub.get("items") or {}).get("data") or []
+        if items:
+            value = items[0].get(key)
+    if not value and edge == "start":
+        value = sub.get("created")
+    return ts_str(value)
+
+
 def fetch_stripe(tenant: str) -> dict[str, list[list]]:
     import stripe
     stripe.api_key = os.environ["STRIPE_API_KEY"]
@@ -101,7 +119,7 @@ def fetch_stripe(tenant: str) -> dict[str, list[list]]:
             price.get("id", ""), (price.get("unit_amount") or 0) / 100.0,
             (price.get("currency") or "").lower(),
             (price.get("recurring") or {}).get("interval", ""),
-            ts_str(s.current_period_start), ts_str(s.current_period_end),
+            _sub_period(s, "start"), _sub_period(s, "end"),
             ts_str(s.trial_start) or None, ts_str(s.trial_end) or None,
             ts_str(s.cancel_at) or None, ts_str(s.canceled_at) or None,
             ts_str(s.created), now])

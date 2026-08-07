@@ -1135,6 +1135,50 @@ def saas_offer_edit():
     return api_json({'ok': True})
 
 
+@bp.post('/saas/users/import')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_users_import():
+    """Разовая загрузка базы юзеров клиента (CSV/JSON из его админки).
+
+    Сниппет видит только то, что происходит после установки. Всё, что было до,
+    лежит в базе клиента - и без этой загрузки экран юзеров показывает горстку
+    людей вместо реальной базы. Каждая строка становится обычным событием
+    регистрации, дальше работает штатный конвейер.
+    """
+    from stripe_sync.users_import import COLUMNS, parse_rows, to_events
+
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    raw = str((request.get_json(silent=True) or {}).get('data', ''))
+    if len(raw) > 8_000_000:
+        return _bad('file_too_large')
+    rows = parse_rows(raw)
+    if not rows:
+        return _bad('nothing_to_import')
+    events, report = to_events(rows, tenant)
+    if not events:
+        return _bad('no_id_or_email_columns')
+
+    ch = _ch_direct()
+    ch.insert('retention.saas_events', events, column_names=COLUMNS)
+    print(f'[import] {tenant}: {report}', flush=True)
+    return api_json({'tenant': tenant, **report})
+
+
+def _ch_direct():
+    """Отдельный клиент CH для записи (q() умеет только читать)."""
+    import os as _os5
+
+    import clickhouse_connect
+    return clickhouse_connect.get_client(
+        host=_os5.environ.get('CH_HOST', 'clickhouse'),
+        port=int(_os5.environ.get('CH_PORT', '8123')),
+        username=_os5.environ.get('CH_USER', 'default'),
+        password=_os5.environ.get('CH_PASSWORD', ''),
+        database=_os5.environ.get('CH_DB', 'retention'))
+
+
 @bp.get('/saas/offers/suggestions')
 @require_auth(roles=LEAK_ROLES)
 def saas_offer_suggestions():
