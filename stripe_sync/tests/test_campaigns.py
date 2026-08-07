@@ -279,3 +279,14 @@ def test_delay_between_touches_survives_downtime():
     assert nxt == late + timedelta(hours=48)  # 72 - 24 = двое суток от факта
     # без опоздания расписание прежнее
     assert next_step_time(steps, T0, 2, T0 + timedelta(hours=24)) == T0 + timedelta(hours=72)
+
+
+def test_sms_length_respects_the_alphabet():
+    """Кириллица в SMS - 70 знаков на сегмент, латиница 160. Не режешь сам -
+    оператор порежет и возьмёт деньги за каждую часть."""
+    from stripe_sync.saas_senders import fit_sms
+    ru = "Платёж не прошёл, обновите карту в личном кабинете " * 6
+    en = "Payment failed, please update your card in the billing portal " * 6
+    assert len(fit_sms(ru)) <= 140 and fit_sms(ru).endswith("…")
+    assert len(fit_sms(en)) <= 320 and fit_sms(en).endswith("…")
+    assert fit_sms("Коротко") == "Коротко"        # короткое не трогаем

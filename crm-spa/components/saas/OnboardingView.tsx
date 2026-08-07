@@ -15,6 +15,7 @@ import { NoTenant, isNoTenant } from "./NoTenant";
 
 interface Payload {
   steps: { snippet: boolean; stripe: boolean; channels: boolean; offers: boolean; autopilot: boolean };
+  autopilot_blockers: string[];
   snippet: {
     token: string; html: string; ingest_url: string;
     rejects: { count: number; last_seen: string; origin: string; token_prefix: string } | null;
@@ -609,9 +610,22 @@ export function OnboardingView() {
             </div>
             <p className="text-[13.5px] leading-relaxed text-slate">{t("saas.ob.autopilot.desc")}</p>
             <div>
+              {data.autopilot_blockers.length > 0 ? (
+              <div className="rounded-ctl border border-hair bg-surface p-3.5">
+                <div className="text-[13px] font-medium text-ink">
+                  {t("saas.ob.autopilot.locked")}
+                </div>
+                <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-5 text-[12.5px] text-steel">
+                  {data.autopilot_blockers.map((b) => (
+                    <li key={b}>{t(`saas.ob.autopilot.blocker.${b}` as MessageKey)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
               <Link href="/campaigns">
                 <Button variant="brand" size="sm">{t("saas.ob.autopilot.cta")}</Button>
               </Link>
+            )}
             </div>
           </Card>
         </>

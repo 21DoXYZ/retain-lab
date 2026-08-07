@@ -244,6 +244,20 @@ def home():
     })
 
 
+def _autopilot_blockers(tenant: str) -> list:
+    """Чего не хватает, чтобы автопилот имел смысл. Пусто - можно включать."""
+    out = []
+    if not _any_channel_active(tenant):
+        out.append('no_channel')
+    if not _offers_step_done(tenant):
+        out.append('no_offers')
+    live_users = int(q("SELECT count() FROM user_actions WHERE tenant_id = {t:String}",
+                       {'t': tenant})[1][0][0])
+    if not live_users:
+        out.append('no_users')
+    return out
+
+
 def _any_channel_active(tenant: str) -> bool:
     """Хоть один внешний канал доведён до конца (email verified+from или
     телеграм-бот подключён). In-app не считаем - он живёт на сниппете."""
@@ -370,6 +384,7 @@ def saas_onboarding():
             'offers': offers_edited or offers_reviewed,
             'autopilot': _autopilot_resolved(camp_conf, tenant),
         },
+        'autopilot_blockers': _autopilot_blockers(tenant),
         'offers': offers_list,
         'snippet': {'token': token, 'html': snippet_html, 'rejects': reject_info,
                     'events': snippet_events, 'last_event': str(last_event or ''),
@@ -1368,6 +1383,13 @@ def saas_campaigns_autopilot():
         return _err
     body = request.get_json(silent=True) or {}
     enabled = bool(body.get('enabled'))
+    if enabled:
+        # ВКЛЮЧАТЬ НЕЧЕГО, ЕСЛИ НЕЧЕМ И НЕКОМУ. Автопилот без канала выдаёт
+        # только отказы «нет контакта», без офферов - «оффер не привязан», а
+        # владелец видит зелёный рубильник и думает, что работает.
+        blockers = _autopilot_blockers(tenant)
+        if blockers:
+            return api_json({'blockers': blockers}, 409, 'autopilot_not_ready')
     ca.update_tenant(tenant, {'autopilot': enabled})
     print(f'[campaigns] {tenant}: autopilot -> {enabled}', flush=True)
     return api_json(_campaigns_payload(tenant))

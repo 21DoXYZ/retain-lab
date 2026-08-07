@@ -408,6 +408,11 @@ export const saas = {
   "saas.q.fromSite": "с сайта",
   "saas.q.checkThis": "проверьте",
 
+  "saas.ob.autopilot.locked": "Пока включать нечего",
+  "saas.ob.autopilot.blocker.no_channel": "Не подключён ни один канал: письма и сообщения уходить некуда.",
+  "saas.ob.autopilot.blocker.no_offers": "Не собраны офферы: шаги с подарком будут отбиваться.",
+  "saas.ob.autopilot.blocker.no_users": "В системе нет людей: заведите базу или дождитесь событий с сайта.",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

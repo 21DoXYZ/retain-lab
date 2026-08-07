@@ -77,5 +77,8 @@ scratch_api_coh.json
 *.ndjson
 data/hubcontent/
 
-# Сырые ответы Clarity (агрегаты по трафику)
+# Сырые ответы Clarity (агрегаты по трафику). data/clarity — симлинк в
+# ~/Library/Application Support/retainlab-clarity, чтобы launchd-агент мог писать
+# мимо защиты macOS на ~/Documents. Игнорируем и симлинк, и содержимое.
+data/clarity
 data/clarity/

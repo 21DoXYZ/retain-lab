@@ -409,6 +409,11 @@ export const saas: Partial<Messages> = {
   "saas.q.fromSite": "from site",
   "saas.q.checkThis": "check",
 
+  "saas.ob.autopilot.locked": "Nothing to switch on yet",
+  "saas.ob.autopilot.blocker.no_channel": "No channel is connected: messages have nowhere to go.",
+  "saas.ob.autopilot.blocker.no_offers": "No offers composed: gift steps would be rejected.",
+  "saas.ob.autopilot.blocker.no_users": "No people in the system yet: import your base or wait for site events.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

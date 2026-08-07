@@ -406,6 +406,11 @@ export const saas: Partial<Messages> = {
   "saas.q.fromSite": "",
   "saas.q.checkThis": "",
 
+  "saas.ob.autopilot.locked": "",
+  "saas.ob.autopilot.blocker.no_channel": "",
+  "saas.ob.autopilot.blocker.no_offers": "",
+  "saas.ob.autopilot.blocker.no_users": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

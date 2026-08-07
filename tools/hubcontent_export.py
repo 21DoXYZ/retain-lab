@@ -20,14 +20,18 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-DATASETS = [
-    "summary",
+# Запасной список на случай, если summary недоступен. Боевой перечень берётся из
+# summary.datasets — эндпоинт пополняют, и захардкоженный список молча отстаёт.
+FALLBACK_DATASETS = [
     "users",
     "projects",
     "jobs",
     "credit_transactions",
     "subscriptions",
     "plan_changes",
+    "feedback",
+    "support_conversations",
+    "support_messages",
 ]
 DEFAULT_URL = "https://hubcontent.ai/api/retivo-export"
 MAX_LIMIT = 1000
@@ -200,9 +204,26 @@ def pull(dataset, args, key):
     return rows
 
 
+def discover_datasets(args, key):
+    """Перечень датасетов спрашиваем у самого API: список пополняется на их стороне."""
+    try:
+        payload = fetch(os.environ.get("HUBCONTENT_EXPORT_URL", DEFAULT_URL), key, args.auth,
+                        {"dataset": "summary"}, args.transport)
+        rows, _ = unwrap(payload, "summary")
+        found = rows[0].get("datasets") if rows and isinstance(rows[0], dict) else None
+        if isinstance(found, list) and found:
+            new = [d for d in found if d not in FALLBACK_DATASETS]
+            if new:
+                print(f"  ! в API появились новые датасеты: {', '.join(new)}", file=sys.stderr)
+            return found
+    except SystemExit:
+        pass
+    return FALLBACK_DATASETS
+
+
 def main():
     p = argparse.ArgumentParser(description="Read-only выгрузка hubcontent.ai")
-    p.add_argument("dataset", nargs="?", choices=DATASETS)
+    p.add_argument("dataset", nargs="?")
     p.add_argument("--all", action="store_true", help="выгрузить все датасеты")
     p.add_argument("--since", help="ISO-таймстамп для инкрементальной выгрузки")
     p.add_argument("--limit", type=int, default=MAX_LIMIT, help=f"размер страницы (макс {MAX_LIMIT})")
@@ -221,7 +242,9 @@ def main():
     if not key:
         sys.exit("Нет HUBCONTENT_API_KEY — впишите ключ в retain-lab/.env")
 
-    targets = DATASETS if args.all else [args.dataset]
+    targets = discover_datasets(args, key) if args.all else [args.dataset]
+    if args.all and "summary" not in targets:
+        targets = ["summary"] + targets
     out_dir = pathlib.Path(args.out) if args.out else None
     if out_dir:
         out_dir.mkdir(parents=True, exist_ok=True)

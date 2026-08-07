@@ -90,14 +90,19 @@ def text_to_html(body: str, unsubscribe: str, brand: str = "") -> str:
 
 
 def build_email_payload(to: str, subject: str, body: str, email_from: str,
-                        unsubscribe: str, brand: str = "") -> dict:
+                        unsubscribe: str, brand: str = "", cta_label: str = "",
+                        brand_color: str = "") -> dict:
     """Тело запроса к Resend: и HTML, и текст (клиенты без HTML), плюс
     заголовки отписки - их читают Gmail/Outlook и показывают свою кнопку."""
+    try:                                    # борд импортирует пакетом, джобы плоско
+        from email_template import render
+    except ImportError:
+        from stripe_sync.email_template import render
     return {
         "from": email_from,
         "to": [to],
         "subject": subject,
-        "html": text_to_html(body, unsubscribe, brand),
+        "html": render(subject, body, unsubscribe, brand, cta_label, brand_color),
         "text": f"{body.strip()}\n\n---\nUnsubscribe: {unsubscribe}",
         "headers": {
             "List-Unsubscribe": f"<{unsubscribe}>",

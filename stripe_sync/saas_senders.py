@@ -159,6 +159,30 @@ def is_us_number(digits: str) -> bool:
     return len(digits) == 11 and digits.startswith("1")
 
 
+# Длина сообщения зависит от канала и алфавита: в SMS латиница даёт 160
+# знаков на сегмент, кириллица - 70 (UCS-2). Длинный текст оператор бьёт на
+# части и берёт за каждую - поэтому режем сами и предсказуемо.
+SMS_GSM, SMS_UNICODE, SMS_SEGMENTS = 160, 70, 2
+TELEGRAM_LIMIT = 4096
+
+
+def fit_sms(text: str) -> str:
+    """Текст под SMS: два сегмента максимум, обрыв по слову."""
+    body = " ".join(str(text or "").split())
+    per = SMS_GSM if all(ord(ch) < 128 for ch in body) else SMS_UNICODE
+    limit = per * SMS_SEGMENTS
+    if len(body) <= limit:
+        return body
+    cut = body[:limit - 1]
+    space = cut.rfind(" ")
+    return (cut[:space] if space > limit * 0.6 else cut).rstrip(" ,.;:") + "…"
+
+
+def fit_telegram(text: str) -> str:
+    body = str(text or "").strip()
+    return body if len(body) <= TELEGRAM_LIMIT else body[:TELEGRAM_LIMIT - 1] + "…"
+
+
 def send_sms(phone: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
     num = normalize_phone(phone)
     if not num:
@@ -171,7 +195,8 @@ def send_sms(phone: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
     if not cfg.decision_api_key or not cfg.sms_sender:
         return False, "sms_not_configured"
     return _post_json(DECISION_SMS_URL,
-                      {"phone": int(num), "sender": cfg.sms_sender, "text": text},
+                      {"phone": int(num), "sender": cfg.sms_sender,
+                       "text": fit_sms(text)},
                       {"Authorization": f"Basic {cfg.decision_api_key}"})
 
 
@@ -186,7 +211,7 @@ def send_viber(phone: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
         return False, "viber_not_configured"
     return _post_json(DECISION_VIBER_URL,
                       {"source_addr": cfg.viber_sender, "destination_addr": int(num),
-                       "message_type": cfg.viber_message_type, "text": text,
+                       "message_type": cfg.viber_message_type, "text": fit_telegram(text),
                        "source_type": 1, "validity_period": 3600},
                       {"Authorization": f"Basic {cfg.decision_api_key}"})
 
@@ -208,7 +233,7 @@ def send_telegram(chat_id: str, text: str, cfg: MessagingConfig) -> tuple[bool, 
     if not cfg.telegram_bot_token:
         return False, "telegram_not_configured"
     return _post_json(f"{TG_API}/bot{cfg.telegram_bot_token}/sendMessage",
-                      {"chat_id": chat_id, "text": text}, {})
+                      {"chat_id": chat_id, "text": fit_telegram(text)}, {})
 
 
 def route_message(channel: str, address: str, subject: str, body: str,
