@@ -76,3 +76,6 @@ scratch_api_coh.json
 # Выгрузки hubcontent read-only export (stripe_customer_id, выручка, себестоимость)
 *.ndjson
 data/hubcontent/
+
+# Сырые ответы Clarity (агрегаты по трафику)
+data/clarity/

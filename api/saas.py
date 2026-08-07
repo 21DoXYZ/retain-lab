@@ -1135,6 +1135,48 @@ def saas_offer_edit():
     return api_json({'ok': True})
 
 
+@bp.post('/saas/users/source')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_users_source():
+    """Подключить ПОСТОЯННЫЙ источник базы юзеров (без кода на стороне клиента).
+
+    Поддержаны: Supabase, Clerk и любой собственный админский API продукта
+    (URL + токен). Проверяем живым запросом и сразу говорим, сколько людей
+    видим - клиент не остаётся гадать, сработало или нет.
+    """
+    from stripe_sync.connectors import probe
+
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    kind = str(body.get('kind') or '').strip()
+
+    if not kind:                       # отключение источника
+        ca.update_tenant(tenant, {'users_source': None})
+        return api_json({'tenant': tenant, 'connected': False})
+
+    cfg = {'kind': kind,
+           'url': str(body.get('url') or '').strip(),
+           'key': str(body.get('key') or '').strip(),
+           'list_path': str(body.get('list_path') or '').strip(),
+           'id_field': str(body.get('id_field') or 'id').strip(),
+           'email_field': str(body.get('email_field') or 'email').strip(),
+           'created_field': str(body.get('created_field') or 'created_at').strip()}
+    if kind in ('supabase', 'json') and not cfg['url']:
+        return _bad('url_required')
+    if not cfg['key'] and kind != 'json':
+        return _bad('key_required')
+
+    ok, reason, seen = probe(cfg)
+    if not ok:
+        return _bad(f'source_{reason}', 400)
+
+    ca.update_tenant(tenant, {'users_source': cfg})
+    print(f'[users_source] {tenant}: подключён {kind}, видно юзеров: {seen}', flush=True)
+    return api_json({'tenant': tenant, 'connected': True, 'kind': kind, 'users_seen': seen})
+
+
 @bp.post('/saas/users/import')
 @require_auth(roles=CHANNEL_WRITE_ROLES)
 def saas_users_import():

@@ -50,3 +50,24 @@ def test_broken_email_does_not_break_the_row():
     rows = parse_rows("id,email\nu_1,не-почта\n")
     events, report = to_events(rows, "t")
     assert report["imported"] == 1 and events[0][6] == ""
+
+
+def test_connector_output_feeds_the_same_pipeline():
+    """Любой источник отдаёт один формат - дальше та же загрузка, без развилок."""
+    from users_import import to_events
+    from_supabase = [
+        {"id": "abc-1", "email": "A@B.co", "created_at": "2026-03-01T10:00:00Z",
+         "last_seen": "2026-08-01T10:00:00Z"},
+        {"id": "abc-2", "email": "", "created_at": "2026-04-01T10:00:00Z", "last_seen": ""},
+    ]
+    rows, report = to_events(from_supabase, "t")
+    assert report["imported"] == 2
+    assert rows[0][3].startswith("2026-03-01")
+    assert rows[0][6] == "a@b.co"
+
+
+def test_unknown_source_is_rejected_loudly():
+    import pytest
+    from connectors import fetch_users
+    with pytest.raises(ValueError):
+        fetch_users({"kind": "телепатия"})

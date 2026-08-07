@@ -44,6 +44,9 @@ JOBS = [
     # разбор причин отмены (свободный текст юзеров -> категории)
     ("cancel_reasons", ["python", "cancel_reasons.py"],
      lambda t: t.minute == 20),
+    # база юзеров из источника клиента (провайдер авторизации / его API)
+    ("users_sync", ["python", "users_sync.py"],
+     lambda t: t.minute == 35),
 ]
 
 
