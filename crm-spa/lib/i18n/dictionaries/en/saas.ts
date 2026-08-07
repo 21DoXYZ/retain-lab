@@ -395,6 +395,11 @@ export const saas: Partial<Messages> = {
   "saas.ob.snippet.badKey.title": "The code is on your site, but the key does not match",
   "saas.ob.snippet.badKey.body": "In the last 24 hours we rejected {n} requests from {origin}: they arrive with a key starting {prefix}, which is no longer valid. This usually happens when the key was reissued after the code was installed. Copy the code below again and replace the old one - the status turns green within a minute.",
 
+  "saas.ob.snippet.check": "Check now",
+  "saas.ob.snippet.verdict.ok": "Events are flowing: {n} received, last one {when} UTC.",
+  "saas.ob.snippet.verdict.silence": "Nothing has arrived from your site yet. Open a page where the code is installed and press check again - events show up within seconds.",
+  "saas.ob.snippet.verdict.badKey": "Requests are arriving, but with key {prefix}, which is not valid. Replace the code on your site with the one below.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

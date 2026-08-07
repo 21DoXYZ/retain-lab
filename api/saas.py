@@ -329,6 +329,11 @@ def saas_onboarding():
                     'token_prefix': str(rejects[3] or '')}
                    if int(rejects[0]) > 0 and snippet_events == 0 else None)
 
+    # Для кнопки «проверить сейчас»: когда последний раз что-то приходило.
+    last_event = q(
+        "SELECT toString(max(ts)) FROM saas_events "
+        "WHERE tenant_id = {t:String} AND source = 'snippet'", {'t': tenant})[1][0][0]
+
     ch = _channels_payload(tenant)['channels']
     camp_conf = _campaigns_conf(tenant)
 
@@ -349,6 +354,7 @@ def saas_onboarding():
         },
         'offers': offers_list,
         'snippet': {'token': token, 'html': snippet_html, 'rejects': reject_info,
+                    'events': snippet_events, 'last_event': str(last_event or ''),
                     'ingest_url': f'https://{host}/ingest/saas/events' if host else ''},
         'stripe': {
             # URL СВОЙ у каждого пространства: без хвоста события некуда класть

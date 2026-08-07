@@ -392,6 +392,11 @@ export const saas: Partial<Messages> = {
   "saas.ob.snippet.badKey.title": "",
   "saas.ob.snippet.badKey.body": "",
 
+  "saas.ob.snippet.check": "",
+  "saas.ob.snippet.verdict.ok": "",
+  "saas.ob.snippet.verdict.silence": "",
+  "saas.ob.snippet.verdict.badKey": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",

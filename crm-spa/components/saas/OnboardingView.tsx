@@ -18,6 +18,8 @@ interface Payload {
   snippet: {
     token: string; html: string; ingest_url: string;
     rejects: { count: number; last_seen: string; origin: string; token_prefix: string } | null;
+    events: number;
+    last_event: string;
   };
   stripe: { webhook_url: string; events: string[]; secret_set: boolean; api_key_set: boolean };
   channels: { channel: string; state: string }[];
@@ -255,6 +257,53 @@ function StripeKeys({ data, onSaved }: { data: Payload["stripe"]; onSaved: (p: P
   );
 }
 
+/** Кнопка «проверить сейчас» с человеческим вердиктом вместо тишины. */
+function SnippetCheck({ data, onData }: { data: Payload; onData: (p: Payload) => void }) {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const [checked, setChecked] = useState<Payload | null>(null);
+
+  const run = () => {
+    setBusy(true);
+    flaskFetch<Payload>("/api/v1/saas/onboarding")
+      .then((p) => {
+        onData(p);
+        setChecked(p);
+      })
+      .catch(() => {})
+      .finally(() => setBusy(false));
+  };
+
+  const verdict = () => {
+    if (!checked) return "";
+    if (checked.steps.snippet) {
+      return t("saas.ob.snippet.verdict.ok", {
+        n: checked.snippet.events,
+        when: checked.snippet.last_event.slice(0, 19) || "-",
+      });
+    }
+    if (checked.snippet.rejects) {
+      return t("saas.ob.snippet.verdict.badKey", {
+        prefix: checked.snippet.rejects.token_prefix || "-",
+      });
+    }
+    return t("saas.ob.snippet.verdict.silence");
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button variant="brand" size="sm" loading={busy} onClick={run}>
+        {t("saas.ob.snippet.check")}
+      </Button>
+      {checked && (
+        <span className={"text-[12.5px] " + (checked.steps.snippet ? "text-pos" : "text-slate")}>
+          {verdict()}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function OnboardingView() {
   const t = useT();
   const [data, setData] = useState<Payload | null>(null);
@@ -374,6 +423,10 @@ export function OnboardingView() {
             <p className="text-[12.5px] text-steel">
               {data.steps.snippet ? t("saas.ob.snippet.okNote") : t("saas.ob.snippet.checkNote")}
             </p>
+
+            {/* Явная проверка по кнопке: клиент вставил код и хочет ответ
+                СРАЗУ, а не гадать, обновилась страница или нет. */}
+            <SnippetCheck data={data} onData={setData} />
           </Card>
 
           {/* ── Шаг 2: Stripe ── */}
