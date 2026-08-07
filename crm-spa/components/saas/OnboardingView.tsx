@@ -33,7 +33,13 @@ interface Payload {
 const STEP_ORDER = ["snippet", "stripe", "channels", "offers", "autopilot"] as const;
 
 /** Поля опросника (зеркало compose.QUESTIONS): порядок = порядок в форме. */
-const Q_FIELDS: { key: string; kind: "str" | "num" | "bool"; showIf?: (a: Record<string, string>) => boolean }[] = [
+const Q_FIELDS: {
+  key: string;
+  kind: "str" | "num" | "bool";
+  showIf?: (a: Record<string, string>) => boolean;
+  /** поле спрашивается, только если его запросил тип экономики (economy.ask) */
+  ask?: boolean;
+}[] = [
   { key: "product_name", kind: "str" },
   { key: "product_desc", kind: "str" },
   { key: "app_url", kind: "str" },
@@ -46,7 +52,29 @@ const Q_FIELDS: { key: string; kind: "str" | "num" | "bool"; showIf?: (a: Record
   { key: "avg_plan_price", kind: "num" },
   { key: "max_discount_pct", kind: "num" },
   { key: "can_pause", kind: "bool" },
+  // ── Себестоимость. Спрашиваем НЕ у всех: набор нужных чисел зависит от типа
+  // экономики, который система определила по сайту. Классическому софту хватает
+  // валовой маржи, продукту с оплатой за генерацию нужна цена юнита и пакета.
+  { key: "gross_margin_pct", kind: "num", ask: true },
+  { key: "unit_cost_usd", kind: "num", ask: true },
+  { key: "topup_price", kind: "num", ask: true },
+  { key: "topup_units", kind: "num", ask: true },
+  { key: "trial_units", kind: "num", ask: true },
+  { key: "fixed_monthly_cost", kind: "num" },
 ];
+
+/** Разбор экономики, который система сделала по сайту (archetypes.read). */
+interface EconomyCard {
+  archetype: string;
+  label: string;
+  confidence: number;
+  why: string;
+  margin_band_pct: [number, number];
+  margin_in: string;
+  costly_levers: string[];
+  never: string[];
+  ask: string[];
+}
 
 function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; onDone: () => void }) {
   const t = useT();
@@ -66,6 +94,7 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
   // Что мы САМИ нашли на сайте - чтобы поле честно говорило, откуда значение
   const [fromSite, setFromSite] = useState<Set<string>>(new Set());
   const [plans, setPlans] = useState<{ name: string; price_usd: number; units_included: number | null }[]>([]);
+  const [economy, setEconomy] = useState<EconomyCard | null>(null);
   // Пока сайт не разобран и ответов нет - показываем ОДНО поле, а не стену
   const [phase, setPhase] = useState<"site" | "review">(
     Object.keys(prefill || {}).length ? "review" : "site");
@@ -73,10 +102,14 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
   const scanSite = () => {
     setScanning(true);
     setScanNote("");
-    flaskFetch<{ profile: Record<string, unknown>; pages: string[]; note: string }>(
+    flaskFetch<{ profile: Record<string, unknown>; pages: string[]; note: string;
+                 brief?: { economy?: EconomyCard } }>(
       "/api/v1/saas/scan", { method: "POST", body: { url: a.app_url } },
     )
       .then((d) => {
+        // Тип экономики считается даже когда с сайта не извлеклось ничего:
+        // он детерминированный и не зависит от модели.
+        setEconomy(d.brief?.economy ?? null);
         const p = (d.profile || {}) as Record<string, unknown>;
         const filled: string[] = [];
         setA((prev) => {
@@ -173,8 +206,40 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
           {t("saas.q.stage2.lead", { n: fromSite.size })}
         </p>
       )}
+      {/* ЧТО МЫ ПОНЯЛИ ПРО ВАШУ ЭКОНОМИКУ. Сайт не назовёт себестоимость, но
+          он выдаёт тип бизнеса, а у типа известно, где лежит маржа и какой
+          подарок разорителен. Отсюда и берётся список полей ниже. */}
+      {economy && (
+        <div className="rounded-ctl border border-hair bg-surface p-3">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-[12.5px] font-medium text-ink">
+              {t("saas.q.economy.title", { label: economy.label })}
+            </span>
+            <span className="rounded-full border border-hair2 px-2 py-0.5 text-[11px] text-steel">
+              {t("saas.q.economy.assumed", {
+                low: economy.margin_band_pct[0], high: economy.margin_band_pct[1],
+              })}
+            </span>
+          </div>
+          <p className="mt-1.5 max-w-[640px] text-[12.5px] leading-relaxed text-slate">
+            {economy.why}
+          </p>
+          {economy.costly_levers.length > 0 && (
+            <p className="mt-1.5 text-[12px] leading-relaxed text-[#b54708]">
+              {t("saas.q.economy.costly", { levers: economy.costly_levers.join(", ") })}
+            </p>
+          )}
+          <p className="mt-1.5 text-[12px] leading-relaxed text-steel">
+            {t("saas.q.economy.ask")}
+          </p>
+        </div>
+      )}
+
       <div className="grid gap-2.5 sm:grid-cols-2">
-        {Q_FIELDS.filter((f) => !f.showIf || f.showIf(a)).map((f) => (
+        {Q_FIELDS
+          .filter((f) => !f.ask || (economy?.ask ?? []).includes(f.key) || a[f.key])
+          .filter((f) => !f.showIf || f.showIf(a))
+          .map((f) => (
           <label key={f.key} className="flex flex-col gap-1 text-[12px] text-steel">
             <span className="flex items-center gap-1.5">
               {t(`saas.q.${f.key}` as MessageKey)}
@@ -248,6 +313,9 @@ function Questionnaire({ prefill, onDone }: { prefill: Record<string, unknown>; 
               if (v === undefined || v === "") continue;
               answers[f.key] = f.kind === "bool" ? v === "yes" : f.kind === "num" ? Number(v) : v;
             }
+            // тип экономики не спрашивают - он выведен из сайта, но именно он
+            // решает, дешёвый подарок или разорительный
+            if (economy?.archetype) answers.cost_archetype = economy.archetype;
             flaskFetch("/api/v1/saas/questionnaire", { method: "POST", body: { answers } })
               .then(onDone)
               .catch((e: unknown) => setErr(e instanceof Error ? e.message : t("saas.channels.err.generic")))

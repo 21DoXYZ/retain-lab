@@ -361,15 +361,24 @@ def analyse(url_raw: str) -> tuple[dict, dict, list, str]:
     except ImportError:
         from stripe_sync.client_brief import SYSTEM as BRIEF_SYSTEM, parse_brief
 
+    try:
+        from archetypes import read as read_economy
+    except ImportError:
+        from stripe_sync.archetypes import read as read_economy
+
     url = normalize_url(url_raw)
     if not url:
         return {}, {}, [], "invalid_url"
     blob, visited = collect_text(url)
     if not blob:
         return {}, {}, [], "site_unreachable"
+    # ТИП ЭКОНОМИКИ СЧИТАЕТСЯ ВСЕГДА. Он детерминированный и не требует
+    # модели, поэтому даже сайт, с которого ничего не извлеклось, перестаёт
+    # быть пустым экраном: видно, где у бизнеса лежит маржа и что спросить.
+    economy = read_economy(blob, None, None)
     provider, api_key = resolve_provider()
     if not provider:
-        return {}, {}, visited, "ai_not_configured"
+        return {}, {"economy": economy}, visited, "ai_not_configured"
     call = _call_anthropic if provider == "anthropic" else _call_openai
 
     try:
@@ -389,6 +398,9 @@ def analyse(url_raw: str) -> tuple[dict, dict, list, str]:
     except Exception as exc:  # noqa: BLE001 - разбор не обязателен, факты важнее
         print(f"[scan] разбор не удался: {type(exc).__name__}", flush=True)
 
+    # Ответ модели сверяется с признаками сайта: совпали - уверенность выше,
+    # разошлись - в карточке написано, кто из них взят и почему.
+    brief["economy"] = read_economy(blob, facts, brief)
     return facts, brief, visited, ("" if facts else "ai_empty")
 
 

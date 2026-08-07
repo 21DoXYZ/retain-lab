@@ -35,6 +35,7 @@ Output ONLY valid JSON:
 {"what_it_does": "...", "who_for": "...", "job_to_be_done": "...",
  "value_unit": "...", "activation_moment": "...", "value_event_hint": "...",
  "pricing_model": "flat|per_seat|usage|unknown",
+ "cost_archetype": "ai_usage|software_saas|per_seat_b2b|marketplace|ecommerce_physical|services|infrastructure",
  "churn_drivers": ["...", "..."],
  "retention_levers": [{"lever": "bonus_units|trial_extension|pause|discount|credit",
                        "why": "...", "fit": "high|medium|low"}],
@@ -53,6 +54,17 @@ Rules:
   the value").
 - value_event_hint: what the tracking event for that moment would most likely
   be called in their product, lowercase with underscores.
+- cost_archetype: what it COSTS this business to serve one more customer. This
+  decides whether a gift is cheap or ruinous, so answer by the cost structure,
+  not by the industry label:
+    ai_usage           every unit of value burns provider money (generation,
+                       inference, rendering, minutes of compute)
+    software_saas      one more customer costs almost nothing
+    per_seat_b2b       priced per seat; a gifted seat replaces a sale
+    marketplace        revenue is a commission on someone else's transaction
+    ecommerce_physical a gift is a real object plus shipping
+    services           a gift is paid in the team's hours
+    infrastructure     metered consumption, but wider margin than generation
 - churn_drivers: 2-4 reasons people in THIS category stop paying, specific to
   this product and pricing model. No generic "bad onboarding".
 - retention_levers: which incentives fit this business and why. In a per-seat
@@ -97,6 +109,11 @@ def parse_brief(text: str) -> dict:
 
     model = _s("pricing_model", 20).lower()
     conf = _s("confidence", 10).lower()
+    try:                                # борд импортирует пакетом, джобы плоско
+        from archetypes import ARCHETYPES
+    except ImportError:
+        from stripe_sync.archetypes import ARCHETYPES  # type: ignore
+    arch = _s("cost_archetype", 30).lower()
     return {
         "what_it_does": _s("what_it_does", 240),
         "who_for": _s("who_for", 160),
@@ -105,6 +122,7 @@ def parse_brief(text: str) -> dict:
         "activation_moment": _s("activation_moment", 160),
         "value_event_hint": _s("value_event_hint", 60).lower().replace(" ", "_"),
         "pricing_model": model if model in ("flat", "per_seat", "usage") else "unknown",
+        "cost_archetype": arch if arch in ARCHETYPES else "",
         "churn_drivers": _list("churn_drivers", 4, 160),
         "retention_levers": levers,
         "never_offer": _list("never_offer", 4, 120),
@@ -161,6 +179,11 @@ def answers_from_brief(brief: dict, facts: dict) -> dict:
             out[key] = facts[key]
     if not out.get("value_unit") and brief.get("value_unit"):
         out["value_unit"] = brief["value_unit"]
+    # тип экономики решает, дешёвый подарок или разорительный - он обязан
+    # доехать до расчёта, а не остаться украшением экрана
+    economy = brief.get("economy") or {}
+    if economy.get("archetype") or brief.get("cost_archetype"):
+        out["cost_archetype"] = economy.get("archetype") or brief["cost_archetype"]
     if facts.get("trial_days"):
         out["has_trial"] = True
     # в модели «за место» дарить юниты бессмысленно - подсказываем это анкете

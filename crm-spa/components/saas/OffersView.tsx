@@ -26,12 +26,31 @@ interface OfferRow {
   stats: { issued: number; dry_run: number; holdout: number; rejected: number };
   role: string;
   stage: string;
-  economics: { cost?: number; share?: number; payback_months?: number; ok?: boolean; note?: string };
+  economics: {
+    cost?: number; share?: number; payback_months?: number;
+    ok?: boolean; note?: string;
+    // cash - деньги, которые уйдут со счёта; monthly_margin - из чего подарок
+    // окупается; basis - измерено, предположено по типу бизнеса или неизвестно
+    cash?: number | null; monthly_margin?: number | null;
+    basis?: "stated" | "margin" | "assumed" | "price";
+  };
+  /** ступень лестницы уступок: слово -> отсрочка -> маржа -> выручка -> деньги */
+  tier?: number;
+  /** сколько сделка приносит после вычета уступки; blocked - почему отложена */
+  ev?: number | null;
+  blocked?: {
+    code: "stake_too_small" | "budget_spent" | "cheaper_rung_first" | "negative_value";
+    stake?: number; budget?: number; tier?: number;
+    gain?: number | null; cost?: number | null;
+  } | null;
 }
 
 interface OffersData {
   control_pct: number;
   offers: OfferRow[];
+  /** измерена ли себестоимость или пока предположена - решает тон всего экрана */
+  cost_basis?: "stated" | "margin" | "assumed" | "price";
+  monthly_margin?: number | null;
 }
 
 /** Типы подарков - человеческий язык; исполнитель и command под капотом.
@@ -271,7 +290,15 @@ function OfferCard({ o, onEdit }: { o: OfferRow; onEdit: () => void }) {
     <div className={"rounded-card border p-4 " +
       (o.disabled ? "border-hair bg-surface opacity-60" : "border-hair bg-canvas")}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="text-[15px] font-semibold text-ink">{o.title}</div>
+        <div className="flex items-baseline gap-2">
+          <div className="text-[15px] font-semibold text-ink">{o.title}</div>
+          {/* Чем платим за этот подарок - главное свойство оффера, а не деталь */}
+          {o.tier != null && (
+            <span className="rounded-full border border-hair2 bg-surface px-2 py-0.5 text-[11px] text-steel">
+              {t("saas.offers.tier", { tier: t(`saas.offers.tier.${o.tier}` as MessageKey) })}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span className="rounded-full border border-hair2 px-2 py-0.5 text-[11px] text-steel">
             {o.offer_id.startsWith("C_") ? t("saas.offers.byOwner") : t("saas.offers.bySystem")}
@@ -293,15 +320,7 @@ function OfferCard({ o, onEdit }: { o: OfferRow; onEdit: () => void }) {
 
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-steel">
         <span className={o.economics?.ok === false ? "text-[#b54708]" : ""}>
-          {o.economics?.cost === 0
-            ? t("saas.offers.card.free")
-            : o.economics?.cost != null && o.economics?.share != null
-              ? t("saas.offers.card.costLine", {
-                  cost: `$${o.economics.cost}`,
-                  share: Math.round((o.economics.share ?? 0) * 100),
-                  payback: o.economics.payback_months ?? 0,
-                })
-              : t("saas.offers.card.costUnknown")}
+          {costPhrase(t, o.economics)}
         </span>
         <span>{t("saas.offers.card.cap", { n: o.max_per_user_30d || 1 })}</span>
         {o.stats.issued + o.stats.dry_run > 0 && (
@@ -312,11 +331,61 @@ function OfferCard({ o, onEdit }: { o: OfferRow; onEdit: () => void }) {
         )}
       </div>
 
+      {/* Почему подарок стоит в очереди, а не выдаётся. Молчащий каталог -
+          это то же серое неактивное состояние без объяснения причины. */}
+      {o.blocked && (
+        <p className="mt-1.5 text-[12px] leading-relaxed text-[#b54708]">
+          {t("saas.offers.card.held")}{" "}
+          {t(`saas.offers.held.${o.blocked.code}` as MessageKey, {
+            stake: `$${o.blocked.stake ?? 0}`,
+            budget: `$${o.blocked.budget ?? 0}`,
+            gain: `$${o.blocked.gain ?? 0}`,
+            cost: `$${o.blocked.cost ?? 0}`,
+            tier: t(`saas.offers.tier.${o.blocked.tier ?? 0}` as MessageKey),
+          })}
+        </p>
+      )}
+
       {params && (
         <div className="mt-1.5 font-mono text-[11.5px] text-steel">{params}</div>
       )}
     </div>
   );
+}
+
+/**
+ * Цена подарка человеческой фразой.
+ *
+ * Живые деньги и недополученная выручка - РАЗНЫЕ вещи, и путать их опасно:
+ * скидку платят из будущего, а себестоимость подарка списывают со счёта
+ * сегодня, ещё до того, как человек решил остаться. Окупаемость всегда в
+ * месяцах МАРЖИ: тариф за $99 при валовой марже 10% приносит $10 в месяц.
+ */
+function costPhrase(
+  t: ReturnType<typeof useT>,
+  e: OfferRow["economics"] | undefined,
+): string {
+  if (!e || e.cost == null || e.share == null) return t("saas.offers.card.costUnknown");
+  if (e.cost === 0) return t("saas.offers.card.free");
+  const payback = e.payback_months ?? 0;
+  // Пока маржа не названа, окупаемость посчитана от ВЫРУЧКИ. Называть её
+  // месяцами маржи в этот момент - вранье в пользу подарка.
+  const measured = e.basis === "stated" || e.basis === "margin";
+  if (e.cash != null && e.cash > 0 && e.monthly_margin != null && e.cash > e.monthly_margin) {
+    return t("saas.offers.card.overMargin", {
+      cost: `$${e.cash}`,
+      margin: `$${e.monthly_margin}`,
+    });
+  }
+  if (e.cash != null && e.cash > 0) {
+    return t(measured ? "saas.offers.card.cashLine" : "saas.offers.card.cashLineRevenue",
+             { cost: `$${e.cash}`, payback });
+  }
+  return t(measured ? "saas.offers.card.costLine" : "saas.offers.card.costLineRevenue", {
+    cost: `$${e.cost}`,
+    share: Math.round((e.share ?? 0) * 100),
+    payback,
+  });
 }
 
 export function OffersView() {
@@ -387,6 +456,17 @@ export function OffersView() {
             if (reload) load();
           }}
         />
+      )}
+      {/* ОТКУДА ВЗЯТА СЕБЕСТОИМОСТЬ - один раз на экран, а не на каждой
+          карточке: повторённое четыре раза предупреждение перестаёт читаться.
+          Пока маржа не названа, все суммы ниже - оценка сверху. */}
+      {(data?.cost_basis === "price" || data?.cost_basis === "assumed") &&
+        (data?.offers ?? []).length > 0 && (
+        <div className="rounded-ctl border border-[#fedf89] bg-[#fffcf5] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-[#b54708]">
+          {t(data.cost_basis === "assumed"
+            ? "saas.offers.basis.assumed"
+            : "saas.offers.basis.price")}
+        </div>
       )}
       {noTenant ? (
         <NoTenant />

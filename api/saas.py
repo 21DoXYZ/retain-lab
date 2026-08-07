@@ -726,7 +726,7 @@ def saas_offers():
 
     # ЭКОНОМИКА РЯДОМ С КАЖДЫМ ПОДАРКОМ. Без неё каталог - список технических
     # строк: непонятно, кому это уйдёт, когда и во что обойдётся.
-    from stripe_sync.economics import verdict
+    from stripe_sync.economics import gross_margin, unit_cost, unit_price, verdict
     # ТИПОВОЙ тариф, а не средний по лестнице: экономика подарка считается от
     # того, что платит обычный клиент, а не от среднего между стартовым и топом
     ladder = sorted(_flt(r[0]) for r in q(
@@ -734,18 +734,82 @@ def saas_offers():
         "WHERE tenant_id = {t:String} AND mrr > 0", {'t': tenant})[1])
     price = (ladder[len(ladder) // 2] if len(ladder) >= 3
              else (ladder[0] if ladder else 0.0))
+
+    # ОКУПАЕМОСТЬ СЧИТАЕТСЯ ИЗ МАРЖИ, А НЕ ИЗ ЧЕКА. Тариф за $99 с валовой
+    # маржой 10% приносит $10 в месяц: подарок возвращается из этих $10.
+    answers = (ca.load_tenants().get(tenant, {}) or {}).get('onboarding_answers') or {}
+    units = _flt(answers.get('monthly_units'))
+    u_cost, cost_basis = unit_cost(answers, unit_price(price, units))
+    margin = gross_margin(answers)
+    if margin is None and cost_basis in ('stated', 'assumed') and units and price:
+        u_price = unit_price(price, units)
+        if u_price and u_cost is not None:
+            margin = round(max(0.0, 1.0 - u_cost / u_price), 4)
+
     role_stage = {'activation': 'ACTIVATE', 'conversion': 'CONVERT',
                   'dunning': 'DUNNING', 'save': 'SAVE', 'upgrade': 'UPGRADE',
                   'winback': 'WINBACK'}
+    # ЛЕСТНИЦА УСТУПОК И ЦЕННОСТЬ СДЕЛКИ. Оффер - это обмен: отдаём часть маржи
+    # сейчас, чтобы сохранить поток маржи потом. Порядок и пригодность считает
+    # offer_value; здесь он применяется к типовому клиенту, чтобы владелец видел
+    # ту же арифметику, по которой система будет выбирать подарок в цепочке.
+    from stripe_sync.offer_value import (TIER_NAMES, gift_budget, margin_at_stake,
+                                         rank, tier_of, uplift_or_prior)
+    monthly_margin = round(price * margin, 2) if (price and margin) else None
+    stake = margin_at_stake(monthly_margin, 12)
+    budget = gift_budget(stake)
+
+    candidates = []
     for o in offers:
         role = str(o.get('role') or '')
         o['stage'] = role_stage.get(role, '')
-        o['economics'] = verdict(o.get('cost_estimate'), price) if price else {}
+        # cost_estimate у денежных подарков - это ЖИВЫЕ деньги (себестоимость
+        # подаренного или прямой кредит); у скидок и паузы - недополученная
+        # выручка, которая из кармана не уходит.
+        cash = (_flt(o.get('cost_estimate'))
+                if o.get('executor') in ('client_callback', 'balance_credit') else 0.0)
+        if o.get('executor') == 'client_callback' and \
+                str((o.get('params') or {}).get('command') or '').endswith('_discount'):
+            cash = 0.0                 # скидка на докупку живых денег не уносит
+        o['economics'] = (verdict(o.get('cost_estimate'), price, margin, cash)
+                          if price else {})
+        if o['economics']:
+            o['economics']['basis'] = cost_basis
+        lift, lift_src = uplift_or_prior(None, str(o.get('executor') or ''))
+        o['uplift_source'] = lift_src
+        candidates.append({'offer_id': o['offer_id'], 'executor': o.get('executor'),
+                           'params': o.get('params') or {}, 'cash': cash,
+                           'revenue': max(0.0, _flt(o.get('cost_estimate')) - cash),
+                           'uplift': lift})
+
+    # Лестница действует ВНУТРИ СТАДИИ. Подарок для «не начал пользоваться» и
+    # подарок для «собирается уходить» уйдут разным людям и не конкурируют:
+    # ранжировать их вместе значит блокировать один другим без причины.
+    stage_of = {o['offer_id']: o.get('stage') or '' for o in offers}
+    by_id = {}
+    for stage in set(stage_of.values()):
+        group = [c for c in candidates if stage_of.get(c['offer_id']) == stage]
+        by_id.update({r['offer_id']: r for r in rank(group, stake, budget)})
+    for o in offers:
+        row = by_id.get(o['offer_id'])
+        if not row:
+            o['tier'] = tier_of({'executor': o.get('executor'),
+                                 'params': o.get('params') or {}})
+            o['tier_name'] = TIER_NAMES.get(o['tier'], '')
+            continue
+        o['tier'] = row['tier']
+        o['tier_name'] = row['tier_name']
+        o['ev'] = row['ev']
+        o['blocked'] = row['blocked']
 
     return api_json({'tenant': tenant, 'control_pct': catalog.get('control_pct', 10),
                      'p_convert_cap': catalog.get('p_convert_cap'),
                      'churn_floor': catalog.get('churn_floor'),
                      'monthly_price': round(price, 2) if price else None,
+                     'monthly_margin': monthly_margin,
+                     'margin_at_stake': stake,
+                     'gift_budget': budget,
+                     'cost_basis': cost_basis,
                      'offers': offers})
 
 
