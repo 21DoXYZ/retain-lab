@@ -559,7 +559,7 @@ export function OnboardingView() {
               <StepBadge done={data.steps.offers} waitKey="saas.ob.offers.waiting" />
             </div>
             <p className="text-[13.5px] leading-relaxed text-slate">
-              {t(Object.keys(data.answers ?? {}).length ? "saas.ob.offers.descDone" : "saas.q.lead")}
+              {t(Object.keys(data.answers ?? {}).length ? "saas.ob.offers.descDone" : "saas.ob.offers.desc")}
             </p>
 
             <Questionnaire prefill={data.answers ?? {}} onDone={load} />
