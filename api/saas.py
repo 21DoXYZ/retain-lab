@@ -1239,17 +1239,22 @@ def saas_users_import():
     людей вместо реальной базы. Каждая строка становится обычным событием
     регистрации, дальше работает штатный конвейер.
     """
-    from stripe_sync.users_import import COLUMNS, parse_rows, to_events
+    from stripe_sync.users_import import COLUMNS, parse_rows, preview, to_events
 
     tenant, _err = _tenant_arg_write()
     if _err:
         return _err
-    raw = str((request.get_json(silent=True) or {}).get('data', ''))
+    body = request.get_json(silent=True) or {}
+    raw = str(body.get('data', ''))
     if len(raw) > 8_000_000:
         return _bad('file_too_large')
     rows = parse_rows(raw)
     if not rows:
         return _bad('nothing_to_import')
+    if body.get('preview'):
+        # СНАЧАЛА ПОКАЗАТЬ, ПОТОМ ГРУЗИТЬ: человек видит, какие колонки мы
+        # распознали и сколько строк уйдёт в брак, и решает сам.
+        return api_json({'tenant': tenant, **preview(rows)})
     events, report = to_events(rows, tenant)
     if not events:
         return _bad('no_id_or_email_columns')

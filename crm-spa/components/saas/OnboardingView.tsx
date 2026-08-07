@@ -6,6 +6,7 @@ import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Button, Card, PageHeader } from "@/components/ui";
 import { NoTenant, isNoTenant } from "./NoTenant";
+import { UsersSource } from "./UsersSource";
 
 /**
  * /onboarding — визард «Get started»: 4 шага с живыми статусами и ГОТОВЫМИ
@@ -497,6 +498,13 @@ export function OnboardingView() {
             {/* Явная проверка по кнопке: клиент вставил код и хочет ответ
                 СРАЗУ, а не гадать, обновилась страница или нет. */}
             <SnippetCheck data={data} onData={setData} />
+
+            <div className="mt-1 border-t border-hair pt-4">
+              <div className="mb-2 text-[14px] font-semibold text-ink">
+                {t("saas.src.title")}
+              </div>
+              <UsersSource onImported={load} />
+            </div>
           </Card>
 
           {/* ── Шаг 2: Stripe ── */}

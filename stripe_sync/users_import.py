@@ -111,3 +111,36 @@ def to_events(rows: list[dict], tenant: str) -> tuple[list[list], dict]:
 
 COLUMNS = ["tenant_id", "event_id", "event_type", "ts", "client_user_id",
            "email_hash", "email", "source", "stripe_customer_id", "meta"]
+
+
+def preview(rows: list[dict], limit: int = 5) -> dict:
+    """Что мы поняли в файле - ДО загрузки.
+
+    Человек прислал выгрузку и не обязан верить нам на слово: показываем, какие
+    колонки распознали, что попадёт в систему и сколько строк уйдёт в брак.
+    """
+    mapping, sample = {}, []
+    known = {"id": ID_KEYS, "email": EMAIL_KEYS, "created_at": CREATED_KEYS,
+             "stripe_customer_id": CUSTOMER_KEYS}
+    first = next((r for r in rows if isinstance(r, dict)), {})
+    for field, keys in known.items():
+        for real in first:
+            if _norm_key(real) in keys:
+                mapping[field] = real
+                break
+
+    good = bad = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            bad += 1
+            continue
+        uid, email = _pick(row, ID_KEYS), _pick(row, EMAIL_KEYS).lower()
+        if not uid and not email:
+            bad += 1
+            continue
+        good += 1
+        if len(sample) < limit:
+            sample.append({"id": uid, "email": email,
+                           "created_at": _ts(_pick(row, CREATED_KEYS))})
+    return {"columns": list(first.keys())[:20], "mapping": mapping,
+            "rows": len(rows), "usable": good, "unusable": bad, "sample": sample}

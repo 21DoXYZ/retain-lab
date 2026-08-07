@@ -414,6 +414,23 @@ export const saas: Partial<Messages> = {
   "saas.ob.autopilot.blocker.no_offers": "No offers composed: gift steps would be rejected.",
   "saas.ob.autopilot.blocker.no_users": "No people in the system yet: import your base or wait for site events.",
 
+  "saas.src.title": "Your user base",
+  "saas.src.lead": "The snippet only sees what happens after it is installed. Everything before that - your past signups - has to be brought in. Two ways, neither needs a developer.",
+  "saas.src.file.title": "Option 1. Drop an export",
+  "saas.src.file.desc": "Export your users table from your admin panel as CSV or JSON. Two columns are enough: an identifier and an email; a signup date helps. We recognise the column names ourselves.",
+  "saas.src.file.pick": "Choose file",
+  "saas.src.file.understood": "Parsed {rows} rows: {usable} usable, {bad} without an identifier or email.",
+  "saas.src.file.noColumns": "No identifier and no email found - check this is the right file.",
+  "saas.src.file.load": "Load {n} people",
+  "saas.src.loaded": "Loaded: {n}. Skipped (duplicates and empty rows): {skipped}. People appear on screen within the hour, or right after the next stitch run.",
+  "saas.src.live.title": "Option 2. Connect a permanent source",
+  "saas.src.live.desc": "If your users live in Supabase, Clerk or your own admin API - give a read-only key and the system pulls new ones by itself, every hour. No more exports.",
+  "saas.src.live.own": "Own API",
+  "saas.src.live.urlPh": "https://xxx.supabase.co",
+  "saas.src.live.keyPh": "read-only key",
+  "saas.src.live.connect": "Connect source",
+  "saas.src.connected": "Source connected, we can see {n} people. Synced every hour.",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

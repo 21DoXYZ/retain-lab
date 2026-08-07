@@ -71,3 +71,16 @@ def test_unknown_source_is_rejected_loudly():
     from connectors import fetch_users
     with pytest.raises(ValueError):
         fetch_users({"kind": "телепатия"})
+
+
+def test_preview_shows_what_we_understood_before_loading():
+    """Клиент не обязан верить на слово: до загрузки показываем разбор файла."""
+    from users_import import preview
+    rows = parse_rows("User ID;E-Mail;Registration Date\n"
+                      "u_1;a@b.co;2026-01-15\n"
+                      ";;\n"
+                      "u_2;bad-email;2026-02-15\n")
+    p = preview(rows)
+    assert p["mapping"]["id"] == "User ID" and p["mapping"]["email"] == "E-Mail"
+    assert p["rows"] == 3 and p["usable"] == 2 and p["unusable"] == 1
+    assert p["sample"][0]["created_at"].startswith("2026-01-15")
