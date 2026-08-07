@@ -304,8 +304,10 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
             "params": {"months": 1},
         })
 
-    if ceiling > 0:
-        pct_wb = int(min(30, ceiling))
+    # Винбэк-скидка подчиняется ТОЙ ЖЕ гигиене маржи, что и основная: правило,
+    # применённое в одном месте и забытое в соседнем - хуже отсутствия правила.
+    pct_wb = safe_discount_pct(ceiling, margin_pct, want=30) if ceiling > 0 else 0
+    if pct_wb > 0:
         out.append({
             "offer_id": f"{AUTO_PREFIX}winback{pct_wb}", "role": "winback",
             "title": f"{pct_wb}% off your first month back",
@@ -316,14 +318,20 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
         })
 
     if ceiling > 0 and price > 0:
-        credit = round(min(25.0, price * 0.2))
+        # Кредит - живые деньги: они уходят и когда человек всё равно ушёл.
+        # Потолок - четверть МЕСЯЧНОЙ МАРЖИ, а не месячной цены: на марже 10%
+        # «20% от чека» дарит вдвое больше, чем клиент приносит за месяц.
+        credit_cap = price * 0.2
+        if monthly_margin is not None:
+            credit_cap = min(credit_cap, monthly_margin * 0.25)
+        credit = int(min(25.0, credit_cap))
         if credit >= 1:
             out.append({
-                "offer_id": f"{AUTO_PREFIX}credit_{int(credit)}", "role": "dunning",
-                "title": f"${int(credit)} account credit",
+                "offer_id": f"{AUTO_PREFIX}credit_{credit}", "role": "dunning",
+                "title": f"${credit} account credit",
                 "executor": "balance_credit", "monetary": True,
                 "cost_estimate": float(credit), "max_per_user_30d": 1,
-                "params": {"amount_usd": int(credit)},
+                "params": {"amount_usd": credit},
             })
 
     return out

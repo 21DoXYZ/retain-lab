@@ -126,15 +126,19 @@ def _check_ladder(offer: dict, ctx: dict) -> list:
 
 
 def _check_sleeping_dogs(offer: dict, ctx: dict) -> list:
-    """Кому это уйдёт - и не разбудит ли тех, кто остался бы сам."""
+    """Кому это уйдёт - и не разбудит ли тех, кто остался бы сам.
+
+    Срабатывает только когда стадия ИЗВЕСТНА и тревожна. Каталог обычно
+    смотрят без конкретного человека - молотить этим замечанием по каждой
+    карточке значит приучить владельца его не читать.
+    """
     if not offer.get("monetary"):
         return []
     stage = str(ctx.get("stage") or "")
-    if stage not in ("SAVE", "MONITOR", ""):
+    if stage not in ("SAVE", "MONITOR"):
         return []
     return [_flag("may_wake_a_sleeping_dog",
-                  HARMFUL if stage == "MONITOR" else NOTE,
-                  stage=stage or "unknown")]
+                  HARMFUL if stage == "MONITOR" else NOTE, stage=stage)]
 
 
 def _check_reason_fit(offer: dict, ctx: dict) -> list:
@@ -167,23 +171,34 @@ CHECKS = (_check_cost_basis, _check_gift_vs_margin, _check_discount_below_cost,
 
 # ── Замена: что предложить вместо ───────────────────────────────────────────
 
+# Пауза осмысленна только там, где человек УХОДИТ: предлагать её вместо
+# активационного бонуса - бессмыслица, нечего ставить на паузу у того, кто
+# ещё не начал пользоваться.
+PAUSE_ROLES = ("save", "winback", "dunning")
+
+
 def alternative(offer: dict, ctx: dict) -> dict | None:
     """Рычаг, решающий ту же задачу дешевле или надёжнее. None - нечего менять.
 
     Сказать «плохо» и уйти - не разбор. Замена подбирается из того, что у
-    клиента ДЕЙСТВИТЕЛЬНО есть: без паузы в биллинге предлагать паузу нельзя.
+    клиента ДЕЙСТВИТЕЛЬНО есть (без паузы в биллинге предлагать паузу нельзя)
+    и подходит РОЛИ оффера (пауза не лечит активацию).
     """
     can = set(ctx.get("can_execute") or ())
     tier = tier_of(offer, ctx.get("cash"))
     if tier <= TIER_OTHER_MARGIN:
         return None
 
+    role = str(offer.get("role") or "").lower()
+    stage = str(ctx.get("stage") or "")
+    leaving = role in PAUSE_ROLES or stage in ("SAVE", "WINBACK", "DUNNING")
+
     reason = str(ctx.get("reason") or "")
     wanted = offer_for_reason(reason)
-    if wanted["matched"] and wanted["executor"] in can:
+    if leaving and wanted["matched"] and wanted["executor"] in can:
         return {"executor": wanted["executor"], "why": "reason", "reason": reason}
 
-    if "pause_collection" in can:
+    if leaving and "pause_collection" in can:
         return {"executor": "pause_collection", "why": "pause_holds_longer"}
     if ctx.get("has_topup") and "client_callback" in can:
         return {"executor": "client_callback", "why": "topup_costs_no_cash"}
@@ -212,6 +227,9 @@ def review(offer: dict, ctx: dict | None = None) -> dict:
     # сначала то, что вредит, потом то, что слабо, потом оговорки
     order = {HARMFUL: 0, WEAK: 1, NOTE: 2}
     flags.sort(key=lambda f: order.get(f["level"], 3))
+    # Три замечания - потолок: стена из пяти пунктов на одной карточке
+    # перестаёт читаться, а главное уже наверху.
+    flags = flags[:3]
 
     executor = str(offer.get("executor") or "")
     uplift, source = uplift_or_prior(ctx.get("measured"), executor)
@@ -239,14 +257,21 @@ def review_catalog(offers: list, ctx: dict | None = None) -> list:
     только когда этот рычаг у клиента действительно есть.
     """
     ctx = ctx or {}
-    tiers = {tier_of(o, (o.get("_cash") if o.get("_cash") is not None
-                         else ctx.get("cash"))) for o in offers or []}
+    # Ступени считаются ВНУТРИ РОЛИ: подарок для «не начал пользоваться» и
+    # пауза для «собирается уходить» уйдут разным людям - советовать одному
+    # ступень другого значит предлагать нелепое.
+    tiers_by_role: dict = {}
+    for o in offers or []:
+        role = str(o.get("role") or "").lower()
+        cash = o.get("_cash") if o.get("_cash") is not None else ctx.get("cash")
+        tiers_by_role.setdefault(role, set()).add(tier_of(o, cash))
     executors = {str(o.get("executor") or "") for o in offers or []}
-    shared = {**ctx, "available_tiers": tiers,
-              "can_execute": set(ctx.get("can_execute") or executors)}
+    shared = {**ctx, "can_execute": set(ctx.get("can_execute") or executors)}
     out = []
     for offer in offers or []:
         own = dict(shared)
+        own["available_tiers"] = tiers_by_role.get(
+            str(offer.get("role") or "").lower(), set())
         if offer.get("_cash") is not None:
             own["cash"] = offer["_cash"]
         if offer.get("_stage"):

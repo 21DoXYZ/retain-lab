@@ -110,10 +110,56 @@ def test_a_cheaper_rung_in_the_catalog_is_pointed_out():
 
 def test_every_complaint_comes_with_a_replacement():
     """Разбор обязан предлагать выход, а не только ставить диагноз."""
-    r = review(DISCOUNT20, {**THIN, "can_execute": {"pause_collection"}})
+    r = review(DISCOUNT20, {**THIN, "stage": "SAVE",
+                            "can_execute": {"pause_collection"}})
     assert r["verdict"] != "ok"
     assert r["alternative"] and r["alternative"]["executor"] == "pause_collection"
     assert r["alternative"]["why"]
+
+
+def test_pause_is_not_proposed_where_nobody_is_leaving():
+    """Пауза лечит уход. Советовать её вместо активационного бонуса -
+    бессмыслица: нечего ставить на паузу у того, кто не начал пользоваться."""
+    activation = {**BONUS, "role": "activation"}
+    r = review(activation, {**THIN, "cash": 17.75, "stage": "ACTIVATE",
+                            "can_execute": {"pause_collection"}})
+    assert r["verdict"] == "harmful"          # подарок дороже клиента
+    assert r["alternative"] is None           # но пауза тут не замена
+    # тому же офферу с докупкой в каталоге замена находится
+    r2 = review(activation, {**THIN, "cash": 17.75, "stage": "ACTIVATE",
+                             "has_topup": True,
+                             "can_execute": {"client_callback"}})
+    assert r2["alternative"]["why"] == "topup_costs_no_cash"
+
+
+def test_catalog_view_does_not_cry_wolf_about_sleeping_dogs():
+    """Каталог смотрят без конкретного человека - стадия неизвестна.
+
+    Замечание про спящих собак на каждой карточке приучает его не читать.
+    """
+    assert "may_wake_a_sleeping_dog" not in codes(review(DISCOUNT20, FAT))
+    assert "may_wake_a_sleeping_dog" not in codes(review(BONUS, {}))
+
+
+def test_the_ladder_compares_within_a_role_not_across():
+    """Активационному бонусу нельзя советовать ступень спасательной паузы."""
+    from offer_review import review_catalog
+    out = review_catalog(
+        [{**BONUS, "role": "activation", "_cash": 5.0},
+         {**PAUSE, "role": "save"}],
+        {"cost_basis": "margin", "gross_margin": 0.85, "monthly_margin": 84.15,
+         "gift_budget": 250.0})
+    by_id = {r["offer_id"]: r for r in out}
+    assert "cheaper_rung_exists" not in {f["code"] for f in by_id["A_bonus"]["flags"]}
+
+
+def test_a_card_never_shows_more_than_three_flags():
+    """Стена из пяти замечаний перестаёт читаться - главное уже наверху."""
+    r = review({**CREDIT, "role": "save"},
+               {**THIN, "cash": 40.0, "stage": "SAVE",
+                "reason": "missing_feature", "available_tiers": {1, 4}})
+    assert len(r["flags"]) <= 3
+    assert r["flags"][0]["level"] == "harmful"
 
 
 def test_the_replacement_only_offers_what_the_client_can_actually_do():

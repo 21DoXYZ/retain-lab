@@ -238,3 +238,22 @@ def test_copy_reads_correctly_without_a_value_unit():
                     assert not re.search(r"\b(account|history|work) are\b", text), \
                         f"{cid}:{idx}:{field} -> {text}"
                     assert "your your" not in text.lower()
+
+
+def test_winback_discount_obeys_the_same_margin_hygiene():
+    """Правило, применённое к одной скидке и забытое у соседней - хуже
+    отсутствия правила: на марже 10% собирался «20% off first month back»,
+    который продаёт возвращённый месяц ниже себестоимости."""
+    offers = {o["offer_id"]: o for o in compose_offers(THIN, avg_price=99.0)}
+    assert "A_winback20" not in offers and "A_winback30" not in offers
+    assert "A_winback5" in offers                     # половина маржи
+
+
+def test_credit_is_capped_by_margin_not_by_price():
+    """«20% от чека» на марже 10% дарит вдвое больше месячной маржи клиента."""
+    offers = {o["offer_id"]: o for o in compose_offers(THIN, avg_price=99.0)}
+    credits = [o for o in offers.values() if o["executor"] == "balance_credit"]
+    assert credits and credits[0]["cost_estimate"] <= 10.26 * 0.25 + 1
+    # без данных о марже поведение прежнее - от цены
+    wide = {o["offer_id"]: o for o in compose_offers(FULL, avg_price=50.0)}
+    assert wide["A_credit_10"]["cost_estimate"] == 10.0
