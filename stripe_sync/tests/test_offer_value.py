@@ -215,3 +215,55 @@ def test_price_is_the_one_reason_where_a_discount_belongs():
     ranked = rank([DISCOUNT], stake=2000.0, tried_tiers={0, 1, 2},
                   churn_risk=0.9, reason="price")
     assert not ranked[0]["blocked"]
+
+
+# ── Опыт ниш с самым долгим стажем удержания (iGaming, free-to-play) ─────────
+
+def test_product_currency_beats_cash_of_the_same_value():
+    """A/B на 2000 спящих: валюта продукта вернула 14.9%, деньги - 5.4%.
+
+    Деньги читаются как откуп, валюта продукта - как повод вернуться в
+    продукт. Поэтому прайор у неё выше, хотя щедрость меньше.
+    """
+    from offer_value import uplift_or_prior
+    units, _ = uplift_or_prior(None, "client_callback")
+    cash, _ = uplift_or_prior(None, "balance_credit")
+    assert units > cash * 2
+
+
+def test_quiet_means_different_things_to_different_customers():
+    """Неделя тишины у крупного клиента - тревога, у разового - норма.
+
+    Один порог для всех - это одновременно ложная тревога по мелким и
+    опоздание по крупным.
+    """
+    from offer_value import quiet_window, value_tier
+    assert value_tier(400.0, 100.0) == "top"          # вдвое дороже медианы
+    assert value_tier(90.0, 100.0) == "regular"
+    assert value_tier(20.0, 100.0) == "light"
+    # медианы нет - не выдумываем, все обычные
+    assert value_tier(400.0, None) == "regular"
+    assert quiet_window("top") == 7
+    assert quiet_window("light") == 30
+    assert quiet_window("неизвестно") == 14
+
+
+def test_we_stop_paying_for_someone_who_has_decided():
+    """Предел попыток: без него бюджет уходит незаметно.
+
+    Каждая отдельная выдача выглядит оправданной - именно поэтому предел
+    должен стоять на счётчике, а не на здравом смысле.
+    """
+    from offer_value import give_up
+    assert give_up(3) is False
+    assert give_up(4) is True
+    assert give_up(4, "top") is False        # крупному одна попытка сверху
+    assert give_up(5, "top") is True
+
+    ranked = rank([DISCOUNT], stake=2000.0, tried_tiers={0, 1, 2},
+                  churn_risk=0.9, attempts=4)
+    assert ranked[0]["blocked"]["code"] == "enough_attempts"
+    # бесплатное слово предел не трогает: оно ничего не стоит
+    ranked = rank([{"offer_id": "m", "executor": "message", "cash": 0.0,
+                    "revenue": 0.0, "uplift": 0.03}], stake=2000.0, attempts=9)
+    assert not ranked[0]["blocked"]

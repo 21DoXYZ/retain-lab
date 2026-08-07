@@ -187,7 +187,8 @@ def expected_value(cash: float | None, revenue: float | None,
 
 def rank(candidates: list, stake: float | None, budget: float | None = None,
          tried_tiers: set | None = None, base_stay: float = 0.5,
-         churn_risk: float | None = None, reason: str = "") -> list:
+         churn_risk: float | None = None, reason: str = "",
+         attempts: int = 0, tier_name: str = "regular") -> list:
     """Упорядочить офферы для конкретного человека: сначала дешёвые и годные.
 
     candidates - [{offer_id, executor, params, cash, revenue, uplift}];
@@ -219,7 +220,11 @@ def rank(candidates: list, stake: float | None, budget: float | None = None,
         # нельзя показать в интерфейсе на другом языке, а логика отказа нужна
         # и экрану, и логам, и тестам.
         blocked = None
-        if wakes_a_sleeping_dog(executor, churn_risk, tier >= TIER_OTHER_MARGIN):
+        if tier >= TIER_OTHER_MARGIN and give_up(attempts, tier_name):
+            # человек уже решил; каждая следующая выдача по отдельности
+            # выглядит оправданной, и именно так уходит весь бюджет
+            blocked = {"code": "enough_attempts", "attempts": int(attempts)}
+        elif wakes_a_sleeping_dog(executor, churn_risk, tier >= TIER_OTHER_MARGIN):
             # он и так остаётся - подарок ему не нужен, а напоминание о том,
             # что он платит, может стоить нам этого человека
             blocked = {"code": "would_stay_anyway",
@@ -282,10 +287,64 @@ def uplift_or_prior(measured: dict | None, executor: str,
         return float(measured["uplift"]), "measured"
     # Переоценка эффекта - главный способ обосновать подарок, который на деле
     # ничего не меняет, поэтому прайоры осознанно скромные.
+    # ВАЛЮТА ПРОДУКТА БЬЁТ ДЕНЬГИ. В A/B на 2000 спящих игроков подарок во
+    # внутренней валюте дал 14.9% возврата против 5.4% у денежного бонуса
+    # ТОЙ ЖЕ стоимости - втрое, при меньшей воспринимаемой щедрости. Деньги
+    # читаются как откуп, а валюта продукта - как повод вернуться в продукт.
     priors = {"pause_collection": 0.18, "trial_extend": 0.08,
-              "stripe_coupon": 0.06, "balance_credit": 0.05,
-              "client_callback": 0.05, "message": 0.03}
+              "client_callback": 0.09, "stripe_coupon": 0.06,
+              "balance_credit": 0.03, "message": 0.03}
     return priors.get(executor, 0.04), "prior"
+
+
+# ВНИМАНИЕ РАЗНОЙ ЦЕНЫ. В нишах с самым долгим опытом удержания (iGaming)
+# «затих» - это не одно событие: у крупного клиента неделя тишины уже тревога,
+# у разового покупателя это норма. Реакция на первый день тишины возвращает до
+# 27% ушедших, а ожидание до тридцатого дня стоит в пять раз дороже за
+# возврат - но только для тех, кого стоит ловить так рано.
+#
+# Одинаковый порог тишины для всех - это одновременно и ложная тревога по
+# мелким, и опоздание по крупным.
+QUIET_WINDOW_DAYS = {"top": 7, "regular": 14, "light": 30}
+
+
+def value_tier(monthly_margin: float | None, median_margin: float | None) -> str:
+    """Насколько этот клиент дороже обычного: 'top' | 'regular' | 'light'.
+
+    Считается от МЕДИАНЫ по базе, а не от абсолютных сумм: «крупный» у одного
+    клиента $400 в месяц, у другого $40, и зашивать это числом нельзя.
+    """
+    if not monthly_margin or not median_margin:
+        return "regular"
+    ratio = float(monthly_margin) / float(median_margin)
+    if ratio >= 2.0:
+        return "top"
+    if ratio < 0.5:
+        return "light"
+    return "regular"
+
+
+def quiet_window(tier: str) -> int:
+    """Через сколько дней тишины этот клиент считается тревожным."""
+    return QUIET_WINDOW_DAYS.get(tier, QUIET_WINDOW_DAYS["regular"])
+
+
+# КОГДА ПЕРЕСТАТЬ ПЛАТИТЬ. Операторы ставят жёсткий предел в 3-5 попыток
+# вернуть человека, после чего он уходит в спящий список и бюджет
+# перераспределяется. Без такого предела система бесконечно тратит на тех,
+# кто уже решил, и это не видно ни в одном отчёте: каждая выдача по
+# отдельности выглядит оправданной.
+MAX_SAVE_ATTEMPTS = 4
+
+
+def give_up(attempts: int, tier: str = "regular") -> bool:
+    """Пора ли перестать тратить на этого человека.
+
+    Крупному клиенту даём на одну попытку больше: там на кону заметно больше
+    маржи, и это единственная причина, по которой предел вообще двигается.
+    """
+    limit = MAX_SAVE_ATTEMPTS + (1 if tier == "top" else 0)
+    return int(attempts or 0) >= limit
 
 
 # СПАСЁННЫЙ СПАСЁННОМУ РОЗНЬ. Удержание скидкой заканчивается уходом в 70-80%
