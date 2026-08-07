@@ -57,6 +57,34 @@ def _ch():
     return _ch_client
 
 
+def _tenant_by_signature(payload: bytes, sig_header: str) -> tuple[str, dict | None]:
+    """Определяем пространство ПО ПОДПИСИ, когда в URL его не указали.
+
+    Подпись проверяется секретом конкретного клиента, поэтому совпадение
+    однозначно: чужой секрет её не подтвердит. Так работает вебхук, заведённый
+    на короткий адрес - клиенту не нужно ничего переделывать в Stripe.
+    """
+    try:
+        from saas_senders import TENANTS_FILE
+    except ImportError:
+        from stripe_sync.saas_senders import TENANTS_FILE
+    try:
+        with open(TENANTS_FILE) as fh:
+            tenants = json.load(fh)
+    except Exception:  # noqa: BLE001
+        tenants = {}
+    import stripe
+    for tenant, conf in (tenants or {}).items():
+        secret = str((conf or {}).get("stripe_webhook_secret") or "").strip()
+        if not secret:
+            continue
+        try:
+            return tenant, stripe.Webhook.construct_event(payload, sig_header, secret)
+        except Exception:  # noqa: BLE001 - не этот клиент, пробуем следующего
+            continue
+    return "", None
+
+
 def _tenant_secret(tenant: str) -> str:
     """Подписной секрет вебхука ЭТОГО клиента: он заводит вебхук в СВОЁМ Stripe
     и получает свой whsec_. Платформенный env - фолбэк для нашего аккаунта."""
@@ -92,10 +120,14 @@ def _verified_event(tenant: str) -> dict | None:
 @app.post("/stripe/webhook/<tenant_id>")
 def stripe_webhook(tenant_id: str = ""):
     tenant = tenant_id or DEFAULT_TENANT
-    if not tenant:
-        # без пространства событие некуда класть: раньше падало в «hubcontent»
-        return jsonify(error="tenant required in url: /stripe/webhook/<tenant>"), 400
-    evt = _verified_event(tenant)
+    if tenant:
+        evt = _verified_event(tenant)
+    else:
+        # Адрес без хвоста пространства: определяем клиента по подписи.
+        tenant, evt = _tenant_by_signature(
+            request.get_data(), request.headers.get("Stripe-Signature", ""))
+        if evt is not None:
+            log.info("tenant by signature: %s", tenant)
     if evt is None:
         return jsonify(error="signature verification failed"), 400
 

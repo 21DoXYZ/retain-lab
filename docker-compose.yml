@@ -146,6 +146,11 @@ services:
       STRIPE_API_KEY: ${STRIPE_API_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_SIGVERIFY_OFF: ${STRIPE_SIGVERIFY_OFF:-}   # 1 = дев-моки без подписи (НЕ в проде)
+    volumes:
+      # tenants.json: подписной секрет вебхука КЛИЕНТА. Без этого тома
+      # per-tenant секрет был невидим сервису и проверка подписи падала
+      # на любом событии клиента.
+      - ./secrets:/secrets:ro
     restart: unless-stopped
 
   # Планировщик SaaS-джобов (Phase 6): campaign_tick */15м, stitch :05,
