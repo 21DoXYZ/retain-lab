@@ -158,6 +158,32 @@ def validate_answers(raw: dict) -> tuple[dict, str]:
     return out, ""
 
 
+def dedupe_offers(offers: list) -> list:
+    """Один и тот же подарок не должен лежать в каталоге дважды.
+
+    Сборка выдавала «20% на месяц» отдельно для апгрейда и отдельно для
+    винбэка - одинаковые по сути, разные по id. В каталоге это выглядит как
+    ошибка, а в лимитах считается как два разных подарка. Схлопываем по
+    исполнителю и параметрам, роли объединяем.
+    """
+    out, seen = [], {}
+    for offer in offers or []:
+        key = (offer.get("executor"),
+               tuple(sorted((k, str(v)) for k, v in (offer.get("params") or {}).items())))
+        if key in seen:
+            kept = seen[key]
+            roles = kept.setdefault("roles", [kept.get("role")] if kept.get("role") else [])
+            if offer.get("role") and offer["role"] not in roles:
+                roles.append(offer["role"])
+            continue
+        seen[key] = offer
+        out.append(offer)
+    for offer in out:
+        if offer.get("roles") and len(offer["roles"]) > 1:
+            offer["role"] = offer["roles"][0]
+    return out
+
+
 def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
     """Ответы -> список офферов. Чистая функция, правила из докстринга модуля.
     avg_price - средний чек из Stripe-планов (важнее ручного ответа)."""

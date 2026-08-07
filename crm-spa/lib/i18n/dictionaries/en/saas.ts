@@ -436,6 +436,21 @@ export const saas: Partial<Messages> = {
 
   "saas.q.missing": "To compose offers, please answer:",
 
+  "saas.offers.card.who": "Who gets it: people at the «{stage}» stage.",
+  "saas.offers.card.whoUnknown": "Who gets it: not bound to a stage yet - unused in chains.",
+  "saas.offers.card.cost": "Costs {cost}: {note}.",
+  "saas.offers.card.costUnknown": "We will price it once the system knows your plan price.",
+  "saas.offers.card.cap": "At most {n} time per 30 days per person.",
+  "saas.offers.card.issued": "Given out: {n} (plus {dry} in safe mode).",
+  "saas.offers.card.rejected": "Blocked by limits: {n}.",
+  "saas.offers.how.client_callback": "Credited through your product via webhook.",
+  "saas.offers.how.stripe_coupon": "A coupon discount in your Stripe.",
+  "saas.offers.how.trial_extend": "Extends the trial in Stripe.",
+  "saas.offers.how.pause_collection": "Pauses collection in Stripe.",
+  "saas.offers.how.balance_credit": "Adds balance credit in Stripe.",
+  "saas.offers.editedTag": "edited",
+  "saas.offers.custom": "custom",
+
   "nav.channelsSetup": "Channels",
 
   "saas.channels.title": "Channels",

@@ -435,6 +435,21 @@ export const saas = {
 
   "saas.q.missing": "Чтобы собрать офферы, ответьте ещё на:",
 
+  "saas.offers.card.who": "Кому: тем, у кого стадия «{stage}».",
+  "saas.offers.card.whoUnknown": "Кому: пока не привязан к стадии - в цепочках не используется.",
+  "saas.offers.card.cost": "Стоит {cost}: {note}.",
+  "saas.offers.card.costUnknown": "Стоимость посчитаем, когда система узнает цену тарифа.",
+  "saas.offers.card.cap": "Не чаще {n} раза в 30 дней на человека.",
+  "saas.offers.card.issued": "Выдано: {n} (плюс {dry} вхолостую).",
+  "saas.offers.card.rejected": "Отбито лимитами: {n}.",
+  "saas.offers.how.client_callback": "Начисляем через ваш продукт по вебхуку.",
+  "saas.offers.how.stripe_coupon": "Скидка купоном в вашем Stripe.",
+  "saas.offers.how.trial_extend": "Продлеваем пробный период в Stripe.",
+  "saas.offers.how.pause_collection": "Ставим списания на паузу в Stripe.",
+  "saas.offers.how.balance_credit": "Кладём деньги на баланс в Stripe.",
+  "saas.offers.editedTag": "правлено",
+  "saas.offers.custom": "свой",
+
   "nav.channelsSetup": "Каналы",
 
   "saas.channels.title": "Каналы",

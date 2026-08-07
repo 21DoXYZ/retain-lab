@@ -544,6 +544,8 @@ def saas_questionnaire_submit():
     if added:
         print(f'[onboarding] {tenant}: добор ролей детерминированными: {added}', flush=True)
 
+    from stripe_sync.compose import dedupe_offers
+    final = dedupe_offers(final)          # один подарок - одна строка в каталоге
     ovr.replace_auto_offers(tenant, final)
     ca.update_tenant(tenant, {'onboarding_answers': answers,
                               'offers_reviewed': True,
@@ -714,6 +716,7 @@ def saas_offers():
         'cost_estimate': _flt(o.get('cost_estimate')),
         'max_per_user_30d': int(o.get('max_per_user_30d') or 0),
         'params': o.get('params') or {},
+        'role': str(o.get('role') or ''),
         'edited': bool(o.get('_edited')),
         'custom': bool(o.get('_custom')),
         'disabled': bool(o.get('_disabled')),
@@ -721,9 +724,28 @@ def saas_offers():
                            {'issued': 0, 'dry_run': 0, 'holdout': 0, 'rejected': 0}),
     } for o in catalog.get('offers', [])]
 
+    # ЭКОНОМИКА РЯДОМ С КАЖДЫМ ПОДАРКОМ. Без неё каталог - список технических
+    # строк: непонятно, кому это уйдёт, когда и во что обойдётся.
+    from stripe_sync.economics import verdict
+    # ТИПОВОЙ тариф, а не средний по лестнице: экономика подарка считается от
+    # того, что платит обычный клиент, а не от среднего между стартовым и топом
+    ladder = sorted(_flt(r[0]) for r in q(
+        "SELECT toFloat64(mrr) FROM tenant_plans_current "
+        "WHERE tenant_id = {t:String} AND mrr > 0", {'t': tenant})[1])
+    price = (ladder[len(ladder) // 2] if len(ladder) >= 3
+             else (ladder[0] if ladder else 0.0))
+    role_stage = {'activation': 'ACTIVATE', 'conversion': 'CONVERT',
+                  'dunning': 'DUNNING', 'save': 'SAVE', 'upgrade': 'UPGRADE',
+                  'winback': 'WINBACK'}
+    for o in offers:
+        role = str(o.get('role') or '')
+        o['stage'] = role_stage.get(role, '')
+        o['economics'] = verdict(o.get('cost_estimate'), price) if price else {}
+
     return api_json({'tenant': tenant, 'control_pct': catalog.get('control_pct', 10),
                      'p_convert_cap': catalog.get('p_convert_cap'),
                      'churn_floor': catalog.get('churn_floor'),
+                     'monthly_price': round(price, 2) if price else None,
                      'offers': offers})
 
 

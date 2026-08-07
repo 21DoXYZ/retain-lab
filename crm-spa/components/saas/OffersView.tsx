@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { flaskFetch } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useT, type MessageKey } from "@/lib/i18n";
 import { Button, Card, DataTable, PageHeader, type Column, type TableState } from "@/components/ui";
 import { NoTenant, isNoTenant } from "./NoTenant";
 
@@ -24,6 +24,9 @@ interface OfferRow {
   custom: boolean;
   disabled: boolean;
   stats: { issued: number; dry_run: number; holdout: number; rejected: number };
+  role: string;
+  stage: string;
+  economics: { cost?: number; share?: number; payback_months?: number; ok?: boolean; note?: string };
 }
 
 interface OffersData {
@@ -254,6 +257,60 @@ function NewOfferForm({ onDone }: { onDone: (reload: boolean) => void }) {
   );
 }
 
+/**
+ * Один подарок - одна карточка, которая читается фразой: что даём, кому,
+ * во сколько обходится и как часто. Таблица с колонками COGS и executor
+ * отвечала на вопросы инженера, а не владельца продукта.
+ */
+function OfferCard({ o, onEdit }: { o: OfferRow; onEdit: () => void }) {
+  const t = useT();
+  const params = Object.entries(o.params || {})
+    .map(([k, v]) => `${k}: ${String(v)}`)
+    .join(" · ");
+  return (
+    <div className={"rounded-card border p-4 " +
+      (o.disabled ? "border-hair bg-surface opacity-60" : "border-hair bg-canvas")}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="text-[15px] font-semibold text-ink">{o.title}</div>
+        <div className="flex items-center gap-2">
+          {o.custom && <span className="rounded-full border border-hair2 px-2 py-0.5 text-[11px] text-steel">{t("saas.offers.custom")}</span>}
+          {o.edited && <span className="rounded-full border border-[#b2ddff] bg-[#eff8ff] px-2 py-0.5 text-[11px] font-semibold text-primary">{t("saas.offers.editedTag")}</span>}
+          <button type="button" onClick={onEdit}
+                  className="cursor-pointer rounded-md border border-hair2 px-2 py-0.5 text-[11.5px] text-steel transition-[color,border-color] duration-150 hover:border-primary hover:text-primary">
+            {t("saas.camp.edit")}
+          </button>
+        </div>
+      </div>
+
+      <p className="mt-1.5 text-[13px] leading-relaxed text-slate">
+        {o.stage
+          ? t("saas.offers.card.who", { stage: t(`saas.stage.${o.stage}` as MessageKey) })
+          : t("saas.offers.card.whoUnknown")}{" "}
+        {t(`saas.offers.how.${o.executor}` as MessageKey)}
+      </p>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-steel">
+        <span className={o.economics?.ok === false ? "text-[#b54708]" : ""}>
+          {o.economics?.note
+            ? t("saas.offers.card.cost", { cost: `$${o.economics.cost}`, note: o.economics.note })
+            : t("saas.offers.card.costUnknown")}
+        </span>
+        <span>{t("saas.offers.card.cap", { n: o.max_per_user_30d || 1 })}</span>
+        {o.stats.issued + o.stats.dry_run > 0 && (
+          <span>{t("saas.offers.card.issued", { n: o.stats.issued, dry: o.stats.dry_run })}</span>
+        )}
+        {o.stats.rejected > 0 && (
+          <span>{t("saas.offers.card.rejected", { n: o.stats.rejected })}</span>
+        )}
+      </div>
+
+      {params && (
+        <div className="mt-1.5 font-mono text-[11.5px] text-steel">{params}</div>
+      )}
+    </div>
+  );
+}
+
 export function OffersView() {
   const t = useT();
   const [data, setData] = useState<OffersData | null>(null);
@@ -289,80 +346,6 @@ export function OffersView() {
 
   useEffect(load, [load]);
 
-  const columns: Column<OfferRow>[] = [
-    {
-      key: "offer_id", header: t("saas.offers.col.offer"),
-      render: (r) => (
-        <div className={"min-w-0" + (r.disabled ? " opacity-50" : "")}>
-          <div className="font-medium text-ink">
-            {r.title}
-            {r.edited && !r.custom && (
-              <span className="ml-2 inline-block rounded-full border border-[#b2ddff] bg-[#eff8ff] px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                {t("saas.camp.edited")}
-              </span>
-            )}
-            {r.custom && (
-              <span className="ml-2 inline-block rounded-full border border-[#abefc6] bg-[#ecfdf3] px-1.5 py-0.5 text-[10px] font-semibold text-pos">
-                {t("saas.offers.customChip")}
-              </span>
-            )}
-            {r.disabled && (
-              <span className="ml-2 inline-block rounded-full border border-hair2 bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-steel">
-                {t("saas.offers.disabledChip")}
-              </span>
-            )}
-          </div>
-          <div className="text-[11px] text-steel font-mono">{r.offer_id}</div>
-        </div>
-      ),
-    },
-    { key: "executor", header: t("saas.offers.col.executor"), mono: true, render: (r) => r.executor },
-    {
-      key: "monetary", header: t("saas.offers.col.monetary"),
-      render: (r) => (r.monetary ? t("saas.offers.yes") : t("saas.offers.no")),
-      sortValue: (r) => (r.monetary ? 1 : 0),
-    },
-    {
-      key: "cost_estimate", header: t("saas.offers.col.cost"), align: "right", mono: true,
-      render: (r) => "$" + r.cost_estimate.toFixed(2),
-    },
-    { key: "max_per_user_30d", header: t("saas.offers.col.limit"), align: "right", mono: true,
-      render: (r) => String(r.max_per_user_30d || "-") },
-    {
-      key: "issued", header: t("saas.offers.col.issued"), align: "right", mono: true,
-      render: (r) => String(r.stats.issued + r.stats.dry_run),
-      sortValue: (r) => r.stats.issued + r.stats.dry_run,
-    },
-    { key: "holdout", header: t("saas.offers.col.holdout"), align: "right", mono: true,
-      render: (r) => String(r.stats.holdout), sortValue: (r) => r.stats.holdout },
-    {
-      key: "rejected", header: t("saas.offers.col.rejected"), align: "right", mono: true,
-      render: (r) => (r.stats.rejected ? <span className="text-neg">{r.stats.rejected}</span> : "0"),
-      sortValue: (r) => r.stats.rejected,
-    },
-    {
-      key: "edit", header: "",
-      render: (r) => (
-        <div className="flex gap-1.5">
-          <button
-            type="button"
-            className="cursor-pointer rounded-md border border-hair2 px-2 py-0.5 text-[11.5px] text-steel transition-[color,border-color] duration-150 hover:border-primary hover:text-primary"
-            onClick={() => setEditId(r.offer_id)}
-          >
-            {t("saas.camp.edit")}
-          </button>
-          <button
-            type="button"
-            disabled={busyId === r.offer_id}
-            className="cursor-pointer rounded-md border border-hair2 px-2 py-0.5 text-[11.5px] text-steel transition-[color,border-color] duration-150 hover:border-neg hover:text-neg disabled:opacity-50"
-            onClick={() => toggleDisabled(r)}
-          >
-            {r.disabled ? t("saas.offers.enable") : t("saas.offers.disable")}
-          </button>
-        </div>
-      ),
-    },
-  ];
 
   const editing = editId ? data?.offers.find((o) => o.offer_id === editId) : null;
 
@@ -400,15 +383,17 @@ export function OffersView() {
       {noTenant ? (
         <NoTenant />
       ) : (
-      <DataTable
-        columns={columns}
-        rows={data?.offers ?? []}
-        getRowKey={(r) => r.offer_id}
-        state={state}
-        onRetry={load}
-        emptyTitle={t("saas.offers.empty.title")}
-        emptyDescription={t("saas.offers.empty.desc")}
-      />
+      <div className="flex flex-col gap-2.5">
+        {(data?.offers ?? []).map((o) => (
+          <OfferCard key={o.offer_id} o={o} onEdit={() => setEditId(o.offer_id)} />
+        ))}
+        {state === "data" && !(data?.offers ?? []).length && (
+          <div className="rounded-card border border-hair bg-canvas p-6 text-center">
+            <div className="text-[15px] font-semibold text-ink">{t("saas.offers.empty.title")}</div>
+            <p className="mt-1 text-[13px] text-steel">{t("saas.offers.empty.desc")}</p>
+          </div>
+        )}
+      </div>
       )}
     </div>
   );

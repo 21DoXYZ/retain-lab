@@ -433,6 +433,21 @@ export const saas: Partial<Messages> = {
 
   "saas.q.missing": "",
 
+  "saas.offers.card.who": "",
+  "saas.offers.card.whoUnknown": "",
+  "saas.offers.card.cost": "",
+  "saas.offers.card.costUnknown": "",
+  "saas.offers.card.cap": "",
+  "saas.offers.card.issued": "",
+  "saas.offers.card.rejected": "",
+  "saas.offers.how.client_callback": "",
+  "saas.offers.how.stripe_coupon": "",
+  "saas.offers.how.trial_extend": "",
+  "saas.offers.how.pause_collection": "",
+  "saas.offers.how.balance_credit": "",
+  "saas.offers.editedTag": "",
+  "saas.offers.custom": "",
+
   "nav.channelsSetup": "",
   "saas.channels.title": "",
   "saas.channels.lead": "",
