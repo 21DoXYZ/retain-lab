@@ -157,3 +157,37 @@ def test_client_clock_cannot_poison_the_windows():
     assert sane_ts("не время", now) == now_s                     # мусор
     assert sane_ts(None, now) == now_s
     assert sane_ts("2026-08-06T11:00:00Z", now) == "2026-08-06 11:00:00.000"
+
+
+def test_subscription_period_is_read_from_items():
+    """Stripe перенёс период внутрь позиций подписки. Пока читали только
+    верхний уровень, снапшот подписки падал при вставке - и КАЖДАЯ подписка
+    клиента терялась: ни стадий, ни MRR, ни аудита утечек."""
+    from stripe_sync.mapper import snapshot
+
+    def evt(top_level: bool):
+        item = {"price": {"id": "price_1", "unit_amount": 9900, "currency": "usd",
+                          "recurring": {"interval": "month"}, "product": "prod_1"}}
+        if not top_level:
+            item["current_period_start"] = 1786000000
+            item["current_period_end"] = 1788592000
+        obj = {"id": "sub_1", "customer": "cus_1", "status": "active",
+               "created": 1785000000, "items": {"data": [item]}}
+        if top_level:
+            obj["current_period_start"] = 1786000000
+            obj["current_period_end"] = 1788592000
+        return {"id": "e", "type": "customer.subscription.created",
+                "created": 1786000000, "data": {"object": obj}}
+
+    for top in (True, False):
+        table, row = snapshot(evt(top), "t")
+        assert table == "stripe_subscriptions"
+        assert row["current_period_start"], f"пусто при top_level={top}"
+        assert row["current_period_end"], f"пусто при top_level={top}"
+
+    # совсем без периода: начало берём из даты создания, а не роняем подписку
+    bare = {"id": "e", "type": "customer.subscription.created", "created": 1785000000,
+            "data": {"object": {"id": "s", "customer": "c", "status": "active",
+                                "created": 1785000000}}}
+    _, row = snapshot(bare, "t")
+    assert row["current_period_start"]

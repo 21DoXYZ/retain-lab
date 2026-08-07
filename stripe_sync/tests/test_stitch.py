@@ -137,3 +137,21 @@ def test_every_job_entrypoint_is_runnable():
                 continue          # __file__ и прочая магия модуля
             assert n in local or n in module or hasattr(builtins, n), \
                 f"{name}.main(): имя {n!r} нигде не определено"
+
+
+def test_resnapshot_only_fills_the_gaps():
+    """Добираем только те подписки, снимка которых нет: повтор не плодит дубли."""
+    import os
+    from datetime import datetime, timezone
+    from resnapshot import missing_rows
+
+    os.environ["TENANT_ID"] = "t"
+    now = datetime(2026, 8, 7, tzinfo=timezone.utc)
+    ts = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    events = [("sub_a", "cus_a", "active", "pro", "price_1", 99.0, "month", ts),
+              ("sub_b", "cus_b", "active", "pro", "price_1", 99.0, "year", ts)]
+    rows = missing_rows(events, known={"sub_a"}, now=now)
+    assert [r[1] for r in rows] == ["sub_b"]
+    assert rows[0][9].startswith("2026-08-01")          # начало периода = событие
+    assert rows[0][10].startswith("2027-08-01")         # годовой шаг
+    assert missing_rows(events, known={"sub_a", "sub_b"}, now=now) == []

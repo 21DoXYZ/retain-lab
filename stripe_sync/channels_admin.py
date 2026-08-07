@@ -25,6 +25,10 @@ import urllib.request
 
 _TIMEOUT = 20
 
+# Cloudflare у провайдеров отбивает дефолтный Python-urllib с 403 - без
+# собственного User-Agent не работали ни проверка ключа, ни ОТПРАВКА ПИСЕМ.
+USER_AGENT = "RevenueAutopilot/1.0 (+https://retivo.digital)"
+
 RESEND_API = "https://api.resend.com"
 TG_API = "https://api.telegram.org"
 
@@ -41,7 +45,8 @@ def _request(method: str, url: str, payload: dict | None,
              headers: dict) -> tuple[bool, str, dict]:
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(url, data=data, method=method,
-                                 headers={"Content-Type": "application/json", **headers})
+                                 headers={"Content-Type": "application/json",
+                                          "User-Agent": USER_AGENT, **headers})
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
             body = resp.read().decode() or "{}"
@@ -68,6 +73,22 @@ def _resend_headers(api_key: str) -> dict:
 def resend_create_domain(domain: str, api_key: str) -> tuple[bool, str, dict]:
     return _request("POST", f"{RESEND_API}/domains", {"name": domain},
                     _resend_headers(api_key))
+
+
+def resend_find_domain(domain: str, api_key: str) -> dict:
+    """Домен, УЖЕ заведённый в аккаунте клиента (часто он там есть и проверен).
+
+    Без этого клиент с готовым доменом упирался в ошибку «уже существует» и
+    вынужден был заводить лишний поддомен с новыми DNS-записями.
+    """
+    ok, _status, data = _request("GET", f"{RESEND_API}/domains", None,
+                                 _resend_headers(api_key))
+    if not ok:
+        return {}
+    for item in (data or {}).get("data", []) or []:
+        if str(item.get("name", "")).lower() == domain.lower():
+            return item
+    return {}
 
 
 def resend_get_domain(domain_id: str, api_key: str) -> tuple[bool, str, dict]:

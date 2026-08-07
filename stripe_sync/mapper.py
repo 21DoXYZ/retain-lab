@@ -97,6 +97,23 @@ def _sub_plan(sub: dict[str, Any]) -> tuple[str, str, float, str, str]:
     )
 
 
+def _period(obj: dict[str, Any], edge: str) -> str:
+    """Начало/конец текущего оплаченного периода: с подписки или с её позиции.
+
+    Порядок: поле подписки -> поле первой позиции -> для начала дата создания
+    подписки. Пустая строка ломала вставку в ClickHouse, поэтому фолбэк нужен.
+    """
+    key = f"current_period_{edge}"
+    value = obj.get(key)
+    if not value:
+        items = ((obj.get("items") or {}).get("data") or [])
+        if items:
+            value = (items[0] or {}).get(key)
+    if not value and edge == "start":
+        value = obj.get("created")
+    return ts_str(value)
+
+
 def _prev_amount(prev: dict[str, Any]) -> float | None:
     """Прошлая цена подписки из previous_attributes (Stripe кладёт туда только
     изменившиеся поля). None - цена не менялась, значит это не смена тарифа."""
@@ -204,8 +221,12 @@ def snapshot(evt: dict[str, Any], tenant_id: str) -> tuple[str, dict[str, Any]] 
             "amount": amount,
             "currency": currency,
             "bill_interval": interval,
-            "current_period_start": ts_str(obj.get("current_period_start")),
-            "current_period_end": ts_str(obj.get("current_period_end")),
+            # В актуальных версиях Stripe период переехал ВНУТРЬ позиций
+            # подписки. Читали только верхний уровень - получали пусто, вставка
+            # снапшота падала, и подписка терялась целиком: без неё нет ни
+            # стадий, ни MRR, ни аудита утечек.
+            "current_period_start": _period(obj, "start"),
+            "current_period_end": _period(obj, "end"),
             "trial_start": ts_str(obj.get("trial_start")) or None,
             "trial_end": ts_str(obj.get("trial_end")) or None,
             "cancel_at": ts_str(obj.get("cancel_at")) or None,

@@ -17,6 +17,10 @@ from dataclasses import dataclass
 
 _TIMEOUT = 30
 
+# Cloudflare у провайдеров отбивает дефолтный Python-urllib с 403 - без
+# собственного User-Agent не работали ни проверка ключа, ни ОТПРАВКА ПИСЕМ.
+USER_AGENT = "RevenueAutopilot/1.0 (+https://retivo.digital)"
+
 
 @dataclass(frozen=True)
 class EmailConfig:
@@ -71,6 +75,7 @@ def send_email(to: str, subject: str, body: str, cfg: EmailConfig,
     req = urllib.request.Request(
         "https://api.resend.com/emails", data=payload, method="POST",
         headers={"Content-Type": "application/json",
+                 "User-Agent": USER_AGENT,
                  "Authorization": f"Bearer {cfg.resend_api_key}"},
     )
     try:
@@ -120,7 +125,8 @@ class MessagingConfig:
 def _post_json(url: str, payload: dict, headers: dict) -> tuple[bool, str]:
     data = json.dumps(payload).encode()
     req = urllib.request.Request(url, data=data, method="POST",
-                                 headers={"Content-Type": "application/json", **headers})
+                                 headers={"Content-Type": "application/json",
+                                          "User-Agent": USER_AGENT, **headers})
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
             return (200 <= resp.status < 300), f"http_{resp.status}"

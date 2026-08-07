@@ -24,6 +24,8 @@ from player_board import q
 
 bp = Blueprint('api_saas', __name__, url_prefix='/api/v1')
 
+_UA = 'RevenueAutopilot/1.0 (+https://retivo.digital)'
+
 LEAK_ROLES = ('super_admin', 'head_retention', 'director', 'analyst',
               'finance', 'marketing_manager')
 
@@ -1118,6 +1120,55 @@ def saas_offer_edit():
     return api_json({'ok': True})
 
 
+@bp.get('/saas/offers/suggestions')
+@require_auth(roles=LEAK_ROLES)
+def saas_offer_suggestions():
+    """Что система предлагает добавить или починить - по ЖИВЫМ данным клиента.
+
+    Ничего не применяется автоматически: это список с фактами и кнопкой.
+    """
+    import json as _json
+    import os as _os4
+    from stripe_sync import overrides as ovr
+    from stripe_sync.compose import compose_offers
+    from stripe_sync.offer_suggest import suggest
+
+    tenant = _tenant_arg()
+
+    path = _os4.path.join(_os4.path.dirname(_os4.path.dirname(_os4.path.abspath(__file__))),
+                          'stripe_sync', 'offers_catalog.json')
+    base = _json.load(open(path))
+    catalog = ovr.merge_catalog({**(base.get('_default') or {}),
+                                 **(base.get(tenant) or {})},
+                                ovr.load_tenant(tenant)).get('offers', [])
+    catalog = [{**o, 'disabled': bool(o.get('_disabled'))} for o in catalog]
+
+    stages, stage_value = {}, {}
+    for r in q("SELECT stage, count(), sum(value_at_stake) FROM user_actions "
+               "WHERE tenant_id = {t:String} GROUP BY stage", {'t': tenant})[1]:
+        stages[r[0]] = int(r[1])
+        stage_value[r[0]] = _flt(r[2])
+
+    rejects = {(r[0], r[1]): int(r[2]) for r in q(
+        "SELECT offer_id, reason, count() FROM offers_issued "
+        "WHERE tenant_id = {t:String} AND status = 'rejected' "
+        "AND issued_at >= now() - INTERVAL 30 DAY GROUP BY offer_id, reason",
+        {'t': tenant})[1]}
+
+    tc = ca.load_tenants().get(tenant, {}) or {}
+    answers = tc.get('onboarding_answers') or {}
+    avg_price = _flt(q(
+        "SELECT coalesce(avg(nullIf(toFloat64(mrr), 0)), 0) FROM tenant_plans_current "
+        "WHERE tenant_id = {t:String}", {'t': tenant})[1][0][0])
+    composed = compose_offers(answers, avg_price) if answers else []
+
+    return api_json({
+        'tenant': tenant,
+        'suggestions': suggest(catalog, stages, stage_value, rejects,
+                               answers, avg_price, composed),
+    })
+
+
 @bp.post('/saas/offers/create')
 @require_auth(roles=CHANNEL_WRITE_ROLES)
 def saas_offer_create():
@@ -1212,7 +1263,13 @@ def channels_email_domain():
 
     ok, status, data = ca.resend_create_domain(domain, key)
     if not ok:
-        return _bad(f'resend_{status}', 502)
+        # Домен может быть уже заведён в аккаунте клиента (частый случай:
+        # он оттуда уже шлёт письма). Тогда берём его как есть, а не требуем
+        # заводить лишний поддомен ради новых DNS-записей.
+        existing = ca.resend_find_domain(domain, key)
+        if not existing:
+            return _bad(f'resend_{status}', 502)
+        data = existing
     ca.update_tenant(tenant, {'email_domain': domain,
                               'email_domain_id': str(data.get('id', '')),
                               'email_domain_status': 'pending_dns',
@@ -1300,14 +1357,17 @@ def channels_email_key():
 
     # живая проверка: ключ должен уметь читать домены аккаунта
     req = _ur.Request('https://api.resend.com/domains',
-                      headers={'Authorization': f'Bearer {key}'})
+                      headers={'Authorization': f'Bearer {key}',
+                               'User-Agent': _UA})
     try:
         with _ur.urlopen(req, timeout=20) as resp:
             if not (200 <= resp.status < 300):
                 return _bad(f'resend_http_{resp.status}', 502)
     except _ue.HTTPError as exc:
-        return _bad('invalid_resend_key' if exc.code in (401, 403) else f'resend_http_{exc.code}',
-                    400 if exc.code in (401, 403) else 502)
+        # 401 - ключ действительно не тот; 403 обычно значит, что провайдер
+        # отбил НАШ запрос (заслон Cloudflare) - винить ключ клиента нельзя
+        return _bad('invalid_resend_key' if exc.code == 401 else f'resend_http_{exc.code}',
+                    400 if exc.code == 401 else 502)
     except Exception as exc:  # noqa: BLE001
         return _bad(f'resend_{type(exc).__name__}', 502)
 
@@ -1359,15 +1419,16 @@ def onboarding_stripe():
             if not (key.startswith('rk_') or key.startswith('sk_')) or len(key) < 20:
                 return _bad('invalid_stripe_key')
             req = _ur.Request('https://api.stripe.com/v1/customers?limit=1',
-                              headers={'Authorization': f'Bearer {key}'})
+                              headers={'Authorization': f'Bearer {key}',
+                                       'User-Agent': _UA})
             try:
                 with _ur.urlopen(req, timeout=20) as resp:
                     if not (200 <= resp.status < 300):
                         return _bad(f'stripe_http_{resp.status}', 502)
             except _ue.HTTPError as exc:
-                return _bad('invalid_stripe_key' if exc.code in (401, 403)
+                return _bad('invalid_stripe_key' if exc.code == 401
                             else f'stripe_http_{exc.code}',
-                            400 if exc.code in (401, 403) else 502)
+                            400 if exc.code == 401 else 502)
             except Exception as exc:  # noqa: BLE001
                 return _bad(f'stripe_{type(exc).__name__}', 502)
         patch['stripe_api_key'] = key or None
