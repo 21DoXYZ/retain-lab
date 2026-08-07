@@ -87,7 +87,8 @@ def test_cheap_rungs_come_before_expensive_ones():
 
 def test_the_ladder_opens_up_as_cheaper_rungs_get_used():
     tried = {0, 1, 2}                                  # слово, отсрочка, чужая маржа
-    ranked = rank([BONUS, DISCOUNT], stake=400.0, tried_tiers=tried)
+    # ставка крупная: на мелком клиенте скидка не окупается сама по себе
+    ranked = rank([BONUS, DISCOUNT], stake=2000.0, tried_tiers=tried)
     assert ranked[0]["offer_id"] == "disc" and not ranked[0]["blocked"]
 
 
@@ -141,3 +142,76 @@ def test_the_hubcontent_case_resolves_the_way_the_spreadsheet_implies():
     assert "bonus" not in order
     bonus = next(r for r in ranked if r["offer_id"] == "bonus")
     assert bonus["cash"] == 17.75 and bonus["blocked"]
+
+
+# ── Поправки по внешним замерам: долговечность, спящие собаки, причина ───────
+
+def test_a_discount_saves_people_who_leave_anyway():
+    """Удержание скидкой кончается уходом в 70-80% случаев.
+
+    Без поправки на долговечность скидка всегда побеждает паузу на бумаге:
+    у неё дешевле выдача. На деле она покупает не клиента, а отсрочку.
+    """
+    from offer_value import durable_gain
+    assert durable_gain(1000.0, 0.1, "stripe_coupon") == 25.0
+    assert durable_gain(1000.0, 0.1, "pause_collection") == 75.0
+    # при равном эффекте пауза сохраняет втрое больше
+    coupon = expected_value(0.0, 20.0, 0.1, 1000.0, executor="stripe_coupon")
+    pause = expected_value(0.0, 20.0, 0.1, 1000.0, executor="pause_collection")
+    assert pause["ev"] > coupon["ev"]
+    assert coupon["durability"] == 0.25
+
+
+def test_we_do_not_wake_someone_who_was_going_to_stay():
+    """4-5% людей уходят ИМЕННО потому, что их потревожили.
+
+    Целиться по «риску ухода» - худший способ их найти: там они и сидят.
+    """
+    from offer_value import wakes_a_sleeping_dog
+    assert wakes_a_sleeping_dog("stripe_coupon", churn_risk=0.05) is True
+    assert wakes_a_sleeping_dog("stripe_coupon", churn_risk=0.80) is False
+    assert wakes_a_sleeping_dog("message", churn_risk=0.05) is False
+    # риск неизвестен - не выдумываем и не блокируем
+    assert wakes_a_sleeping_dog("stripe_coupon", churn_risk=None) is False
+
+    ranked = rank([DISCOUNT], stake=2000.0, tried_tiers={0, 1, 2}, churn_risk=0.05)
+    assert ranked[0]["blocked"]["code"] == "would_stay_anyway"
+
+
+def test_the_offer_matches_the_reason_the_person_gave():
+    """Общий оффер спасает 5-10% уходящих, подобранный под причину - 15-30%."""
+    from offer_value import offer_for_reason
+    assert offer_for_reason("price")["executor"] == "stripe_coupon"
+    assert offer_for_reason("one_time_need")["executor"] == "pause_collection"
+    assert offer_for_reason("switched")["executor"] == "pause_collection"
+    # причина неизвестна - обычный порядок лестницы, гадать вредно
+    assert offer_for_reason("")["matched"] is False
+
+
+def test_money_is_not_offered_where_money_does_not_help():
+    """Ушедшему из-за отсутствующей функции скидка не помогает.
+
+    Настаивать подарком в этом случае - превращать удержание в тёмный
+    паттерн: человеку нужна функция, а не деньги.
+    """
+    for reason in ("missing_feature", "quality", "support"):
+        ranked = rank([DISCOUNT], stake=2000.0, tried_tiers={0, 1, 2},
+                      churn_risk=0.9, reason=reason)
+        assert ranked[0]["blocked"]["code"] == "reason_needs_no_gift", reason
+
+
+def test_the_stated_reason_overrides_the_default_ladder():
+    """«Задача кончилась» - это пауза, а не скидка, сколько бы ни было маржи."""
+    ranked = rank([DISCOUNT, PAUSE], stake=2000.0, churn_risk=0.9,
+                  reason="one_time_need")
+    picked = [r for r in ranked if not r["blocked"]]
+    assert picked and picked[0]["offer_id"] == "pause"
+    disc = next(r for r in ranked if r["offer_id"] == "disc")
+    assert disc["blocked"]["code"] == "reason_wants_another_lever"
+    assert disc["blocked"]["executor"] == "pause_collection"
+
+
+def test_price_is_the_one_reason_where_a_discount_belongs():
+    ranked = rank([DISCOUNT], stake=2000.0, tried_tiers={0, 1, 2},
+                  churn_risk=0.9, reason="price")
+    assert not ranked[0]["blocked"]

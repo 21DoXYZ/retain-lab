@@ -148,7 +148,7 @@ def gift_budget(stake: float | None, spent: float = 0.0,
 
 def expected_value(cash: float | None, revenue: float | None,
                    uplift: float | None, stake: float | None,
-                   base_stay: float = 0.5) -> dict:
+                   base_stay: float = 0.5, executor: str = "") -> dict:
     """Стоит ли оффер того. Возвращает EV и разобранные слагаемые.
 
     uplift    - НАСКОЛЬКО оффер поднимает удержание (0.06 = на 6 п.п.);
@@ -163,7 +163,11 @@ def expected_value(cash: float | None, revenue: float | None,
         return {"ev": None, "gain": None, "cost": None,
                 "note": "не хватает маржи на кону или замера эффекта"}
 
-    gain = float(stake) * float(uplift)
+    # Сохранённая маржа - НЕ вся маржа на кону: удержанный скидкой уходит в
+    # 70-80% случаев, удержанный паузой в основном возвращается к обычной
+    # оплате. Без этой поправки скидка всегда выигрывает у паузы на бумаге.
+    keeps = RETENTION_DURABILITY.get(executor, 1.0) if executor else 1.0
+    gain = float(stake) * float(uplift) * keeps
     stay = min(1.0, max(0.0, float(base_stay) + float(uplift)))
     cash_cost = float(cash or 0)
     rev_cost = float(revenue or 0) * stay
@@ -175,14 +179,15 @@ def expected_value(cash: float | None, revenue: float | None,
     else:
         note = (f"стоит ${cash_cost + rev_cost:.2f}, а сохраняет только "
                 f"${gain:.2f} - в минус на ${-ev:.2f}")
-    return {"ev": ev, "gain": round(gain, 2),
+    return {"ev": ev, "gain": round(gain, 2), "durability": keeps,
             "cost": round(cash_cost + rev_cost, 2),
             "cash": round(cash_cost, 2), "revenue_expected": round(rev_cost, 2),
             "stay_probability": round(stay, 3), "note": note}
 
 
 def rank(candidates: list, stake: float | None, budget: float | None = None,
-         tried_tiers: set | None = None, base_stay: float = 0.5) -> list:
+         tried_tiers: set | None = None, base_stay: float = 0.5,
+         churn_risk: float | None = None, reason: str = "") -> list:
     """Упорядочить офферы для конкретного человека: сначала дешёвые и годные.
 
     candidates - [{offer_id, executor, params, cash, revenue, uplift}];
@@ -201,17 +206,33 @@ def rank(candidates: list, stake: float | None, budget: float | None = None,
     lowest_untried = min((t for t in tiers.values() if t not in tried),
                          default=TIER_CASH)
 
+    wanted = offer_for_reason(reason)
+
     out = []
     for c in candidates or []:
         cash = c.get("cash")
+        executor = str(c.get("executor") or "")
         tier = tiers[c.get("offer_id")]
         value = expected_value(cash, c.get("revenue"), c.get("uplift"),
-                               stake, base_stay)
+                               stake, base_stay, executor)
         # Причина отказа - КОД с числами, а не готовая фраза. Готовую фразу
         # нельзя показать в интерфейсе на другом языке, а логика отказа нужна
         # и экрану, и логам, и тестам.
         blocked = None
-        if stake is not None and stake < TIER_MIN_STAKE.get(tier, 0):
+        if wakes_a_sleeping_dog(executor, churn_risk, tier >= TIER_OTHER_MARGIN):
+            # он и так остаётся - подарок ему не нужен, а напоминание о том,
+            # что он платит, может стоить нам этого человека
+            blocked = {"code": "would_stay_anyway",
+                       "risk": round(float(churn_risk), 2)}
+        elif wanted["matched"] and wanted["executor"] is None \
+                and tier >= TIER_OTHER_MARGIN:
+            # причина ухода известна, и деньги под неё не работают
+            blocked = {"code": "reason_needs_no_gift", "reason": reason}
+        elif wanted["matched"] and wanted["executor"] \
+                and executor != wanted["executor"] and tier >= TIER_OTHER_MARGIN:
+            blocked = {"code": "reason_wants_another_lever", "reason": reason,
+                       "executor": wanted["executor"]}
+        elif stake is not None and stake < TIER_MIN_STAKE.get(tier, 0):
             blocked = {"code": "stake_too_small", "stake": round(stake, 2),
                        "tier": tier}
         elif budget is not None and (cash or 0) + (c.get("revenue") or 0) > budget:
@@ -231,13 +252,15 @@ def rank(candidates: list, stake: float | None, budget: float | None = None,
 
 
 def choose(candidates: list, stake: float | None, budget: float | None = None,
-           tried_tiers: set | None = None, base_stay: float = 0.5) -> dict | None:
+           tried_tiers: set | None = None, base_stay: float = 0.5,
+           churn_risk: float | None = None, reason: str = "") -> dict | None:
     """Один оффер, который надо выдать сейчас. None - не выдавать ничего.
 
     «Не выдавать ничего» - полноправный ответ, а не сбой: если всё, что мы
     умеем, в минусе, честнее промолчать, чем подарить деньги.
     """
-    ranked = rank(candidates, stake, budget, tried_tiers, base_stay)
+    ranked = rank(candidates, stake, budget, tried_tiers, base_stay,
+                  churn_risk, reason)
     for item in ranked:
         if not item["blocked"]:
             return item
@@ -250,12 +273,99 @@ def uplift_or_prior(measured: dict | None, executor: str,
 
     Решение на измерении и решение на прайоре обязаны выглядеть по-разному,
     иначе догадка через месяц читается как факт.
+
+    Прайоры откалиброваны по публичным замерам, а не по вкусу: паузой
+    пользуется около половины тех, кто собирался отменить, и три четверти из
+    них возвращаются - поэтому у неё эффект заметно выше, чем у скидки.
     """
     if measured and measured.get("confident") and measured.get("uplift") is not None:
         return float(measured["uplift"]), "measured"
-    # Прайоры осознанно скромные: переоценка эффекта - главный способ
-    # обосновать подарок, который на деле ничего не меняет.
-    priors = {"pause_collection": 0.12, "trial_extend": 0.08,
+    # Переоценка эффекта - главный способ обосновать подарок, который на деле
+    # ничего не меняет, поэтому прайоры осознанно скромные.
+    priors = {"pause_collection": 0.18, "trial_extend": 0.08,
               "stripe_coupon": 0.06, "balance_credit": 0.05,
               "client_callback": 0.05, "message": 0.03}
     return priors.get(executor, 0.04), "prior"
+
+
+# СПАСЁННЫЙ СПАСЁННОМУ РОЗНЬ. Удержание скидкой заканчивается уходом в 70-80%
+# случаев, а сама скидка снижает пожизненную ценность примерно на треть:
+# человек остаётся до конца акции и уходит, как только она кончается. Пауза
+# наоборот - три четверти вернувшихся возвращаются к обычной оплате.
+#
+# Поэтому сохранённая маржа умножается на ДОЛГОВЕЧНОСТЬ рычага. Без этого
+# скидка выглядит в расчёте сильнее, чем она есть, и всегда побеждает.
+RETENTION_DURABILITY = {
+    "message": 1.0,
+    "pause_collection": 0.75,
+    "trial_extend": 0.7,
+    "client_callback": 0.6,
+    "balance_credit": 0.35,
+    "stripe_coupon": 0.25,
+}
+
+# СПЯЩИЕ СОБАКИ. В замерах удерживающих кампаний 4-5% людей уходят ИМЕННО
+# ПОТОМУ, что их потревожили: они бы остались, но письмо «мы заметили, что вы
+# собираетесь уйти, вот скидка» напомнило им, что они платят. Целиться по
+# «риску ухода» - худший способ их найти: там они и сидят.
+#
+# Правило: денежный подарок не уходит тому, чей риск ухода низкий. Ему нечего
+# спасать, а разбудить его можно.
+SLEEPING_DOG_RISK_FLOOR = 0.25
+
+
+def durable_gain(stake: float | None, uplift: float | None,
+                 executor: str) -> float | None:
+    """Сколько маржи рычаг сохраняет НА САМОМ ДЕЛЕ, с поправкой на долговечность."""
+    if stake is None or uplift is None:
+        return None
+    return round(float(stake) * float(uplift)
+                 * RETENTION_DURABILITY.get(executor, 0.6), 2)
+
+
+def wakes_a_sleeping_dog(executor: str, churn_risk: float | None,
+                         monetary: bool = True) -> bool:
+    """Разбудит ли это касание того, кто и так собирался остаться."""
+    if not monetary or executor == "message":
+        return False
+    if churn_risk is None:
+        return False
+    return float(churn_risk) < SLEEPING_DOG_RISK_FLOOR
+
+
+# ЧТО ПРЕДЛАГАТЬ ПОД КОНКРЕТНУЮ ПРИЧИНУ УХОДА. Общий оффер спасает 5-10%
+# уходящих, подобранный под названную причину - 15-30%. Это самый дешёвый
+# известный способ удвоить спасение: причину человек уже сам написал.
+#
+# offer=None значит НЕ ПРЕДЛАГАТЬ НИЧЕГО. Это не пробел, а вывод: тому, кто
+# уходит из-за отсутствующей функции, скидка не помогает, и настаивать -
+# значит превращать удержание в тёмный паттерн.
+REASON_PLAYBOOK = {
+    "price": {"executor": "stripe_coupon", "why": "уходит из-за денег - "
+              "единственный случай, где скидка действительно к месту"},
+    "one_time_need": {"executor": "pause_collection", "why": "задача кончилась, "
+                      "а не продукт разонравился: пауза сохраняет человека "
+                      "до следующего раза, скидка ему не нужна"},
+    "missing_feature": {"executor": None, "why": "скидка не заменяет функцию: "
+                        "таким людям помогает письмо о выходе нужной "
+                        "возможности, а не деньги"},
+    "quality": {"executor": None, "why": "платить человеку за то, что продукт "
+                "работал плохо - это откуп, а не удержание"},
+    "support": {"executor": None, "why": "проблема была в людях, а не в цене: "
+                "деньгами она не закрывается"},
+    "switched": {"executor": "pause_collection", "why": "уже пробует другое: "
+                 "пауза оставляет дверь открытой, а скидка сейчас проиграет "
+                 "гонку предложений"},
+}
+
+
+def offer_for_reason(reason: str) -> dict:
+    """Какой рычаг уместен под названную причину ухода.
+
+    Причина неизвестна - обычный порядок лестницы: гадать вредно, а
+    подобранный «на всякий случай» подарок и есть та самая раздача.
+    """
+    card = REASON_PLAYBOOK.get(str(reason or "").strip().lower())
+    if not card:
+        return {"executor": None, "why": "", "matched": False}
+    return {**card, "matched": True}

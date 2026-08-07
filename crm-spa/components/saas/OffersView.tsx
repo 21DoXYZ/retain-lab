@@ -39,8 +39,10 @@ interface OfferRow {
   /** сколько сделка приносит после вычета уступки; blocked - почему отложена */
   ev?: number | null;
   blocked?: {
-    code: "stake_too_small" | "budget_spent" | "cheaper_rung_first" | "negative_value";
+    code: "stake_too_small" | "budget_spent" | "cheaper_rung_first" | "negative_value"
+        | "would_stay_anyway" | "reason_needs_no_gift" | "reason_wants_another_lever";
     stake?: number; budget?: number; tier?: number;
+    risk?: number; reason?: string; executor?: string;
     gain?: number | null; cost?: number | null;
   } | null;
 }
@@ -342,6 +344,9 @@ function OfferCard({ o, onEdit }: { o: OfferRow; onEdit: () => void }) {
             gain: `$${o.blocked.gain ?? 0}`,
             cost: `$${o.blocked.cost ?? 0}`,
             tier: t(`saas.offers.tier.${o.blocked.tier ?? 0}` as MessageKey),
+            risk: o.blocked.risk ?? 0,
+            reason: o.blocked.reason ?? "",
+            executor: o.blocked.executor ?? "",
           })}
         </p>
       )}

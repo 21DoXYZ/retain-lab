@@ -786,10 +786,24 @@ def saas_offers():
     # подарок для «собирается уходить» уйдут разным людям и не конкурируют:
     # ранжировать их вместе значит блокировать один другим без причины.
     stage_of = {o['offer_id']: o.get('stage') or '' for o in offers}
+    # Самая частая названная причина ухода: под неё подбирается рычаг. Общий
+    # оффер спасает 5-10% уходящих, подобранный под причину - 15-30%.
+    top_reason = ''
+    try:
+        rows = q("SELECT category FROM retention.cancel_reasons "
+                 "WHERE tenant_id = {t:String} AND category != 'other' "
+                 "GROUP BY category ORDER BY count() DESC LIMIT 1", {'t': tenant})[1]
+        top_reason = str(rows[0][0]) if rows else ''
+    except Exception:                     # таблицы может не быть - это не отказ
+        top_reason = ''
+
     by_id = {}
     for stage in set(stage_of.values()):
         group = [c for c in candidates if stage_of.get(c['offer_id']) == stage]
-        by_id.update({r['offer_id']: r for r in rank(group, stake, budget)})
+        # причина ухода осмысленна только там, где человек уже уходит
+        reason = top_reason if stage in ('SAVE', 'WINBACK') else ''
+        by_id.update({r['offer_id']: r for r in
+                      rank(group, stake, budget, reason=reason)})
     for o in offers:
         row = by_id.get(o['offer_id'])
         if not row:

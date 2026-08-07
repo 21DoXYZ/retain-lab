@@ -87,15 +87,31 @@ def test_missing_score_does_not_block_money():
 
 
 def test_live_risk_stage_beats_yesterday_score():
-    """Юзер открыл отмену утром - стадия SAVE уже живая, а ночной скор ещё
-    считает его спокойным. Спасательный оффер обязан уйти."""
+    """Карта отвалилась утром - стадия DUNNING уже живая, а ночной скор ещё
+    считает человека спокойным. Касание обязано уйти: риск тут ФАКТ."""
     from stripe_sync.hygiene import check_churn_floor
     offer = {"monetary": True}
     calm_score = {"sub_status": "active", "p_churn": 0.08}
     assert not check_churn_floor(offer, calm_score, 0.25)[0]
-    for stage in ("SAVE", "DUNNING", "WINBACK"):
+    for stage in ("DUNNING", "WINBACK"):
         assert check_churn_floor(offer, {**calm_score, "stage": stage}, 0.25)[0], stage
     assert not check_churn_floor(offer, {**calm_score, "stage": "MONITOR"}, 0.25)[0]
+
+
+def test_save_stage_does_not_buy_off_someone_who_would_have_stayed():
+    """SAVE - это ВЫВОД по поведению, а не свершившийся факт.
+
+    Около 4-5% людей уходят именно потому, что их потревожили удержанием:
+    подарок «мы заметили, что вы собираетесь уйти» напоминает, что они платят.
+    Сидят такие ровно среди спокойных по скору, поэтому ДЕНЬГИ на SAVE
+    спрашивают скор, а бесплатные рычаги уходят сразу.
+    """
+    from stripe_sync.hygiene import check_churn_floor
+    calm = {"sub_status": "active", "p_churn": 0.08, "stage": "SAVE"}
+    assert not check_churn_floor({"monetary": True}, calm, 0.25)[0]
+    assert check_churn_floor({"monetary": False}, calm, 0.25)[0]
+    # у кого риск настоящий - подарок проходит
+    assert check_churn_floor({"monetary": True}, {**calm, "p_churn": 0.7}, 0.25)[0]
 
 
 def test_safe_mode_does_not_eat_the_gift_budget():
