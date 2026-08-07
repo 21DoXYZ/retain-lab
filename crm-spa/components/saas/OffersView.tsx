@@ -45,6 +45,13 @@ interface OfferRow {
     risk?: number; reason?: string; executor?: string;
     gain?: number | null; cost?: number | null;
   } | null;
+  /** разбор по методологии: что в подарке неверно и чем его заменить */
+  review?: {
+    verdict: "ok" | "weak" | "harmful";
+    flags: { code: string; level: "harmful" | "weak" | "note";
+             params: Record<string, string | number> }[];
+    alternative?: { executor: string; why: string; reason?: string } | null;
+  };
 }
 
 interface OffersData {
@@ -53,6 +60,8 @@ interface OffersData {
   /** измерена ли себестоимость или пока предположена - решает тон всего экрана */
   cost_basis?: "stated" | "margin" | "assumed" | "price";
   monthly_margin?: number | null;
+  /** замечания уровня КЛИЕНТА - показываются один раз, а не на каждой карточке */
+  catalog_notes?: { code: string; level: string; params: Record<string, string | number> }[];
 }
 
 /** Типы подарков - человеческий язык; исполнитель и command под капотом.
@@ -351,6 +360,38 @@ function OfferCard({ o, onEdit }: { o: OfferRow; onEdit: () => void }) {
         </p>
       )}
 
+      {/* РАЗБОР ПО МЕТОДОЛОГИИ. Замечание без замены - это не разбор, поэтому
+          рядом с каждым стоит, что делать. Хороший оффер молчит: разбор,
+          который ругается всегда, перестают читать через неделю. */}
+      {(o.review?.flags?.length ?? 0) > 0 && (
+        <div className={"mt-2.5 rounded-ctl border p-2.5 " +
+          (o.review!.verdict === "harmful"
+            ? "border-[#fecdca] bg-[#fffbfa]" : "border-hair2 bg-surface")}>
+          {o.review!.flags.map((f) => (
+            <div key={f.code} className="mt-1 first:mt-0">
+              <span className={"text-[12px] leading-relaxed " +
+                (f.level === "harmful" ? "text-neg"
+                  : f.level === "weak" ? "text-[#b54708]" : "text-steel")}>
+                {t(`saas.offers.review.${f.code}` as MessageKey, {
+                  ...f.params,
+                  // ступени приходят номерами: их имена живут в словаре
+                  tier: t(`saas.offers.tier.${f.params.tier ?? 0}` as MessageKey),
+                  cheaper: t(`saas.offers.tier.${f.params.cheaper ?? 0}` as MessageKey),
+                })}
+              </span>
+            </div>
+          ))}
+          {o.review!.alternative && (
+            <div className="mt-1.5 border-t border-hair pt-1.5 text-[12px] leading-relaxed text-slate">
+              {t("saas.offers.review.instead", {
+                lever: t(`saas.offers.exec.${o.review!.alternative.executor}` as MessageKey),
+              })}{" "}
+              {t(`saas.offers.review.alt.${o.review!.alternative.why}` as MessageKey)}
+            </div>
+          )}
+        </div>
+      )}
+
       {params && (
         <div className="mt-1.5 font-mono text-[11.5px] text-steel">{params}</div>
       )}
@@ -465,12 +506,13 @@ export function OffersView() {
       {/* ОТКУДА ВЗЯТА СЕБЕСТОИМОСТЬ - один раз на экран, а не на каждой
           карточке: повторённое четыре раза предупреждение перестаёт читаться.
           Пока маржа не названа, все суммы ниже - оценка сверху. */}
-      {(data?.cost_basis === "price" || data?.cost_basis === "assumed") &&
-        (data?.offers ?? []).length > 0 && (
-        <div className="rounded-ctl border border-[#fedf89] bg-[#fffcf5] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-[#b54708]">
-          {t(data.cost_basis === "assumed"
-            ? "saas.offers.basis.assumed"
-            : "saas.offers.basis.price")}
+      {(data?.catalog_notes?.length ?? 0) > 0 && (
+        <div className="rounded-ctl border border-[#fedf89] bg-[#fffcf5] px-3.5 py-2.5">
+          {data!.catalog_notes!.map((n) => (
+            <p key={n.code} className="mt-1 text-[12.5px] leading-relaxed text-[#b54708] first:mt-0">
+              {t(`saas.offers.review.${n.code}` as MessageKey, n.params)}
+            </p>
+          ))}
         </div>
       )}
       {noTenant ? (

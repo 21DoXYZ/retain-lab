@@ -804,6 +804,22 @@ def saas_offers():
         reason = top_reason if stage in ('SAVE', 'WINBACK') else ''
         by_id.update({r['offer_id']: r for r in
                       rank(group, stake, budget, reason=reason)})
+
+    # РАЗБОР ПО МЕТОДОЛОГИИ. Каталог мог собраться правилами год назад, а
+    # экономика клиента с тех пор изменилась: разбор пересчитывается на каждом
+    # открытии экрана и говорит, что в наборе стало неверным.
+    from stripe_sync.offer_review import review_catalog, split_catalog_notes
+    cash_by_id = {c['offer_id']: c['cash'] for c in candidates}
+    reviewed = review_catalog(
+        [{**o, '_cash': cash_by_id.get(o['offer_id']),
+          '_stage': o.get('stage')} for o in offers],
+        {'cost_basis': cost_basis, 'gross_margin': margin,
+         'monthly_margin': monthly_margin, 'gift_budget': budget,
+         'reason': top_reason,
+         'has_topup': any(str((o.get('params') or {}).get('command') or '')
+                          .endswith('_discount') for o in offers)})
+    reviewed, catalog_notes = split_catalog_notes(reviewed)
+    review_by_id = {r['offer_id']: r for r in reviewed}
     for o in offers:
         row = by_id.get(o['offer_id'])
         if not row:
@@ -816,6 +832,12 @@ def saas_offers():
         o['ev'] = row['ev']
         o['blocked'] = row['blocked']
 
+    for o in offers:
+        r = review_by_id.get(o['offer_id']) or {}
+        o['review'] = {'verdict': r.get('verdict', 'ok'),
+                       'flags': r.get('flags', []),
+                       'alternative': r.get('alternative')}
+
     return api_json({'tenant': tenant, 'control_pct': catalog.get('control_pct', 10),
                      'p_convert_cap': catalog.get('p_convert_cap'),
                      'churn_floor': catalog.get('churn_floor'),
@@ -824,6 +846,7 @@ def saas_offers():
                      'margin_at_stake': stake,
                      'gift_budget': budget,
                      'cost_basis': cost_basis,
+                     'catalog_notes': catalog_notes,
                      'offers': offers})
 
 
