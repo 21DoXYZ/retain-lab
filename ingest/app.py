@@ -8,6 +8,7 @@
 Авторизация: заголовок  Authorization: Bearer <INGEST_TOKEN>
 """
 import os
+from datetime import datetime, timedelta, timezone
 import json
 import hmac
 import ipaddress
@@ -97,6 +98,8 @@ REQUIRED = {"event_id", "event_type", "casino_player_id", "ts"}
 # SaaS-контур (Revenue Autopilot): свой топик и свой контракт (saas_schema.sql).
 SAAS_TOPIC = os.environ.get("SAAS_KAFKA_TOPIC", "saas.events")
 REQUIRED_SAAS = {"event_id", "tenant_id", "event_type", "ts"}
+
+from event_time import sane_ts  # noqa: E402
 # Сниппет ra.js постит с сайта тенанта (кросс-домен) — браузеру нужен CORS.
 # Токен «публичного класса» (как ключи аналитик), поэтому echo-origin допустим;
 # сузить до доменов тенантов: SAAS_CORS_ORIGINS="https://app.x.com,https://y.io".
@@ -245,8 +248,10 @@ def ingest_saas():
         if err is not None:
             errs.append(str(err))
 
+    now_utc = datetime.now(tz=timezone.utc)
     for e in events:
         e.setdefault("source", "snippet")
+        e["ts"] = sane_ts(e.get("ts"), now_utc)
         key = e.get("client_user_id") or e.get("stripe_customer_id") or e["tenant_id"]
         producer.produce(SAAS_TOPIC, key=str(key), value=json.dumps(e), on_delivery=_cb)
     producer.flush(10)

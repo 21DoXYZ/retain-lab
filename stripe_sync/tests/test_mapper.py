@@ -136,3 +136,24 @@ def test_upgrade_is_not_any_subscription_change():
              "data": {"object": {"id": "s", "customer": "c", "status": "active"},
                       "previous_attributes": {"metadata": {"x": "y"}}}}
     assert map_event(other, "t")["event_type"] == "billing.subscription_updated"
+
+
+def test_client_clock_cannot_poison_the_windows():
+    """Время события задаёт клиент: у браузера часы врут, сервер клиента может
+    прислать что угодно. Событие «из будущего» иначе считалось бы свежим
+    месяцами и держало человека в активных."""
+    import pathlib
+    import sys
+    from datetime import datetime, timezone
+
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "ingest"))
+    from event_time import sane_ts
+
+    now = datetime(2026, 8, 6, 12, 0, tzinfo=timezone.utc)
+    now_s = "2026-08-06 12:00:00.000"
+    assert sane_ts("2026-08-06 11:59:00.000", now) == "2026-08-06 11:59:00.000"
+    assert sane_ts("2027-01-01 00:00:00.000", now) == now_s      # будущее
+    assert sane_ts("1999-01-01 00:00:00.000", now) == now_s      # древность
+    assert sane_ts("не время", now) == now_s                     # мусор
+    assert sane_ts(None, now) == now_s
+    assert sane_ts("2026-08-06T11:00:00Z", now) == "2026-08-06 11:00:00.000"

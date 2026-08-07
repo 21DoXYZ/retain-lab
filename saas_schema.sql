@@ -339,19 +339,53 @@ FROM (
 GROUP BY tenant_id, identity_id;
 
 -- Последний снимок подписки per customer.
-CREATE OR REPLACE VIEW retention.stripe_subscriptions_current AS
-SELECT tenant_id, customer_id,
-       argMax(subscription_id, updated_at)  AS subscription_id,
-       argMax(status, updated_at)           AS status,
-       argMax(plan_id, updated_at)          AS plan_id,
-       argMax(amount, updated_at)           AS amount,
-       argMax(bill_interval, updated_at)    AS bill_interval,
-       argMax(trial_end, updated_at)        AS trial_end,
-       argMax(cancel_at, updated_at)        AS cancel_at,
-       argMax(canceled_at, updated_at)      AS canceled_at,
-       argMax(current_period_start, updated_at) AS current_period_start,
-       argMax(current_period_end, updated_at) AS current_period_end
+-- Последнее состояние КАЖДОЙ подписки (у клиента их может быть несколько).
+CREATE OR REPLACE VIEW retention.stripe_subscriptions_latest AS
+SELECT tenant_id, subscription_id,
+       argMax(customer_id, updated_at)           AS customer_id,
+       argMax(status, updated_at)                AS status,
+       argMax(plan_id, updated_at)               AS plan_id,
+       argMax(amount, updated_at)                AS amount,
+       argMax(bill_interval, updated_at)         AS bill_interval,
+       argMax(trial_end, updated_at)             AS trial_end,
+       argMax(cancel_at, updated_at)             AS cancel_at,
+       argMax(canceled_at, updated_at)           AS canceled_at,
+       argMax(current_period_start, updated_at)  AS current_period_start,
+       argMax(current_period_end, updated_at)    AS current_period_end,
+       max(updated_at)                           AS updated_at_max
 FROM retention.stripe_subscriptions
+GROUP BY tenant_id, subscription_id;
+
+-- Клиент целиком. ВАЖНО: у него может быть основная подписка и допы. Раньше
+-- эта вьюха брала «последнюю обновлённую» - и отменённый доп делал активного
+-- плательщика «отменившим» (ложный винбэк), а его MRR схлопывался до цены
+-- допа. Теперь статус выбирается по живости, а деньги суммируются по всем
+-- живым подпискам.
+CREATE OR REPLACE VIEW retention.stripe_subscriptions_current AS
+SELECT tenant_id,
+       customer_id,
+       argMax(subscription_id, (alive_rank, monthly))      AS subscription_id,
+       argMax(status, (alive_rank, monthly))               AS status,
+       argMax(plan_id, (alive_rank, monthly))              AS plan_id,
+       argMax(amount, (alive_rank, monthly))               AS amount,
+       argMax(bill_interval, (alive_rank, monthly))        AS bill_interval,
+       argMax(trial_end, (alive_rank, monthly))            AS trial_end,
+       argMax(cancel_at, (alive_rank, monthly))            AS cancel_at,
+       argMax(canceled_at, (alive_rank, monthly))          AS canceled_at,
+       argMax(current_period_start, (alive_rank, monthly)) AS current_period_start,
+       argMax(current_period_end, (alive_rank, monthly))   AS current_period_end,
+       round(sumIf(monthly, alive_rank >= 2), 2)           AS mrr_total,
+       count()                                             AS subs_count
+FROM (
+    SELECT *,
+           multiIf(status = 'active', 4,
+                   status = 'trialing', 3,
+                   status = 'past_due', 2,
+                   status IN ('paused', 'incomplete', 'unpaid'), 1,
+                   0)                                                AS alive_rank,
+           if(bill_interval = 'year', toFloat64(amount) / 12, toFloat64(amount)) AS monthly
+    FROM retention.stripe_subscriptions_latest
+)
 GROUP BY tenant_id, customer_id;
 
 -- ГЛАВНАЯ ВЬЮХА Phase 2: ровно одна стадия + действие на каждого stitched-юзера.
@@ -393,7 +427,10 @@ GROUP BY p.tenant_id, p.plan_id, p.mrr;
 
 CREATE OR REPLACE VIEW retention.user_actions AS
 WITH
-    if(s.bill_interval = 'year', round(s.amount / 12, 2), s.amount) AS sub_mrr,
+    -- CH не мешает Decimal и Float64 в одном if - приводим явно
+    if(s.mrr_total > 0, round(toFloat64(s.mrr_total), 2),
+       if(s.bill_interval = 'year', round(toFloat64(s.amount) / 12, 2),
+          toFloat64(s.amount)))                                         AS sub_mrr,
     if(p.monthly_tokens > 0,
        coalesce(u.tokens_spent_period, f.tokens_spent_month) / p.monthly_tokens,
        0)                                                               AS burn_rate_calc,
