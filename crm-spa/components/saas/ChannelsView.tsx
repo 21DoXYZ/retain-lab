@@ -35,6 +35,8 @@ interface ChannelRow {
   };
   telegram?: { bot_username: string; connect_link: string };
   whatsapp?: {
+    personal?: { status: string; number: string };
+    cloud_connected?: boolean;
     phone_display: string; has_waba: boolean; has_app_secret: boolean;
     webhook_url: string; webhook_verify_token: string;
     templates: { name: string; status: string; campaign_id: string;
@@ -511,6 +513,9 @@ function WhatsappBody({ row, onSaved }: { row: ChannelRow; onSaved: () => void }
     wa_phone_display: "", wa_waba_id: "", wa_app_secret: "" });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [risk, setRisk] = useState(false);
+  const [qr, setQr] = useState("");
+  const [qrStatus, setQrStatus] = useState("");
 
   const post = (path: string, body: Record<string, unknown>, done: (d: unknown) => void) => {
     setBusy(true);
@@ -521,23 +526,141 @@ function WhatsappBody({ row, onSaved }: { row: ChannelRow; onSaved: () => void }
       .finally(() => setBusy(false));
   };
 
-  if (row.state !== "active") {
+  // Пока сессия ждёт скана, поллим QR: код у WhatsApp короткоживущий и
+  // сам обновляется; после WORKING поллинг гаснет
+  const personal = wa?.personal?.status || "";
+  // сессия проходит STARTING -> SCAN_QR_CODE -> WORKING: ждём весь путь,
+  // а не только момент готового QR (иначе поллинг умирал на первом STARTING)
+  const pending = (st: string) =>
+    st === "STARTING" || st === "SCAN_QR_CODE" || st === "FAILED";
+  const waitingScan = pending(qrStatus) ||
+    (pending(personal) && qrStatus !== "WORKING" && qrStatus !== "cancelled");
+  useEffect(() => {
+    if (!waitingScan) return;
+    let alive = true;
+    const tick = () => {
+      flaskFetch<{ status: string; number: string; qr_png: string }>(
+        "/api/v1/saas/channels/whatsapp/personal/qr")
+        .then((d) => {
+          if (!alive) return;
+          setQrStatus(d.status);
+          setQr(d.qr_png || "");
+          if (d.status === "WORKING") onSaved();
+        })
+        .catch(() => {});
+    };
+    tick();
+    const id = window.setInterval(tick, 3000);
+    return () => { alive = false; window.clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingScan]);
+
+  const personalConnected = personal === "WORKING" || qrStatus === "WORKING";
+
+  if (row.state !== "active" && !waitingScan) {
+    return (
+      <div className="flex flex-col gap-3">
+        {/* ── Вариант 1: личный номер, как WhatsApp Web ── */}
+        <div className="rounded-ctl border border-hair bg-surface p-3.5">
+          <div className="text-[13px] font-medium text-ink">{t("saas.channels.wa.personal.title")}</div>
+          <p className="mt-1 max-w-[560px] text-[12.5px] leading-relaxed text-steel">
+            {t("saas.channels.wa.personal.desc")}
+          </p>
+          <label className="mt-2.5 flex max-w-[560px] cursor-pointer items-start gap-2 text-[12.5px] leading-relaxed text-slate">
+            <input type="checkbox" className="mt-0.5" checked={risk}
+                   onChange={(e) => setRisk(e.target.checked)} />
+            <span>{t("saas.channels.wa.personal.risk")}</span>
+          </label>
+          <div className="mt-2.5">
+            <Button variant="brand" size="sm" loading={busy} disabled={!risk}
+                    onClick={() => post("/api/v1/saas/channels/whatsapp/personal",
+                                        { accept_risk: true },
+                                        () => setQrStatus("SCAN_QR_CODE"))}>
+              {t("saas.channels.wa.personal.start")}
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Вариант 2: официальный бизнес-номер (настраиваем мы) ── */}
+        <details className="rounded-ctl border border-hair bg-surface p-3.5">
+          <summary className="cursor-pointer text-[13px] font-medium text-ink">
+            {t("saas.channels.wa.official.title")}
+          </summary>
+          <p className="mt-2 max-w-[560px] text-[12.5px] leading-relaxed text-steel">
+            {t("saas.channels.wa.lead")}
+          </p>
+          <div className="mt-2 flex flex-col gap-2">
+            {(["wa_token", "wa_phone_number_id", "wa_phone_display",
+               "wa_waba_id", "wa_app_secret"] as const).map((k) => (
+              <input key={k} className={inputCls + " font-mono text-[12.5px]"}
+                     placeholder={t(`saas.channels.wa.${k}` as MessageKey)}
+                     value={form[k]}
+                     onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))} />
+            ))}
+            <div>
+              <Button variant="ghost" size="sm" loading={busy}
+                      disabled={!form.wa_token.trim() || !form.wa_phone_number_id.trim()}
+                      onClick={() => post("/api/v1/saas/channels/whatsapp", { ...form },
+                                          () => setNote(""))}>
+                {t("saas.channels.wa.connect")}
+              </Button>
+            </div>
+          </div>
+        </details>
+        {note && <p className="text-[12.5px] text-neg">{note}</p>}
+      </div>
+    );
+  }
+
+  if (waitingScan && !personalConnected) {
+    return (
+      <div className="flex flex-col items-start gap-2.5">
+        <p className="max-w-[560px] text-[13px] leading-relaxed text-slate">
+          {t("saas.channels.wa.personal.scan")}
+        </p>
+        {qrStatus === "FAILED" ? (
+          /* упавшая сессия - не молчим: причина + кнопка «ещё раз» (бэкенд
+             при повторном старте пересоздаёт FAILED-сессию) */
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-[12.5px] text-neg">{t("saas.channels.wa.personal.failed")}</p>
+            <Button variant="brand" size="sm" loading={busy}
+                    onClick={() => post("/api/v1/saas/channels/whatsapp/personal",
+                                        { accept_risk: true },
+                                        () => setQrStatus("SCAN_QR_CODE"))}>
+              {t("saas.channels.wa.personal.retry")}
+            </Button>
+          </div>
+        ) : qr ? (
+          <img src={`data:image/png;base64,${qr}`} alt="WhatsApp QR"
+               width={232} height={232}
+               className="rounded-ctl border border-hair bg-white p-2" />
+        ) : (
+          <p className="text-[12.5px] text-steel">{t("saas.channels.wa.personal.qrLoading")}</p>
+        )}
+        <Button variant="ghost" size="sm"
+                onClick={() => { setQrStatus("cancelled"); setQr(""); }}>
+          {t("saas.camp.cancel")}
+        </Button>
+      </div>
+    );
+  }
+
+  if (personalConnected && !wa?.cloud_connected) {
     return (
       <div className="flex flex-col gap-2">
-        <p className="text-[13px] leading-relaxed text-steel">{t("saas.channels.wa.lead")}</p>
-        {([["wa_token", true], ["wa_phone_number_id", true], ["wa_phone_display", false],
-           ["wa_waba_id", false], ["wa_app_secret", false]] as const).map(([k]) => (
-          <input key={k} className={inputCls + " font-mono text-[12.5px]"}
-                 placeholder={t(`saas.channels.wa.${k}` as MessageKey)}
-                 value={form[k]}
-                 onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))} />
-        ))}
+        <p className="text-[13px] leading-relaxed text-slate">
+          {t("saas.channels.wa.personal.connected", {
+            number: wa?.personal?.number || row.detail || "",
+          })}
+        </p>
+        <p className="max-w-[560px] text-[12.5px] leading-relaxed text-steel">
+          {t("saas.channels.wa.personal.inboundOnly")}
+        </p>
         <div>
-          <Button variant="brand" size="sm" loading={busy}
-                  disabled={!form.wa_token.trim() || !form.wa_phone_number_id.trim()}
-                  onClick={() => post("/api/v1/saas/channels/whatsapp", { ...form },
-                                      () => setNote(""))}>
-            {t("saas.channels.wa.connect")}
+          <Button variant="ghost" size="sm" loading={busy}
+                  onClick={() => post("/api/v1/saas/channels/whatsapp/personal/disconnect",
+                                      {}, () => { setQrStatus(""); setQr(""); })}>
+            {t("saas.channels.wa.personal.disconnect")}
           </Button>
         </div>
         {note && <p className="text-[12.5px] text-neg">{note}</p>}

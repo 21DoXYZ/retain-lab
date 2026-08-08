@@ -1010,16 +1010,24 @@ def _channels_payload(tenant: str) -> dict:
 def _wa_channel_row(tenant: str, tch: dict, cov: dict) -> dict:
     """Строка WhatsApp: Cloud API (WABA клиента), статусы шаблонов, вебхук."""
     connected = bool(tch.get('wa_token') and tch.get('wa_phone_number_id'))
+    personal_status = str(tch.get('wa_personal_status') or '')
     registry = dict(tch.get('wa_templates') or {})
     import hashlib as _hl
     import hmac as _hm
     from stripe_sync.email_delivery import UNSUB_SECRET as _us
     host = _os.environ.get('SAAS_HOST', 'retivo.digital')
     return {
-        'channel': 'whatsapp', 'provider': 'Meta Cloud API',
-        'state': 'active' if connected else 'not_connected',
-        'detail': str(tch.get('wa_phone_display') or ''),
+        'channel': 'whatsapp',
+        'provider': 'Meta Cloud API' if connected else (
+            'Personal number' if personal_status == 'WORKING' else 'Meta Cloud API'),
+        'state': ('active' if connected or personal_status == 'WORKING'
+                  else 'not_connected'),
+        'detail': str(tch.get('wa_phone_display')
+                      or tch.get('wa_personal_number') or ''),
         'whatsapp': {
+            'personal': {'status': personal_status,
+                         'number': str(tch.get('wa_personal_number') or '')},
+            'cloud_connected': connected,
             'phone_display': str(tch.get('wa_phone_display') or ''),
             'has_waba': bool(tch.get('wa_waba_id')),
             'has_app_secret': bool(tch.get('wa_app_secret')),
@@ -1976,3 +1984,62 @@ def channels_whatsapp_templates():
     ca.update_tenant(tenant, {'wa_templates': registry})
     return api_json({'submitted': submitted, 'skipped': skipped,
                      'registry': registry})
+
+
+# ── WhatsApp: ЛИЧНЫЙ номер через QR (трек C, только приём) ───────────────────
+# Подключается как WhatsApp Web: отсканировал QR - работает. Неофициальный
+# протокол: включение только с явным подтверждением риска бана; автокасания
+# сюда не ходят технически (route_message умеет только Cloud API).
+
+@bp.post('/saas/channels/whatsapp/personal')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def wa_personal_start():
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    if not body.get('accept_risk'):
+        # без явного «понимаю, что номер могут забанить» не включаем
+        return _bad('risk_not_accepted')
+    from datetime import datetime, timezone
+
+    from stripe_sync import wa_personal as wap
+    ok, status = wap.start_session(tenant)
+    if not ok:
+        return _bad(f'waha_unavailable:{status}', 502)
+    ca.update_tenant(tenant, {
+        'wa_personal_status': status,
+        'wa_personal_risk_accepted': datetime.now(tz=timezone.utc).isoformat()})
+    print(f'[wa-personal] {tenant}: сессия запущена ({status})', flush=True)
+    return api_json({'status': status})
+
+
+@bp.get('/saas/channels/whatsapp/personal/qr')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def wa_personal_qr():
+    """QR + живой статус. Фронт поллит, пока не WORKING."""
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    from stripe_sync import wa_personal as wap
+    ok, status, number = wap.get_status(tenant)
+    if not ok:
+        return _bad(f'waha_unavailable:{status}', 502)
+    qr = wap.get_qr_png(tenant) if status == 'SCAN_QR_CODE' else ''
+    if status and status != 'NOT_STARTED':
+        ca.update_tenant(tenant, {'wa_personal_status': status,
+                                  'wa_personal_number': number or None})
+    return api_json({'status': status, 'number': number, 'qr_png': qr})
+
+
+@bp.post('/saas/channels/whatsapp/personal/disconnect')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def wa_personal_disconnect():
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    from stripe_sync import wa_personal as wap
+    wap.drop_session(tenant)
+    ca.update_tenant(tenant, {'wa_personal_status': None,
+                              'wa_personal_number': None})
+    return api_json({'ok': True})

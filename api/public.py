@@ -418,3 +418,51 @@ def wa_webhook(tenant: str):
 
     # Meta ретраит не-2xx: наш ответ всегда ok
     return api_json({'ok': True})
+
+
+# ── Личный WhatsApp (WAHA, трек C): вебхук по ВНУТРЕННЕЙ сети ────────────────
+# WAHA шлёт сюда статусы сессии и сообщения. Подпись X-Webhook-Hmac (sha512
+# от сырого тела) ключом, который мы сами задали при создании сессии.
+# Только приём: статус - в tenants.json, входящее с нашим подписанным кодом -
+# контакт с согласием, голое входящее - событие в шину (для инбокса потом).
+
+@bp.post('/wa/personal/<tenant>')
+def wa_personal_webhook(tenant: str):
+    from stripe_sync import wa_personal as wap
+
+    if not wap.verify_webhook(tenant, request.get_data(),
+                              request.headers.get('X-Webhook-Hmac', '')):
+        return api_json(error='forbidden', code=403)
+
+    ev = wap.parse_event(request.get_json(silent=True) or {})
+    from datetime import datetime, timezone
+    now = datetime.now(tz=timezone.utc)
+
+    if ev['kind'] == 'status':
+        from stripe_sync.channels_admin import update_tenant
+        update_tenant(tenant, {'wa_personal_status': ev['status'],
+                               'wa_personal_number': ev['number'] or None})
+        print(f"[wa-personal] {tenant}: {ev['status']} {ev['number']}", flush=True)
+
+    elif ev['kind'] == 'inbound':
+        from stripe_sync.wa_templates import parse_connect_text
+        uid = parse_connect_text(tenant, ev['text'])
+        ch = _ch_client()
+        ch.insert('retention.saas_events',
+                  [[tenant, f"wap-in-{ev['wa_msg_id'] or now.timestamp()}",
+                    'wa_personal_inbound', now, uid, '', '', 'whatsapp_personal',
+                    '', json.dumps({'from': ev['from']})]],
+                  column_names=['tenant_id', 'event_id', 'event_type', 'ts',
+                                'client_user_id', 'email_hash', 'email',
+                                'source', 'stripe_customer_id', 'meta'])
+        if uid:
+            # человек пришёл по НАШЕЙ подписанной ссылке - это явное согласие
+            # и привязка аккаунта; тот же контракт, что у Cloud API
+            ch.insert('retention.contacts',
+                      [[tenant, uid, 'whatsapp', ev['from'], 1, now, now]],
+                      column_names=['tenant_id', 'client_user_id', 'channel',
+                                    'address', 'consent', 'consent_ts',
+                                    'updated_at'])
+            print(f"[wa-personal] {tenant}: connect uid={uid}", flush=True)
+
+    return api_json({'ok': True})

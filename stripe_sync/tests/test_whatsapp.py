@@ -178,3 +178,48 @@ def test_plain_inbound_text_binds_nobody():
     assert parse_connect_text("t", "hi, i need help", secret="k") == ""
     assert connect_url("", "t", "u") == ""
     assert connect_url("+9714", "t", "") == ""
+
+
+# ── Личный номер (WAHA, трек C): только приём ────────────────────────────────
+
+def test_personal_webhook_hmac_is_sha512_of_the_raw_body():
+    import hashlib
+    import hmac as hm
+
+    import wa_personal as wap
+    body = b'{"event": "message.any"}'
+    key = wap.webhook_hmac_key("hub", secret="k")
+    good = hm.new(key.encode(), body, hashlib.sha512).hexdigest()
+    assert wap.verify_webhook("hub", body, good, secret="k")
+    # подмена символа обязана МЕНЯТЬ строку: «заменить на 0», когда там уже 0,
+    # однажды сделал этот тест бессмысленным
+    bad = good[:-1] + ("0" if good[-1] != "0" else "1")
+    assert not wap.verify_webhook("hub", body, bad, secret="k")
+    assert not wap.verify_webhook("other", body, good, secret="k")
+    assert not wap.verify_webhook("hub", body, "", secret="k")
+
+
+def test_personal_events_parse_and_outgoing_is_ignored():
+    import wa_personal as wap
+    st = wap.parse_event({"event": "session.status", "payload": {
+        "status": "WORKING", "me": {"id": "971501112233@c.us"}}})
+    assert st == {"kind": "status", "status": "WORKING",
+                  "number": "971501112233"}
+    msg = wap.parse_event({"event": "message.any", "payload": {
+        "id": "m1", "from": "97150@c.us", "fromMe": False, "body": "hello"}})
+    assert msg["kind"] == "inbound" and msg["from"] == "97150"
+    # свои же ручные ответы событиями подписки не считаются
+    assert wap.parse_event({"event": "message.any", "payload": {
+        "fromMe": True}})["kind"] == "ignore"
+    assert wap.parse_event({})["kind"] == "ignore"
+
+
+def test_personal_transport_has_no_scheduled_send_path():
+    """Гарантия методологии: автокасания на личный номер не ходят ТЕХНИЧЕСКИ.
+
+    route_message знает только Cloud API; у wa_personal вообще нет функции
+    отправки. Если она появится - этот тест заставит объясниться.
+    """
+    import wa_personal as wap
+    senders = [n for n in dir(wap) if "send" in n.lower()]
+    assert senders == [], senders
