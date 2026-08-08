@@ -2025,6 +2025,11 @@ def wa_personal_qr():
     ok, status, number = wap.get_status(tenant)
     if not ok:
         return _bad(f'waha_unavailable:{status}', 502)
+    # НИКАКОГО авто-оживления здесь. В момент привязки движок на секунды
+    # перезапускает сокет, статус мелькает FAILED - оживление из поллинга
+    # убивало почти завершённую привязку (Intentional Logout ровно в момент
+    # скана). Упавшую сессию поднимает ТОЛЬКО явное нажатие кнопки: там
+    # человек точно не сканирует прямо сейчас.
     qr = wap.get_qr_png(tenant) if status == 'SCAN_QR_CODE' else ''
     if status and status != 'NOT_STARTED':
         ca.update_tenant(tenant, {'wa_personal_status': status,
