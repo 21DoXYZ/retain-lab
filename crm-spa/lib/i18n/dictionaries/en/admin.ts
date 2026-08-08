@@ -32,6 +32,8 @@ export const admin: Partial<Messages> = {
   "admin.users.col.name": "Name",
   "admin.users.col.login": "Login",
   "admin.users.col.role": "Role",
+  "admin.users.search": "Search by name, email, role...",
+  "admin.users.flash.roleChanged": "Role for {name} has been changed.",
   "admin.users.col.scope": "Department / code",
   "admin.users.col.status": "Status",
   "admin.users.col.actions": "Actions",

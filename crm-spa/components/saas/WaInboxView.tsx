@@ -104,6 +104,11 @@ export function WaInboxView() {
   const [sendErr, setSendErr] = useState("");
   const [showCard, setShowCard] = useState(true);
   const [reads, setReads] = useState<Record<string, string>>({});
+  const [composing, setComposing] = useState(false);
+  const [newPhone, setNewPhone] = useState("");
+  const [newText, setNewText] = useState("");
+  const [newErr, setNewErr] = useState("");
+  const [newBusy, setNewBusy] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setReads(readMarks()); }, []);
@@ -156,6 +161,27 @@ export function WaInboxView() {
       .finally(() => setSending(false));
   };
 
+  const startChat = () => {
+    if (newBusy || !newPhone.trim() || !newText.trim()) return;
+    setNewBusy(true);
+    setNewErr("");
+    flaskFetch<{ chat_id: string }>("/api/v1/saas/wa/start-chat", {
+      method: "POST", body: { phone: newPhone.trim(), text: newText.trim() } })
+      .then((d) => {
+        setComposing(false);
+        setNewPhone("");
+        setNewText("");
+        setActive(d.chat_id);          // эхо вебхука материализует чат в списке
+        loadChats();
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : "failed";
+        setNewErr(msg.includes("number_not_on_whatsapp")
+          ? t("saas.wainbox.new.notOnWa") : msg);
+      })
+      .finally(() => setNewBusy(false));
+  };
+
   const q = search.trim().toLowerCase();
   const visible = q
     ? chats.filter((c) => (c.name + " " + c.display + " " + c.last_text).toLowerCase().includes(q))
@@ -180,14 +206,45 @@ export function WaInboxView() {
         <Card className="flex min-h-[560px] flex-1 overflow-hidden p-0">
           {/* ── чаты ── */}
           <div className="flex w-[300px] flex-none flex-col border-r border-hair">
-            <div className="border-b border-hair p-3">
+            <div className="flex items-center gap-2 border-b border-hair p-3">
               <input
                 className="h-[36px] w-full rounded-full border border-hair2 bg-canvas px-3.5 text-[13px] text-ink outline-none transition-[border-color] focus:border-primary"
                 placeholder={t("saas.wainbox.search")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
+              <button type="button" aria-label={t("saas.wainbox.new.btn")}
+                      title={t("saas.wainbox.new.btn")}
+                      className="grid h-[36px] w-[36px] flex-none cursor-pointer place-items-center rounded-full bg-primary text-[18px] leading-none text-white transition-transform active:scale-95"
+                      onClick={() => { setComposing((v) => !v); setNewErr(""); }}>
+                +
+              </button>
             </div>
+            {/* написать ПЕРВЫМ на новый номер - вручную, живым человеком */}
+            {composing && (
+              <div className="flex flex-col gap-2 border-b border-hair bg-canvas/60 p-3">
+                <input
+                  className="h-[36px] w-full rounded-ctl border border-hair2 bg-canvas px-3 font-mono text-[13px] text-ink outline-none transition-[border-color] focus:border-primary"
+                  placeholder={t("saas.wainbox.new.phonePh")}
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                />
+                <textarea
+                  className="min-h-[60px] w-full resize-none rounded-ctl border border-hair2 bg-canvas px-3 py-2 text-[13px] text-ink outline-none transition-[border-color] focus:border-primary"
+                  placeholder={t("saas.wainbox.new.textPh")}
+                  value={newText}
+                  onChange={(e) => setNewText(e.target.value)}
+                />
+                {newErr && <p className="text-[12px] text-neg">{newErr}</p>}
+                <div>
+                  <Button variant="brand" size="sm" loading={newBusy}
+                          disabled={!newPhone.trim() || !newText.trim()}
+                          onClick={startChat}>
+                    {t("saas.wainbox.new.send")}
+                  </Button>
+                </div>
+              </div>
+            )}
             {/* «Добавить каналы» из макета: единственный клик до экрана каналов */}
             <a href="/channel-settings"
                className="flex items-center gap-2.5 border-b border-hair bg-primary/[.04] px-3.5 py-3 transition-colors hover:bg-primary/[.08]">

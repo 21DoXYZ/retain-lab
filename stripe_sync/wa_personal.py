@@ -299,3 +299,26 @@ def list_lids(tenant: str) -> dict:
         if lid and pn:
             out[lid] = pn
     return out
+
+
+def check_number(tenant: str, phone: str) -> tuple[bool, str]:
+    """Есть ли номер в WhatsApp вообще. (exists, канонический chat_id).
+
+    Писать первым на номер, которого нет в WhatsApp, - сообщение в пустоту;
+    а канонический chat_id важен, потому что часть аккаунтов живёт за @lid.
+    """
+    import re as _re
+    digits = _re.sub(r"\D", "", str(phone or ""))
+    if not 8 <= len(digits) <= 15:
+        return False, ""
+    status, doc = _call(
+        "GET", f"/api/contacts/check-exists?phone={digits}"
+               f"&session={session_name(tenant)}")
+    if status != 200 or not isinstance(doc, dict):
+        return False, ""
+    if not doc.get("numberExists"):
+        return False, ""
+    chat_id = doc.get("chatId")
+    if isinstance(chat_id, dict):
+        chat_id = chat_id.get("_serialized")
+    return True, str(chat_id or f"{digits}@c.us")

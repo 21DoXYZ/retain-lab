@@ -2141,3 +2141,30 @@ def wa_reply():
     # в тред сообщение ляжет эхом вебхука (message.any, fromMe) - с настоящим
     # id и без дублей; интерфейс показывает его оптимистично
     return api_json({'ok': True})
+
+
+@bp.post('/saas/wa/start-chat')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def wa_start_chat():
+    """Написать ПЕРВЫМ на новый номер - вручную, живым человеком.
+
+    Проверяем, что номер вообще есть в WhatsApp (сообщение в пустоту - хуже
+    честного отказа), берём канонический chat_id (часть аккаунтов живёт за
+    @lid) и шлём тем же единственным ручным путём."""
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    phone = str(body.get('phone') or '').strip()
+    text = str(body.get('text') or '').strip()
+    if not phone or not text:
+        return _bad('phone_and_text_required')
+    from stripe_sync import wa_personal as wap
+    exists, chat_id = wap.check_number(tenant, phone)
+    if not exists:
+        return _bad('number_not_on_whatsapp')
+    ok, detail = wap.reply_as_human(tenant, chat_id, text)
+    if not ok:
+        return _bad(f'send_failed:{detail}', 502)
+    # в тред ляжет эхом вебхука; фронт сразу открывает этот чат
+    return api_json({'ok': True, 'chat_id': chat_id})

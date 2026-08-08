@@ -37,6 +37,8 @@ export const admin = {
   "admin.users.col.name": "Имя",
   "admin.users.col.login": "Логин",
   "admin.users.col.role": "Роль",
+  "admin.users.search": "Поиск по имени, почте, роли...",
+  "admin.users.flash.roleChanged": "Роль пользователя {name} изменена.",
   "admin.users.col.scope": "Отдел / код",
   "admin.users.col.status": "Статус",
   "admin.users.col.actions": "Действия",

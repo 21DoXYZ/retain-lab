@@ -55,6 +55,26 @@ export async function PATCH(
     return ok({ id, is_active: !blocking });
   }
 
+  if (action === "change_role") {
+    // Роль до сих пор менялась только пересозданием человека - терялись
+    // пароль и история. Гейт тот же, что при создании: давать можно только
+    // роль, которую вызывающий вправе создавать.
+    const { creatableRoles } = await import("@/lib/permissions");
+    const role = String(body.role ?? "");
+    if (!creatableRoles(me.role).includes(role as never))
+      return fail("Эту роль назначать нельзя", 403, "role_not_allowed");
+    if (role === target.role) return ok({ id, role });
+    const { error: roleErr } = await admin
+      .schema("crm")
+      .from("crm_users")
+      .update({ role })
+      .eq("id", id);
+    if (roleErr) return fail(roleErr.message, 400);
+    await auditLog(admin, me.id, "change_role", "user", id,
+                   { from: target.role, to: role });
+    return ok({ id, role });
+  }
+
   if (action === "reset_password") {
     const password = String(body.password ?? "");
     if (password.length < 6) return fail("Пароль минимум 6 символов", 400, "password_too_short");

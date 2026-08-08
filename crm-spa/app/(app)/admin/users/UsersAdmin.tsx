@@ -98,6 +98,7 @@ export function UsersAdmin({ me, initialUsers }: Props) {
 
   // create form
   const [createOpen, setCreateOpen] = useState(false);
+  const [search, setSearch] = useState("");
   // SaaS-пресет: колл-центр/VIP/риск/аффилиаты скрыты модулями - роли этих
   // вертикалей в создании не предлагаем (DB-триггер по-прежнему пропустил бы).
   const SAAS_ROLES: UserRole[] = useMemo(
@@ -166,6 +167,17 @@ export function UsersAdmin({ me, initialUsers }: Props) {
       return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function changeRole(u: AdminUserRow, role: UserRole) {
+    if (role === u.role) return;
+    const ok = await call(`/api/admin/users/${u.id}`, "PATCH",
+                          { action: "change_role", role });
+    if (ok) {
+      setFlash({ type: "ok", text: t("admin.users.flash.roleChanged",
+                                     { name: u.full_name }) });
+      router.refresh();
     }
   }
 
@@ -283,6 +295,14 @@ export function UsersAdmin({ me, initialUsers }: Props) {
 
       <div className="mt-5">
         <Panel>
+          <div className="border-b border-hair p-3">
+            <input
+              className="h-[36px] w-full max-w-[360px] rounded-full border border-hair2 bg-canvas px-3.5 text-[13px] text-ink outline-none transition-[border-color] focus:border-primary"
+              placeholder={t("admin.users.search")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           <Table>
             <THead>
               <TR>
@@ -295,7 +315,12 @@ export function UsersAdmin({ me, initialUsers }: Props) {
               </TR>
             </THead>
             <TBody>
-              {initialUsers.map((u) => {
+              {initialUsers.filter((u) => {
+                const q = search.trim().toLowerCase();
+                if (!q) return true;
+                return (u.full_name + " " + u.email + " " + u.role)
+                  .toLowerCase().includes(q);
+              }).map((u) => {
                 const manageable = canManageUser(me, u);
                 const scope = u.affiliate_code ?? (u.department ? t(DEPT_KEY[u.department]) : "—");
                 return (
@@ -303,7 +328,23 @@ export function UsersAdmin({ me, initialUsers }: Props) {
                     <TD className="text-left font-medium text-ink">{u.full_name}</TD>
                     <TD className="text-left font-mono text-steel">{u.email}</TD>
                     <TD className="text-left">
-                      <Badge bg="#ecf3ff" fg="#3641f5">{t(ROLE_KEY[u.role])}</Badge>
+                      {manageable && roles.length > 0 ? (
+                        <select
+                          className="h-[32px] cursor-pointer rounded-ctl border border-hair2 bg-canvas px-2 text-[12.5px] text-ink outline-none transition-[border-color] focus:border-primary"
+                          value={u.role}
+                          disabled={busy}
+                          onChange={(e) => void changeRole(u, e.target.value as UserRole)}
+                        >
+                          {/* текущая роль всегда в списке, даже если её нельзя НАЗНАЧИТЬ - иначе селект врёт */}
+                          {[...new Set([u.role, ...roles])].map((r) => (
+                            <option key={r} value={r} disabled={!roles.includes(r) && r !== u.role}>
+                              {t(ROLE_KEY[r])}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Badge bg="#ecf3ff" fg="#3641f5">{t(ROLE_KEY[u.role])}</Badge>
+                      )}
                     </TD>
                     <TD className="text-left text-slate">{scope}</TD>
                     <TD className="text-left">
