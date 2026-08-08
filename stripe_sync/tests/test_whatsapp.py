@@ -208,18 +208,63 @@ def test_personal_events_parse_and_outgoing_is_ignored():
     msg = wap.parse_event({"event": "message.any", "payload": {
         "id": "m1", "from": "97150@c.us", "fromMe": False, "body": "hello"}})
     assert msg["kind"] == "inbound" and msg["from"] == "97150"
-    # свои же ручные ответы событиями подписки не считаются
+    # свои ответы (с телефона или из инбокса) - в тред, а не в игнор
     assert wap.parse_event({"event": "message.any", "payload": {
-        "fromMe": True}})["kind"] == "ignore"
+        "fromMe": True, "to": "x@lid"}})["kind"] == "outbound"
     assert wap.parse_event({})["kind"] == "ignore"
 
 
 def test_personal_transport_has_no_scheduled_send_path():
     """Гарантия методологии: автокасания на личный номер не ходят ТЕХНИЧЕСКИ.
 
-    route_message знает только Cloud API; у wa_personal вообще нет функции
-    отправки. Если она появится - этот тест заставит объясниться.
+    Отправка в личный канал существует ровно одна - reply_as_human из
+    инбокса, за ней всегда живой человек. Конвейер кампаний до неё не
+    дотягивается: ни campaign_tick, ни saas_senders этот модуль не знают.
     """
+    import inspect
+
+    import campaign_tick
+    import saas_senders
     import wa_personal as wap
     senders = [n for n in dir(wap) if "send" in n.lower()]
-    assert senders == [], senders
+    assert senders == [], senders          # send_* не появилось
+    assert hasattr(wap, "reply_as_human")  # ручной путь есть и один
+    for mod in (campaign_tick, saas_senders):
+        assert "wa_personal" not in inspect.getsource(mod), mod.__name__
+
+
+def test_personal_outbound_echo_lands_in_the_thread():
+    """Свои ответы (в т.ч. с телефона) - в тред: иначе половина разговора."""
+    import wa_personal as wap
+    out = wap.parse_event({"event": "message.any", "payload": {
+        "id": "m9", "from": "971@c.us", "to": "258948@lid", "fromMe": True,
+        "body": "reply from phone"}})
+    assert out["kind"] == "outbound"
+    assert out["chat_id"] == "258948@lid"      # тред собеседника, не свой
+    assert out["text"] == "reply from phone"
+    inb = wap.parse_event({"event": "message.any", "payload": {
+        "id": "m10", "from": "258948@lid", "fromMe": False,
+        "body": "hi", "pushName": "Ivan"}})
+    assert inb["chat_id"] == "258948@lid" and inb["name"] == "Ivan"
+
+
+def test_human_reply_is_the_only_send_and_needs_text():
+    """Единственный путь отправки в личный канал - живой человек с текстом."""
+    import wa_personal as wap
+    ok, why = wap.reply_as_human("t", "", "hello")
+    assert not ok and why == "empty"
+    ok, why = wap.reply_as_human("t", "258948@lid", "   ")
+    assert not ok and why == "empty"
+    # автокампании этот путь не видят: route_message wa_personal не знает
+    import saas_senders
+    import inspect
+    src = inspect.getsource(saas_senders)
+    assert "wa_personal" not in src
+
+
+def test_whatsapp_statuses_are_not_conversations():
+    """status@broadcast - сторис контактов: в инбоксе им не место."""
+    import wa_personal as wap
+    assert wap.parse_event({"event": "message.any", "payload": {
+        "id": "s1", "from": "status@broadcast", "fromMe": False,
+        "body": "somebody's story"}})["kind"] == "ignore"

@@ -40,6 +40,7 @@ export const nav = {
   "nav.exports": "Проверка выгрузок",
   "nav.overview": "Обзор",
   "nav.players": "Игроки",
+  "nav.waInbox": "WhatsApp-инбокс",
   "nav.affiliates": "Аффилиаты",
   "nav.analytics": "Аналитика",
   "nav.ltv": "LTV-прогноз",

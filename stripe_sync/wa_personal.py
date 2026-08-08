@@ -87,13 +87,17 @@ def start_session(tenant: str) -> tuple[bool, str]:
     payload = {
         "name": session_name(tenant),
         "start": True,
-        "config": {"webhooks": [{
+        "config": {
+            # хранилище NOWEB: без него WAHA не отдаёт историю чатов, и
+            # инбокс начинается с пустоты вместо реальной переписки
+            "noweb": {"store": {"enabled": True, "fullSync": True}},
+            "webhooks": [{
             "url": f"{BOARD_INTERNAL}/public/wa/personal/{tenant}",
             # message.any даёт и входящие, и исходящие (ручные ответы тоже
             # видны); message отдельно НЕ подписываем - были бы дубли
             "events": ["message.any", "session.status"],
-            "hmac": {"key": webhook_hmac_key(tenant)},
-        }]},
+                "hmac": {"key": webhook_hmac_key(tenant)},
+            }]},
     }
     status, doc = _call("POST", "/api/sessions", payload)
     if status in (200, 201):
@@ -159,11 +163,139 @@ def parse_event(doc: dict) -> dict:
                 "status": str(payload.get("status") or ""),
                 "number": str(me.get("id") or "").split("@")[0]}
     if event in ("message", "message.any"):
-        if payload.get("fromMe"):
-            return {"kind": "ignore", "why": "from_me"}
         sender = str(payload.get("from") or "")
-        return {"kind": "inbound",
-                "wa_msg_id": str(payload.get("id") or ""),
-                "from": sender.split("@")[0],
-                "text": str(payload.get("body") or "")[:4096]}
+        to = str(payload.get("to") or "")
+        # status@broadcast - статусы контактов, не переписка: в инбоксе это
+        # выглядело чатом по имени «status» с чужими сторис внутри
+        if "@broadcast" in sender or "@broadcast" in to:
+            return {"kind": "ignore", "why": "broadcast"}
+        try:
+            # время САМОГО сообщения: при переподключении WAHA досылает
+            # пропущенное, и время получения вебхука ломало бы порядок треда
+            ts_unix = int(payload.get("timestamp") or 0)
+        except (TypeError, ValueError):
+            ts_unix = 0
+        base = {
+            "wa_msg_id": str(payload.get("id") or ""),
+            "text": str(payload.get("body") or "")[:4096],
+            "name": str(payload.get("pushName") or payload.get("notifyName")
+                        or "")[:80],
+            "ts_unix": ts_unix if 10**9 < ts_unix < 10**11 else 0,
+        }
+        if payload.get("fromMe"):
+            # СВОИ ответы (из инбокса или прямо с телефона) тоже в тред:
+            # без них переписка на экране - половина разговора
+            return {"kind": "outbound", "chat_id": to or sender, **base}
+        return {"kind": "inbound", "chat_id": sender,
+                "from": sender.split("@")[0], **base}
     return {"kind": "ignore", "why": event or "empty"}
+
+
+# ── Ручной ответ из инбокса ──────────────────────────────────────────────────
+# ЕДИНСТВЕННЫЙ путь отправки в личный канал - и он требует явного текста от
+# живого человека в интерфейсе. У кампаний доступа сюда нет: route_message
+# этот модуль не импортирует, и тест-страж это проверяет.
+
+def reply_as_human(tenant: str, chat_id: str, text: str) -> tuple[bool, str]:
+    """Отправить ответ в чат. chat_id - ПОЛНЫЙ (с @lid/@c.us).
+
+    Запись в тред не делаем: подписка message.any вернёт эхо собственного
+    сообщения вебхуком, и оно ляжет в wa_messages обычным путём - без
+    дублей и с настоящим id.
+    """
+    text = str(text or "").strip()
+    if not text or not chat_id:
+        return False, "empty"
+    status, doc = _call("POST", "/api/sendText", {
+        "session": session_name(tenant), "chatId": chat_id, "text": text[:4096]})
+    if 200 <= status < 300:
+        return True, "sent"
+    return False, f"waha_{status}:{str(doc)[:120]}"
+
+
+def update_session_config(tenant: str) -> tuple[bool, str]:
+    """Обновить конфиг живой сессии (PUT) без пересоздания.
+
+    Авторизация лежит в volume - после restart сессия поднимается без
+    повторного скана QR. Нужен для включения хранилища истории на сессии,
+    созданной до этого конфига.
+    """
+    payload = {
+        "config": {
+            "noweb": {"store": {"enabled": True, "fullSync": True}},
+            "webhooks": [{
+                "url": f"{BOARD_INTERNAL}/public/wa/personal/{tenant}",
+                "events": ["message.any", "session.status"],
+                "hmac": {"key": webhook_hmac_key(tenant)},
+            }]},
+    }
+    status, doc = _call("PUT", f"/api/sessions/{session_name(tenant)}", payload)
+    if not (200 <= status < 300):
+        return False, f"waha_{status}:{str(doc)[:120]}"
+    status, doc = _call("POST", f"/api/sessions/{session_name(tenant)}/restart")
+    if 200 <= status < 300:
+        return True, "restarted"
+    return False, f"waha_{status}:{str(doc)[:120]}"
+
+
+def fetch_history(tenant: str, chat_limit: int = 30,
+                  msg_limit: int = 100) -> list[dict]:
+    """История переписки из хранилища WAHA - для бэкфилла wa_messages.
+
+    [{chat_id, wa_msg_id, direction, text, name, ts_unix}]. Статусы
+    (@broadcast) выброшены. Пустой список - хранилище ещё не синхронизировано.
+    """
+    sess = session_name(tenant)
+    status, chats = _call("GET", f"/api/{sess}/chats?limit={chat_limit}")
+    if status != 200 or not isinstance(chats, list):
+        return []
+    out: list[dict] = []
+    for chat in chats:
+        cid = chat.get("id")
+        if isinstance(cid, dict):
+            cid = cid.get("_serialized") or ""
+        cid = str(cid or "")
+        if not cid or "@broadcast" in cid:
+            continue
+        status, msgs = _call(
+            "GET", f"/api/{sess}/chats/{cid}/messages?limit={msg_limit}"
+                   f"&downloadMedia=false")
+        if status != 200 or not isinstance(msgs, list):
+            continue
+        for m in msgs:
+            body = str(m.get("body") or "")
+            if not body:
+                continue                     # медиа без текста - v1 пропускает
+            try:
+                ts = int(m.get("timestamp") or 0)
+            except (TypeError, ValueError):
+                ts = 0
+            out.append({
+                "chat_id": cid,
+                "wa_msg_id": str(m.get("id") or ""),
+                "direction": "out" if m.get("fromMe") else "in",
+                "text": body[:4096],
+                "name": "" if m.get("fromMe") else str(m.get("notifyName")
+                                                       or "")[:80],
+                "ts_unix": ts if 10**9 < ts < 10**11 else 0,
+            })
+    return out
+
+
+def list_lids(tenant: str) -> dict:
+    """{цифры LID: цифры номера} - разгадка приватных идентификаторов.
+
+    WhatsApp прячет номер за LID (258...@lid), но связанное устройство знает
+    соответствие - WAHA отдаёт его целиком. Без этого карточка контакта
+    показывает бессмысленный LID вместо телефона.
+    """
+    status, doc = _call("GET", f"/api/{session_name(tenant)}/lids?limit=500")
+    if status != 200 or not isinstance(doc, list):
+        return {}
+    out = {}
+    for row in doc:
+        lid = str(row.get("lid") or "").split("@")[0]
+        pn = str(row.get("pn") or "").split("@")[0]
+        if lid and pn:
+            out[lid] = pn
+    return out

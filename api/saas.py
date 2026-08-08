@@ -2048,3 +2048,96 @@ def wa_personal_disconnect():
     ca.update_tenant(tenant, {'wa_personal_status': None,
                               'wa_personal_number': None})
     return api_json({'ok': True})
+
+
+# ── Инбокс личного WhatsApp: переписка + ручные ответы ───────────────────────
+# Читает retention.wa_messages (пишет вебхук WAHA, оба направления). Ответ -
+# единственный путь отправки в личный канал, и он требует живого человека.
+
+@bp.get('/saas/wa/chats')
+@require_auth(roles=LEAK_ROLES)
+def wa_chats():
+    tenant = _tenant_arg()
+    rows = q(
+        """
+        SELECT chat_id,
+               argMax(text, ts)                                   AS last_text,
+               argMax(direction, ts)                              AS last_dir,
+               max(ts)                                            AS last_ts,
+               min(ts)                                            AS first_ts,
+               argMaxIf(sender_name, ts, sender_name != '')       AS name,
+               countIf(direction = 'in')                          AS inbound,
+               count()                                            AS total
+        FROM retention.wa_messages
+        WHERE tenant_id = {t:String}
+        GROUP BY chat_id
+        ORDER BY last_ts DESC
+        LIMIT 100
+        """, {'t': tenant})[1]
+    # привязка к юзеру продукта: контакт whatsapp с этим адресом (создаётся,
+    # когда человек пришёл по подписанной connect-ссылке)
+    bound = {str(r[0]): str(r[1]) for r in q(
+        """
+        SELECT address, client_user_id FROM retention.contacts_current
+        WHERE tenant_id = {t:String} AND channel = 'whatsapp'
+          AND client_user_id != ''
+        """, {'t': tenant})[1]}
+    # WhatsApp прячет номера за LID - карточка без разгадки показывает
+    # бессмысленный идентификатор вместо телефона
+    lids = {}
+    if any('@lid' in str(r[0]) for r in rows):
+        from stripe_sync.wa_personal import list_lids
+        try:
+            lids = list_lids(tenant)
+        except Exception:  # noqa: BLE001 - WAHA лежит: карточка без номера
+            lids = {}
+    out = []
+    for r in rows:
+        digits = str(r[0]).split('@')[0]
+        out.append({
+            'chat_id': r[0], 'display': digits,
+            'phone': lids.get(digits, digits if '@lid' not in str(r[0]) else ''),
+            'last_text': r[1], 'last_dir': r[2], 'last_ts': str(r[3]),
+            'first_ts': str(r[4]), 'name': r[5], 'inbound': int(r[6]),
+            'total': int(r[7]),
+            'client_user_id': bound.get(digits, '')})
+    return api_json({'chats': out})
+
+
+@bp.get('/saas/wa/messages')
+@require_auth(roles=LEAK_ROLES)
+def wa_messages():
+    tenant = _tenant_arg()
+    chat = str(request.args.get('chat') or '').strip()
+    if not chat:
+        return _bad('chat_required')
+    rows = q(
+        """
+        SELECT wa_msg_id, direction, text, sender_name, ts
+        FROM retention.wa_messages
+        WHERE tenant_id = {t:String} AND chat_id = {c:String}
+        ORDER BY ts ASC, wa_msg_id ASC LIMIT 500
+        """, {'t': tenant, 'c': chat})[1]
+    return api_json({'messages': [
+        {'id': r[0], 'direction': r[1], 'text': r[2], 'name': r[3],
+         'ts': str(r[4])} for r in rows]})
+
+
+@bp.post('/saas/wa/reply')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def wa_reply():
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    chat = str(body.get('chat_id') or '').strip()
+    text = str(body.get('text') or '').strip()
+    if not chat or not text:
+        return _bad('chat_and_text_required')
+    from stripe_sync import wa_personal as wap
+    ok, detail = wap.reply_as_human(tenant, chat, text)
+    if not ok:
+        return _bad(f'send_failed:{detail}', 502)
+    # в тред сообщение ляжет эхом вебхука (message.any, fromMe) - с настоящим
+    # id и без дублей; интерфейс показывает его оптимистично
+    return api_json({'ok': True})

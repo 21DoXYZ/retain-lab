@@ -438,16 +438,35 @@ def wa_personal_webhook(tenant: str):
     from datetime import datetime, timezone
     now = datetime.now(tz=timezone.utc)
 
+    def msg_ts():
+        unix = int(ev.get('ts_unix') or 0)
+        return datetime.fromtimestamp(unix, tz=timezone.utc) if unix else now
+
     if ev['kind'] == 'status':
         from stripe_sync.channels_admin import update_tenant
         update_tenant(tenant, {'wa_personal_status': ev['status'],
                                'wa_personal_number': ev['number'] or None})
         print(f"[wa-personal] {tenant}: {ev['status']} {ev['number']}", flush=True)
 
+    elif ev['kind'] == 'outbound':
+        # свой ответ (из инбокса или с телефона) - в тред, без событий подписки
+        _ch_client().insert(
+            'retention.wa_messages',
+            [[tenant, ev['chat_id'], ev['wa_msg_id'] or f'out-{now.timestamp()}',
+              'out', ev['text'], '', msg_ts()]],
+            column_names=['tenant_id', 'chat_id', 'wa_msg_id', 'direction',
+                          'text', 'sender_name', 'ts'])
+
     elif ev['kind'] == 'inbound':
         from stripe_sync.wa_templates import parse_connect_text
         uid = parse_connect_text(tenant, ev['text'])
         ch = _ch_client()
+        ch.insert('retention.wa_messages',
+                  [[tenant, ev['chat_id'],
+                    ev['wa_msg_id'] or f'in-{now.timestamp()}',
+                    'in', ev['text'], ev.get('name', ''), msg_ts()]],
+                  column_names=['tenant_id', 'chat_id', 'wa_msg_id', 'direction',
+                                'text', 'sender_name', 'ts'])
         ch.insert('retention.saas_events',
                   [[tenant, f"wap-in-{ev['wa_msg_id'] or now.timestamp()}",
                     'wa_personal_inbound', now, uid, '', '', 'whatsapp_personal',

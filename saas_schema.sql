@@ -777,3 +777,20 @@ SELECT tenant_id, address,
        max(created_at)            AS suppressed_at
 FROM retention.email_suppressions
 GROUP BY tenant_id, address;
+
+-- ── Переписка личного WhatsApp (трек C): инбокс основателя ──────────────────
+-- Пишет вебхук WAHA (оба направления: входящие и ответы, в т.ч. набранные с
+-- телефона). chat_id хранится ПОЛНЫМ (с @lid/@c.us) - он же адрес для ответа.
+-- Replacing по (tenant, chat, msg): эхо собственного ответа не дублируется.
+CREATE TABLE IF NOT EXISTS retention.wa_messages
+(
+    `tenant_id`   LowCardinality(String),
+    `chat_id`     String,
+    `wa_msg_id`   String,
+    `direction`   LowCardinality(String),   -- in | out
+    `text`        String,
+    `sender_name` String,
+    `ts`          DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(ts)
+ORDER BY (tenant_id, chat_id, wa_msg_id);

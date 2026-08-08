@@ -36,6 +36,7 @@ export const nav: Partial<Messages> = {
   "nav.exports": "Export audit",
   "nav.overview": "Overview",
   "nav.players": "Users",
+  "nav.waInbox": "WhatsApp inbox",
   "nav.affiliates": "Affiliates",
   "nav.analytics": "Analytics",
   "nav.ltv": "LTV forecast",

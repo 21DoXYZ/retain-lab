@@ -36,6 +36,7 @@ export const nav: Partial<Messages> = {
   "nav.exports": "Dışa aktarım denetimi",
   "nav.overview": "Genel bakış",
   "nav.players": "Oyuncular",
+  "nav.waInbox": "",
   "nav.affiliates": "Ortaklar",
   "nav.analytics": "Analitik",
   "nav.ltv": "LTV tahmini",
