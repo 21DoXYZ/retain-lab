@@ -601,6 +601,8 @@ CREATE TABLE IF NOT EXISTS retention.campaign_send_log
     `detail`      String,                    -- subject / offer_id
     `status`      LowCardinality(String),    -- dry_run | sent | issued | holdout | rejected
     `reason`      String,
+    `provider_id` String,                    -- id письма/сообщения у провайдера:
+                                             -- по нему вебхуки доставки находят касание
     `ts`          DateTime64(3)
 )
 ENGINE = MergeTree

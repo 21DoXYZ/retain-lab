@@ -172,6 +172,11 @@ class FakeCH:
         self.inserts = []
 
     def query(self, sql, parameters=None):
+        if "argMax(status, updated_at)" in sql:
+            # гард _save: не воскрешать зачисление, снятое вручную из карточки
+            ident = (parameters or {}).get("i")
+            return _Res([["exited" if ident in getattr(self, "exited", set())
+                          else "active"]])
         if "user_actions" in sql:
             return _Res(self.stages)
         if "email_suppressions_current" in sql:
@@ -559,3 +564,30 @@ def test_a_touch_with_an_unresolved_placeholder_is_not_sent():
     ok, detail = route_message("telegram", "5", "s", "Go {{nope}}",
                                cfg, MessagingConfig(dry_run=True))
     assert not ok and detail == "unresolved_placeholder"
+
+
+def test_manual_exit_is_not_resurrected_by_a_running_tick():
+    """Владелец снял человека с кампании из карточки, пока тик шёл по
+    снапшоту начала прогона. Save тика с поздним updated_at молча вернул бы
+    зачисление в active - ручной exit всегда важнее машинного прогресса."""
+    import campaign_tick as ct
+    from datetime import datetime, timezone
+
+    now = datetime.now(tz=timezone.utc)
+    row = {"identity_id": "id1", "control": 0, "entry_stage": "ACTIVATE",
+           "step_idx": 2, "next_step_at": now, "status": "active",
+           "enrolled_at": now}
+    fake = FakeCH([])
+    fake.exited = {"id1"}
+    ct._save(fake, "t", "K1_activation", row)
+    assert fake.inserts == []                  # exited не перезаписан
+
+    fake2 = FakeCH([])
+    ct._save(fake2, "t", "K1_activation", row)
+    assert len(fake2.inserts) == 1             # обычный save работает
+
+    # сам exit (status != active) пишется без вопросов - это и есть снятие
+    fake3 = FakeCH([])
+    fake3.exited = {"id1"}
+    ct._save(fake3, "t", "K1_activation", {**row, "status": "exited"})
+    assert len(fake3.inserts) == 1

@@ -222,6 +222,17 @@ def effective_configs(conf: dict, email_cfg: "EmailConfig",
 # ── I/O ──────────────────────────────────────────────────────────────────────
 
 def _save(client, tenant: str, camp_id: str, row: dict) -> None:
+    # Владелец мог снять человека с кампании ИЗ КАРТОЧКИ, пока тик шёл по
+    # снапшоту начала прогона. Save с поздним updated_at молча воскресил бы
+    # зачисление - ручной exit всегда важнее машинного прогресса.
+    if row.get("status") == "active":
+        cur = client.query(
+            "SELECT argMax(status, updated_at) FROM retention.campaign_enrollments "
+            "WHERE tenant_id = %(t)s AND campaign_id = %(c)s AND identity_id = %(i)s",
+            parameters={"t": tenant, "c": camp_id,
+                        "i": row["identity_id"]}).result_rows
+        if cur and str(cur[0][0]) == "exited":
+            return
     now = _fmt(_now_dt())
     client.insert(
         "retention.campaign_enrollments",
@@ -374,7 +385,11 @@ def tick(client, tenant: str) -> dict[str, int]:
                             if channel == "email":
                                 address, consent = email, 1
                             else:
-                                address, consent = contacts.get((cuid, channel), ("", 0))
+                                # у Stripe-only юзера нет client_user_id -
+                                # ручной контакт из карточки лежит под identity
+                                address, consent = (contacts.get((cuid, channel))
+                                                    or contacts.get((identity, channel))
+                                                    or ("", 0))
                             if not address:
                                 _log_send(client, tenant, cid, identity, i, channel,
                                           step.get("subject", ""), "rejected", "no_contact")

@@ -111,7 +111,12 @@ export function WaInboxView() {
   const [newBusy, setNewBusy] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setReads(readMarks()); }, []);
+  useEffect(() => {
+    setReads(readMarks());
+    // deep-link из карточки юзера: /wa-inbox?chat=<chat_id>
+    const chat = new URLSearchParams(window.location.search).get("chat");
+    if (chat) setActive(chat);
+  }, []);
 
   const loadChats = useCallback(() => {
     flaskFetch<{ chats: Chat[] }>("/api/v1/saas/wa/chats")
@@ -419,7 +424,7 @@ export function WaInboxView() {
                     <div className="mt-1 truncate font-mono text-[11.5px] text-slate">
                       {activeChat.client_user_id}
                     </div>
-                    <a href="/users"
+                    <a href={`/users/${encodeURIComponent(activeChat.client_user_id)}`}
                        className="mt-2 inline-block text-[12.5px] font-medium text-primary hover:underline">
                       {t("saas.wainbox.card.openUser")}
                     </a>

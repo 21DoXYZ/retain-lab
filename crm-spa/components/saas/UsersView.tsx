@@ -149,6 +149,7 @@ export function UsersView() {
         columns={columns}
         rows={data?.users ?? []}
         getRowKey={(r) => r.identity_id}
+        getRowHref={(r) => `/users/${encodeURIComponent(r.identity_id)}`}
         state={state}
         onRetry={() => load(stage)}
         emptyTitle={t("saas.users.empty.title")}

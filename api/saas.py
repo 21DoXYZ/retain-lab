@@ -2168,3 +2168,387 @@ def wa_start_chat():
         return _bad(f'send_failed:{detail}', 502)
     # в тред ляжет эхом вебхука; фронт сразу открывает этот чат
     return api_json({'ok': True, 'chat_id': chat_id})
+
+
+# ── Карточка юзера: всё о человеке + ручные действия ─────────────────────────
+# Система юзероцентрична: вокруг человека собираются стадия, деньги, контакты,
+# история касаний и события продукта - и отсюда же владелец действует руками:
+# добавляет контакт, пишет в любой канал, зачисляет в кампанию.
+
+def _user_row(tenant: str, ident: str):
+    """Строка user_actions по identity_id ЛИБО client_user_id: в карточку
+    ведут и таблица юзеров (identity), и WA-инбокс (client_user_id)."""
+    rows = q(
+        """
+        SELECT identity_id, email_norm, client_user_id, stripe_customer_id,
+               sub_status, plan_id, toFloat64(mrr), stage, recommended_action,
+               value_at_stake, coalesce(p_convert, 0), coalesce(p_churn, 0),
+               coalesce(ltv_estimate, 0),
+               if(toUnixTimestamp(last_seen) = 0, '', toString(last_seen)),
+               stage_note
+        FROM user_actions
+        WHERE tenant_id = {t:String}
+          AND (identity_id = {i:String}
+               OR (client_user_id = {i:String} AND client_user_id != ''))
+        LIMIT 1
+        """, {'t': tenant, 'i': ident})[1]
+    return rows[0] if rows else None
+
+
+def _campaign_titles(tenant: str) -> list:
+    import json as _json
+    from pathlib import Path as _Path
+    p = _Path(__file__).resolve().parent.parent / 'stripe_sync' / 'saas_campaigns.json'
+    try:
+        cfgs = _json.loads(p.read_text())
+    except Exception:
+        return []
+    conf = cfgs.get(tenant) or cfgs.get('_default') or {}
+    return [{'id': c['campaign_id'], 'title': str(c.get('title') or c['campaign_id'])}
+            for c in conf.get('campaigns', [])]
+
+
+def _autopilot_on(tenant: str) -> bool:
+    """Живой ли автопилот тенанта: тот же резолв, что в campaign_tick.
+    Карточка обязана честно сказать, что зачисление пойдёт вхолостую."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    # campaign_tick импортировать нельзя (flat-only модуль джоб) - резолв
+    # зеркалим: рантайм-рубильник из tenants.json важнее git-конфига
+    from stripe_sync.saas_senders import load_tenant_channels
+    p = _Path(__file__).resolve().parent.parent / 'stripe_sync' / 'saas_campaigns.json'
+    try:
+        cfgs = _json.loads(p.read_text())
+    except Exception:
+        return False
+    conf = cfgs.get(tenant) or cfgs.get('_default') or {}
+    overrides = load_tenant_channels(tenant)
+    if 'autopilot' in overrides:
+        return bool(overrides['autopilot'])
+    return bool(conf.get('autopilot'))
+
+
+@bp.get('/saas/user')
+@require_auth(roles=LEAK_ROLES)
+def saas_user_card():
+    tenant = _tenant_arg()
+    ident = str(request.args.get('identity') or '').strip()
+    if not ident:
+        return _bad('identity_required')
+    r = _user_row(tenant, ident)
+    if not r:
+        return _bad('user_not_found', 404)
+    identity, email, cuid = str(r[0]), str(r[1]), str(r[2])
+
+    user = {
+        'identity_id': identity, 'email': email, 'client_user_id': cuid,
+        'stripe_customer_id': r[3], 'sub_status': r[4], 'plan_id': r[5],
+        'mrr': round(_flt(r[6]), 2), 'stage': r[7], 'action': r[8],
+        'value_at_stake': round(_flt(r[9]), 2),
+        'p_convert': round(_flt(r[10]), 2), 'p_churn': round(_flt(r[11]), 2),
+        'ltv': round(_flt(r[12]), 2), 'last_seen': r[13], 'stage_note': r[14],
+    }
+
+    # контакты каналов: лежат под client_user_id, у Stripe-only - под identity.
+    # Ключа два, поэтому канал может встретиться дважды - берём запись под
+    # cuid (основной ключ), identity - только как фолбэк.
+    keys = [k for k in (cuid, identity) if k]
+    by_channel: dict = {}
+    if keys:
+        for c in q(
+            """
+            SELECT channel, address, consent, consent_ts, client_user_id
+            FROM contacts_current
+            WHERE tenant_id = {t:String} AND client_user_id IN {k:Array(String)}
+            ORDER BY channel
+            """, {'t': tenant, 'k': keys})[1]:
+            row = {'channel': c[0], 'address': c[1], 'consent': int(c[2]),
+                   'consent_ts': str(c[3])}
+            if c[0] not in by_channel or str(c[4]) == cuid:
+                by_channel[c[0]] = row
+    contacts = list(by_channel.values())
+
+    email_suppressed = bool(email) and bool(q(
+        "SELECT count() FROM email_suppressions_current "
+        "WHERE tenant_id = {t:String} AND address = {a:String}",
+        {'t': tenant, 'a': email.lower()})[1][0][0])
+
+    enrollments = [{'campaign_id': e[0], 'status': e[1], 'step_idx': int(e[2]),
+                    'next_step_at': str(e[3]), 'control': int(e[4]),
+                    'enrolled_at': str(e[5])} for e in q(
+        """
+        SELECT campaign_id, status, step_idx, next_step_at, control, enrolled_at
+        FROM campaign_enrollments_current
+        WHERE tenant_id = {t:String} AND identity_id = {i:String}
+        ORDER BY enrolled_at DESC
+        """, {'t': tenant, 'i': identity})[1]]
+
+    touches = [{'campaign_id': s[0], 'step_idx': int(s[1]), 'action': s[2],
+                'detail': s[3], 'status': s[4], 'reason': s[5], 'ts': str(s[6])}
+               for s in q(
+        """
+        SELECT campaign_id, step_idx, action, detail, status, reason, ts
+        FROM campaign_send_log
+        WHERE tenant_id = {t:String} AND identity_id = {i:String}
+        ORDER BY ts DESC LIMIT 50
+        """, {'t': tenant, 'i': identity})[1]]
+
+    offers = [{'offer_id': o[0], 'campaign_id': o[1], 'status': o[2],
+               'reason': o[3], 'cost_estimate': round(_flt(o[4]), 2),
+               'issued_at': str(o[5])} for o in q(
+        """
+        SELECT offer_id, campaign_id, status, reason, cost_estimate, issued_at
+        FROM offers_issued
+        WHERE tenant_id = {t:String} AND identity_id = {i:String}
+        ORDER BY issued_at DESC LIMIT 20
+        """, {'t': tenant, 'i': identity})[1]]
+
+    scid = str(r[3] or '')
+    events = [{'event_type': e[0], 'ts': str(e[1]), 'amount': round(_flt(e[2]), 2),
+               'plan_id': e[3], 'page': e[4]} for e in q(
+        """
+        SELECT event_type, ts, amount, plan_id, page
+        FROM saas_events
+        WHERE tenant_id = {t:String}
+          AND ((client_user_id = {c:String} AND {c:String} != '')
+               OR (stripe_customer_id = {s:String} AND {s:String} != ''))
+        ORDER BY ts DESC LIMIT 30
+        """, {'t': tenant, 'c': cuid, 's': scid})[1]] if (cuid or scid) else []
+
+    # личный WhatsApp: если адрес контакта совпадает с тредом инбокса,
+    # карточка даёт прямой переход в переписку
+    wa_chat = ''
+    wa_addr = next((c['address'] for c in contacts if c['channel'] == 'whatsapp'), '')
+    if wa_addr:
+        # точное совпадение: префикс однажды свёл бы короткий номер
+        # с чужим тредом, у которого номер длиннее
+        hit = q(
+            "SELECT chat_id FROM retention.wa_messages "
+            "WHERE tenant_id = {t:String} "
+            "AND chat_id IN ({c:String}, {l:String}) LIMIT 1",
+            {'t': tenant, 'c': f'{wa_addr}@c.us', 'l': f'{wa_addr}@lid'})[1]
+        wa_chat = str(hit[0][0]) if hit else ''
+
+    return api_json({
+        'tenant': tenant, 'user': user, 'contacts': contacts,
+        'email_suppressed': email_suppressed, 'enrollments': enrollments,
+        'touches': touches, 'offers': offers, 'events': events,
+        'campaigns': _campaign_titles(tenant), 'wa_chat': wa_chat,
+        'autopilot': _autopilot_on(tenant),
+    })
+
+
+def _now_ch() -> str:
+    return _dt.datetime.now(tz=_dt.timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+
+@bp.post('/saas/user/contact')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_user_contact():
+    """Завести контакт руками. Галочка согласия в форме - утверждение
+    владельца, что канал дал согласие; без неё касания не пойдут (no_consent),
+    но адрес сохранится."""
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    ident = str(body.get('identity') or '').strip()
+    if not ident:
+        return _bad('identity_required')
+    r = _user_row(tenant, ident)
+    if not r:
+        return _bad('user_not_found', 404)
+    from stripe_sync.manual_touch import validate_contact
+    address, err = validate_contact(str(body.get('channel') or ''),
+                                    str(body.get('address') or ''))
+    if err:
+        return _bad(err)
+    channel = str(body.get('channel')).strip().lower()
+    consent = 1 if body.get('consent') else 0
+    # ключ контакта: client_user_id, у Stripe-only юзера - identity_id
+    key = str(r[2]) or str(r[0])
+    now = _now_ch()
+    _ch_direct().insert(
+        'retention.contacts',
+        [[tenant, key, channel, address, consent, now, now]],
+        column_names=['tenant_id', 'client_user_id', 'channel', 'address',
+                      'consent', 'consent_ts', 'updated_at'])
+    print(f'[user_card] {tenant}: contact {channel}={address} '
+          f'consent={consent} for {key}', flush=True)
+    return api_json({'ok': True, 'channel': channel, 'address': address,
+                     'consent': consent})
+
+
+@bp.post('/saas/user/touch')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_user_touch():
+    """Ручное касание одному человеку. Решение живого человека, поэтому
+    выключенный автопилот его не глушит; согласие и супрессии - обязательны."""
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    ident = str(body.get('identity') or '').strip()
+    channel = str(body.get('channel') or '').strip().lower()
+    subject = str(body.get('subject') or '').strip()
+    text = str(body.get('body') or '').strip()
+    if not ident or not channel:
+        return _bad('identity_and_channel_required')
+    r = _user_row(tenant, ident)
+    if not r:
+        return _bad('user_not_found', 404)
+    identity, email, cuid, stage = str(r[0]), str(r[1]), str(r[2]), str(r[7])
+    if not text:
+        return _bad('empty')
+    if channel not in ('inapp', 'whatsapp', 'email', 'sms', 'viber', 'telegram'):
+        return _bad('unknown_channel')
+
+    from stripe_sync.manual_touch import (SEND_LOG_COLUMNS, manual_send,
+                                          send_log_row)
+    ch = _ch_direct()
+    now = _now_ch()
+
+    def _log(status, reason='', pid=''):
+        ch.insert('retention.campaign_send_log',
+                  [send_log_row(tenant, identity, channel, subject, text,
+                                status, reason, now, pid)],
+                  column_names=SEND_LOG_COLUMNS)
+
+    if channel == 'inapp':
+        if not cuid:
+            return _bad('no_client_user_id')
+        cta = str(body.get('cta_url') or '').strip()
+        # expires_at - plain DateTime: клиенту CH нужен datetime-объект,
+        # строка здесь падает ('str' has no timestamp)
+        exp = _dt.datetime.now(tz=_dt.timezone.utc) + _dt.timedelta(days=7)
+        ch.insert(
+            'retention.inapp_inbox',
+            [[tenant, f'manual:{identity}:{now}', cuid, identity, 'manual', -1,
+              subject, text, str(body.get('cta_label') or '').strip(),
+              cta, stage, exp, now]],
+            column_names=['tenant_id', 'message_id', 'client_user_id',
+                          'identity_id', 'campaign_id', 'step_idx', 'title',
+                          'body', 'cta_label', 'cta_url', 'entry_stage',
+                          'expires_at', 'created_at'])
+        _log('queued')
+        return api_json({'ok': True, 'status': 'queued'})
+
+    if channel == 'whatsapp':
+        # свободный текст - только личный номер, тем же единственным ручным
+        # путём, что и инбокс
+        contact = q(
+            "SELECT address, consent FROM contacts_current "
+            "WHERE tenant_id = {t:String} "
+            "AND client_user_id IN {k:Array(String)} AND channel = 'whatsapp'",
+            {'t': tenant, 'k': [k for k in (cuid, identity) if k]})[1]
+        if not contact:
+            return _bad('no_contact')
+        if not int(contact[0][1]):
+            # UI канал без согласия не показывает, но API - тоже граница
+            _log('rejected', 'no_consent')
+            return _bad('no_consent')
+        from stripe_sync import wa_personal as wap
+        # у нового тенанта личный номер может быть не подключён вовсе -
+        # честный отказ «канал не подключён», а не «номера нет в WhatsApp»
+        _ok, wa_status, _num = wap.get_status(tenant)
+        if not _ok or wa_status != 'WORKING':
+            return _bad('wa_not_connected', 502)
+        exists, chat_id = wap.check_number(tenant, str(contact[0][0]))
+        if not exists:
+            return _bad('number_not_on_whatsapp')
+        ok, detail = wap.reply_as_human(tenant, chat_id, text)
+        _log('sent' if ok else 'rejected', '' if ok else detail)
+        if not ok:
+            return _bad(f'send_failed:{detail}', 502)
+        return api_json({'ok': True, 'status': 'sent', 'chat_id': chat_id})
+
+    # email / sms / viber / telegram - общий транспорт кампаний
+    if channel == 'email':
+        if not email:
+            return _bad('no_contact')
+        if bool(q("SELECT count() FROM email_suppressions_current "
+                  "WHERE tenant_id = {t:String} AND address = {a:String}",
+                  {'t': tenant, 'a': email.lower()})[1][0][0]):
+            _log('rejected', 'suppressed')
+            return _bad('suppressed')
+        address = email
+    else:
+        row = q(
+            "SELECT address, consent FROM contacts_current "
+            "WHERE tenant_id = {t:String} "
+            "AND client_user_id IN {k:Array(String)} AND channel = {c:String}",
+            {'t': tenant, 'k': [k for k in (cuid, identity) if k],
+             'c': channel})[1]
+        if not row:
+            return _bad('no_contact')
+        if not int(row[0][1]):
+            _log('rejected', 'no_consent')
+            return _bad('no_consent')
+        address = str(row[0][0])
+
+    from stripe_sync.saas_senders import (EmailConfig, MessagingConfig,
+                                          tenant_configs)
+    email_cfg, msg_cfg = tenant_configs(tenant, EmailConfig.from_env(),
+                                        MessagingConfig.from_env())
+    ok, detail = manual_send(channel, address, subject, text, email_cfg, msg_cfg)
+    if not ok:
+        _log('rejected', detail)
+        return _bad(f'send_failed:{detail}', 502)
+    pid = detail if detail != 'dry_run' else ''
+    _log('dry_run' if detail == 'dry_run' else 'sent', '', pid)
+    return api_json({'ok': True,
+                     'status': 'dry_run' if detail == 'dry_run' else 'sent'})
+
+
+@bp.post('/saas/user/enroll')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_user_enroll():
+    """Зачислить в кампанию руками / снять с кампании. Ручное зачисление
+    всегда target (control=0): владелец сознательно хочет касаний, молчащий
+    холдаут его бы обманул."""
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    ident = str(body.get('identity') or '').strip()
+    cid = str(body.get('campaign_id') or '').strip()
+    action = str(body.get('action') or 'enroll').strip()
+    if not ident or not cid:
+        return _bad('identity_and_campaign_required')
+    if cid not in {c['id'] for c in _campaign_titles(tenant)}:
+        return _bad('unknown_campaign')
+    r = _user_row(tenant, ident)
+    if not r:
+        return _bad('user_not_found', 404)
+    identity, stage = str(r[0]), str(r[7])
+
+    cur = q(
+        "SELECT status, control, step_idx, enrolled_at "
+        "FROM campaign_enrollments_current WHERE tenant_id = {t:String} "
+        "AND campaign_id = {c:String} AND identity_id = {i:String}",
+        {'t': tenant, 'c': cid, 'i': identity})[1]
+    now = _now_ch()
+    ch = _ch_direct()
+    cols = ['tenant_id', 'campaign_id', 'identity_id', 'control',
+            'entry_stage', 'step_idx', 'next_step_at', 'status',
+            'enrolled_at', 'updated_at']
+
+    if action == 'exit':
+        if not cur or str(cur[0][0]) != 'active':
+            return _bad('not_active')
+        ch.insert('retention.campaign_enrollments',
+                  [[tenant, cid, identity, int(cur[0][1]), stage,
+                    int(cur[0][2]), now, 'exited', cur[0][3], now]],
+                  column_names=cols)
+        print(f'[user_card] {tenant}: {identity} exited {cid}', flush=True)
+        return api_json({'ok': True, 'status': 'exited'})
+
+    if cur and str(cur[0][0]) == 'active':
+        return _bad('already_enrolled')
+    ch.insert('retention.campaign_enrollments',
+              [[tenant, cid, identity, 0, stage, 0, now, 'active', now, now]],
+              column_names=cols)
+    print(f'[user_card] {tenant}: {identity} enrolled into {cid} manually',
+          flush=True)
+    return api_json({'ok': True, 'status': 'active'})
