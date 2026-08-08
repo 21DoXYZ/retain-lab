@@ -438,10 +438,9 @@ function ChannelCard({
                 </p>
                 <div className="mt-2 flex items-center gap-2">
                   <code className="min-w-0 flex-1 truncate rounded-ctl border border-hair2 bg-canvas px-[11px] py-[7px] font-mono text-[12px] text-slate">
-                    {row.telegram?.connect_link}
-                    {"{client_user_id}"}
+                    {"{{telegram_connect_url}}"}
                   </code>
-                  <CopyButton text={`${row.telegram?.connect_link ?? ""}{client_user_id}`} />
+                  <CopyButton text="{{telegram_connect_url}}" />
                 </div>
 
                 <p className="mt-3.5 text-[12.5px] leading-relaxed text-steel">

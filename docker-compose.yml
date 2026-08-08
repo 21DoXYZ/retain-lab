@@ -110,6 +110,10 @@ services:
       SASL_USER: ${INGEST_KAFKA_USER:?set INGEST_KAFKA_USER in .env}
       SASL_PASS: ${INGEST_KAFKA_PASS:?set INGEST_KAFKA_PASS in .env}
       INGEST_TOKEN: ${INGEST_TOKEN:-}   # фолбэк, если secrets/tokens.json недоступен
+      # проверка подписи Telegram-payload (тот же секрет, что подписывает
+      # ссылки борд/тик: отписки и {{telegram_connect_url}})
+      UNSUB_SECRET: ${UNSUB_SECRET:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
       DEBUG_FIELDS: ${DEBUG_FIELDS:-0}   # 1 = логировать поля игрового события (диагностика)
       # след отбитых событий (старый ключ на сайте клиента) - строка в CH
       CH_HOST: clickhouse

@@ -340,18 +340,35 @@ def ingest_tg(tenant_id):
         return jsonify(error="forbidden"), 403
 
     upd = request.get_json(silent=True) or {}
-    ev = update_to_event(tenant_id, upd)
-    if ev is None:
-        return jsonify(status="ignored"), 200   # не-подписочные апдейты не интересны
+    ev, reply = update_to_event(tenant_id, upd)
+    if ev is not None:
+        errs = []
+        producer.produce(SAAS_TOPIC, key=str(ev.get("client_user_id") or tenant_id),
+                         value=json.dumps(ev),
+                         on_delivery=lambda err, _m: errs.append(str(err)) if err else None)
+        producer.flush(10)
+        if errs:   # Telegram ретраит любые не-2xx - доставка гарантируется
+            return jsonify(error="kafka delivery failed"), 503
+    if reply:
+        # молчание после Start - главная жалоба на такие флоу; ошибка ответа
+        # не ломает подписку (событие уже в шине) и не заставляет Telegram
+        # ретраить апдейт
+        _tg_reply(str(_tenant_conf(tenant_id).get("telegram_bot_token", "")),
+                  reply["chat_id"], reply["text"])
+    return jsonify(status="ok" if ev else "ignored"), 200
 
-    errs = []
-    producer.produce(SAAS_TOPIC, key=str(ev.get("client_user_id") or tenant_id),
-                     value=json.dumps(ev),
-                     on_delivery=lambda err, _m: errs.append(str(err)) if err else None)
-    producer.flush(10)
-    if errs:   # Telegram ретраит любые не-2xx - доставка гарантируется
-        return jsonify(error="kafka delivery failed"), 503
-    return jsonify(status="ok"), 200
+
+def _tg_reply(token, chat_id, text):
+    if not token:
+        return
+    try:
+        import urllib.request as _u
+        req = _u.Request(f"https://api.telegram.org/bot{token}/sendMessage",
+                         data=json.dumps({"chat_id": chat_id, "text": text}).encode(),
+                         headers={"Content-Type": "application/json"}, method="POST")
+        _u.urlopen(req, timeout=10).read()
+    except Exception as e:  # noqa: BLE001
+        print(f"[tg] ответ в чат {chat_id} не ушёл: {e}", flush=True)
 
 
 @app.get("/ingest/health")

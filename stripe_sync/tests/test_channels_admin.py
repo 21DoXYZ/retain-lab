@@ -85,38 +85,69 @@ def test_dns_rows_parse():
 
 # ── Telegram-вебхук -> contact_update ────────────────────────────────────────
 
-def test_tg_start_with_payload_binds_user():
-    ev = update_to_event("hub", {"update_id": 7, "message": {
+def test_tg_start_with_legacy_payload_binds_user_unverified():
+    """Голый uid от старого сниппета: принимаем, но помечаем verified=false -
+    contacts_sync привяжет его только к существующему юзеру."""
+    ev, reply = update_to_event("hub", {"update_id": 7, "message": {
         "chat": {"id": 555}, "date": 1754400000, "text": "/start u_18342"}})
     assert ev["event_type"] == "contact_update"
     assert ev["client_user_id"] == "u_18342"
     assert ev["event_id"] == "tg-hub-7"
     meta = json.loads(ev["meta"])
-    assert meta == {"channel": "telegram", "address": "555", "consent": True}
+    assert meta == {"channel": "telegram", "address": "555",
+                    "consent": True, "verified": False}
     assert ev["ts"] == "2025-08-05 13:20:00"
+    assert reply and "Connected" in reply["text"]
 
 
-def test_tg_start_without_payload_still_consents():
-    ev = update_to_event("hub", {"update_id": 8, "message": {
+def test_tg_start_with_signed_payload_is_verified():
+    import sys as _sys
+    from pathlib import Path as _P
+    _sys.path.insert(0, str(_P(__file__).resolve().parent.parent))
+    import tg_events
+    from telegram_connect import sign_payload
+    payload = sign_payload("hub", "u_18342", secret="k")
+    old = tg_events.UNSUB_SECRET
+    tg_events.UNSUB_SECRET = "k"
+    try:
+        ev, reply = update_to_event("hub", {"update_id": 12, "message": {
+            "chat": {"id": 555}, "date": 1754400000,
+            "text": f"/start {payload}"}})
+        assert ev["client_user_id"] == "u_18342"
+        assert json.loads(ev["meta"])["verified"] is True
+        # подделанная подпись не проходит и не привязывает никого
+        bad = payload[:-1] + ("0" if payload[-1] != "0" else "1")
+        ev2, reply2 = update_to_event("hub", {"update_id": 13, "message": {
+            "chat": {"id": 555}, "date": 1754400000, "text": f"/start {bad}"}})
+        assert ev2 is None and reply2 and "connect" in reply2["text"].lower()
+    finally:
+        tg_events.UNSUB_SECRET = old
+
+
+def test_tg_start_without_payload_gets_guidance_not_a_contact():
+    """Человек нашёл бота сам: связать не с кем, но молчать нельзя."""
+    ev, reply = update_to_event("hub", {"update_id": 8, "message": {
         "chat": {"id": 555}, "date": 1754400000, "text": "/start"}})
-    assert ev["client_user_id"] == "" and json.loads(ev["meta"])["consent"] is True
+    assert ev is None
+    assert reply and reply["chat_id"] == 555
 
 
 def test_tg_stop_and_block_revoke_consent():
-    ev = update_to_event("hub", {"update_id": 9, "message": {
+    ev, reply = update_to_event("hub", {"update_id": 9, "message": {
         "chat": {"id": 555}, "date": 1754400000, "text": "/stop"}})
     assert json.loads(ev["meta"])["consent"] is False
-    ev2 = update_to_event("hub", {"update_id": 10, "my_chat_member": {
+    assert reply and "/start" in reply["text"]
+    ev2, reply2 = update_to_event("hub", {"update_id": 10, "my_chat_member": {
         "chat": {"id": 555}, "date": 1754400000,
         "new_chat_member": {"status": "kicked"}}})
     assert json.loads(ev2["meta"])["consent"] is False
-    assert ev2["client_user_id"] == ""
+    assert ev2["client_user_id"] == "" and reply2 is None
 
 
 def test_tg_chatter_ignored():
     assert update_to_event("hub", {"update_id": 11, "message": {
-        "chat": {"id": 555}, "text": "когда видео будет готово?"}}) is None
-    assert update_to_event("hub", {}) is None
+        "chat": {"id": 555}, "text": "когда видео будет готово?"}}) == (None, None)
+    assert update_to_event("hub", {}) == (None, None)
 
 
 # ── contacts_sync: восстановление юзера по адресу для отписок ────────────────
