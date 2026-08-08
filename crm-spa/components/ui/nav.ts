@@ -180,9 +180,9 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "nav.group.core",
     items: [
       // SaaS-пресет: юзеры на user_actions (казино /players скрыт флагом)
-      { key: "users", href: "/users", emoji: "👥", label: "nav.players", roles: [...ANALYSTS, "finance"] },
+      { key: "users", href: "/users", emoji: "👥", label: "nav.players", roles: [...ANALYSTS, "finance", "support"] },
       // Инбокс личного WhatsApp (трек C): живой человек отвечает клиентам
-      { key: "wa-inbox", href: "/wa-inbox", emoji: "💬", label: "nav.waInbox", roles: [...ANALYSTS, "finance"] },
+      { key: "wa-inbox", href: "/wa-inbox", emoji: "💬", label: "nav.waInbox", roles: [...ANALYSTS, "finance", "support"] },
       { key: "players", href: "/players", emoji: "👥", label: "nav.players", roles: ["super_admin", "head_retention", "director", "head_department", "analyst", "finance", "marketing_manager", "affiliate_manager", "risk_officer", "support", "vip_manager", "viewer"] },
       { key: "desk", href: "/desk", emoji: "🎛", label: "nav.desk", roles: DESK },
       { key: "queue", href: "/queue", emoji: "📞", label: "nav.queue", roles: OPS },

@@ -30,3 +30,15 @@ export async function requireSegmentationRole(): Promise<CurrentUser> {
   if (!SEGMENTATION_ROLES.includes(me.role)) redirect("/");
   return me;
 }
+
+/**
+ * Экраны работы с клиентом (/users, /users/[id], /wa-inbox): те же роли, что
+ * в сегментации, ПЛЮС support - человек, нанятый только общаться с клиентами.
+ * Зеркалит Flask CLIENT_READ_ROLES (api/saas.py); жёсткая граница - JWT там.
+ */
+export async function requireClientWorkRole(): Promise<CurrentUser> {
+  const me = await getCurrentUser();
+  if (!me) redirect("/login");
+  if (!SEGMENTATION_ROLES.includes(me.role) && me.role !== "support") redirect("/");
+  return me;
+}

@@ -1,5 +1,5 @@
 /**
- * Revenue Autopilot site snippet (~1.5KB): события продукта → /ingest/saas/events.
+ * Revenue Autopilot site snippet (~7KB gzip): события продукта → /ingest/saas/events.
  *
  * Подключение (одна строка на сайте тенанта):
  *   <script src="https://cdn.../ra.js" data-endpoint="https://ingest.../ingest/saas/events"
@@ -15,8 +15,16 @@
  *   <a data-ra-telegram>Получать уведомления в Telegram</a>
  * Программно: ra.telegramLink() -> строка ссылки или "" (канал выключен).
  *
- * Автособытия: session_start (раз в 30 мин тишины), page_view для /pricing|/cancel.
- * В сеть уходит ТОЛЬКО sha256(email) — сырой email не покидает страницу.
+ * Автособытия: session_start (раз в 30 мин тишины; с контекстом: referrer,
+ * UTM, устройство, экран, язык, таймзона, скорость загрузки, first-touch),
+ * page_view (все страницы, вкл. SPA-переходы), page_leave (секунды на странице
+ * + глубина скролла), heartbeat (раз в 2 мин, только если юзер реально активен
+ * и вкладка видима - из него живёт last_seen и длительность сессий),
+ * js_error (первые 5 за сессию - баги продукта предсказывают отток),
+ * rage_click (3+ клика в одну точку за 0.7с - фрустрация). Разметка
+ * data-ra-event="имя" на любом элементе шлёт событие клика без кода.
+ * Приватность: НИКОГДА не собираем тексты, значения полей, заголовки страниц
+ * и сырой email - в сеть уходит только sha256(email) и техконтекст.
  */
 (function () {
   "use strict";
@@ -59,6 +67,73 @@
   }
 
   function iso(d) { return d.toISOString().slice(0, 23).replace("T", " "); }
+
+  // ── Максимум контекста, ноль PII: техпараметры среды и источника визита ──
+  var KF = "ra_ft";                      // first-touch: как человек ПРИШЁЛ впервые
+
+  function utmOf(search) {
+    var out = {};
+    var keys = ["utm_source", "utm_medium", "utm_campaign", "utm_term",
+                "utm_content", "gclid", "fbclid", "ref"];
+    try {
+      var q = new URLSearchParams(search || location.search);
+      for (var i = 0; i < keys.length; i++) {
+        var v = q.get(keys[i]);
+        if (v) out[keys[i]] = String(v).slice(0, 120);
+      }
+    } catch (_) {}
+    return out;
+  }
+
+  function deviceCtx() {
+    var d = {};
+    try {
+      d.lang = navigator.language || "";
+      d.tz = (Intl.DateTimeFormat().resolvedOptions() || {}).timeZone || "";
+      d.sw = screen.width; d.sh = screen.height;
+      d.vw = innerWidth; d.vh = innerHeight;
+      d.dpr = Math.round((window.devicePixelRatio || 1) * 100) / 100;
+      d.mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 1 : 0;
+      d.platform = (navigator.userAgentData && navigator.userAgentData.platform)
+        || navigator.platform || "";
+      var c = navigator.connection;
+      if (c && c.effectiveType) d.net = c.effectiveType;
+    } catch (_) {}
+    return d;
+  }
+
+  function loadMs() {
+    try {
+      var nav = performance.getEntriesByType("navigation")[0];
+      if (nav && nav.domContentLoadedEventEnd) return Math.round(nav.domContentLoadedEventEnd);
+    } catch (_) {}
+    return 0;
+  }
+
+  function firstTouch() {
+    var raw = get(KF);
+    if (raw) { try { return JSON.parse(raw); } catch (_) {} }
+    var ft = { ts: Date.now(), ref: (document.referrer || "").slice(0, 200),
+               page: location.pathname };
+    var utm = utmOf();
+    for (var k in utm) if (Object.prototype.hasOwnProperty.call(utm, k)) ft[k] = utm[k];
+    set(KF, JSON.stringify(ft));
+    return ft;
+  }
+
+  function sessionCtx() {
+    var m = deviceCtx();
+    m.ref = (document.referrer || "").slice(0, 200);
+    var utm = utmOf();
+    for (var k in utm) if (Object.prototype.hasOwnProperty.call(utm, k)) m[k] = utm[k];
+    m.load_ms = loadMs();
+    m.first = firstTouch();
+    return m;
+  }
+
+  function metaProps(obj) {
+    try { return { meta: JSON.stringify(obj) }; } catch (_) { return {}; }
+  }
 
   function uuid() {
     try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (_) {}
@@ -115,7 +190,7 @@
     }
     var sid = "s_" + now.toString(36) + Math.random().toString(36).slice(2, 8);
     set(KS, sid + "|" + now, "s");
-    setTimeout(function () { send("session_start"); }, 0);
+    setTimeout(function () { send("session_start", metaProps(sessionCtx())); }, 0);
     return sid;
   }
 
@@ -350,6 +425,110 @@
     },
   };
 
+  // ── Поведение: время на странице, активность, фрустрация, ошибки ─────────
+  var pageEnter = Date.now();
+  var maxScroll = 0;
+  var lastActivity = Date.now();
+  var leaveSent = false;
+
+  function scrollPct() {
+    try {
+      var doc = document.documentElement;
+      var total = doc.scrollHeight - innerHeight;
+      if (total <= 0) return 100;
+      return Math.min(100, Math.round((scrollY / total) * 100));
+    } catch (_) { return 0; }
+  }
+
+  function noteActivity() {
+    lastActivity = Date.now();
+    var p = scrollPct();
+    if (p > maxScroll) maxScroll = p;
+  }
+
+  ["scroll", "mousemove", "keydown", "touchstart", "click"].forEach(function (ev) {
+    addEventListener(ev, noteActivity, { passive: true, capture: true });
+  });
+
+  // Сколько секунд человек РЕАЛЬНО провёл на странице - главный сигнал
+  // вовлечённости. Шлём на уходе (закрытие, скрытие вкладки, SPA-переход).
+  function sendLeave() {
+    if (leaveSent) return;
+    var secs = Math.round((Date.now() - pageEnter) / 1000);
+    if (secs < 2) return;                  // мгновенный отскок не считаем уходом
+    leaveSent = true;
+    send("page_leave", metaProps({ seconds: secs, scroll_pct: maxScroll }));
+  }
+
+  function resetPage() {
+    pageEnter = Date.now();
+    maxScroll = scrollPct();
+    leaveSent = false;
+  }
+
+  addEventListener("pagehide", sendLeave);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") sendLeave();
+    else resetPage();                      // вернулся во вкладку - новый отсчёт
+  });
+
+  // Heartbeat раз в 2 минуты, только если вкладка видима и была активность:
+  // из него живут last_seen и честная длительность сессий. Фоновая вкладка
+  // молчит - «работал 8 часов» из открытой и забытой вкладки было бы враньём.
+  setInterval(function () {
+    try {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastActivity > 120000) return;
+      send("heartbeat", metaProps({ scroll_pct: maxScroll }));
+    } catch (_) {}
+  }, 120000);
+
+  // Ошибки JS продукта: баги -> фрустрация -> отток. Только техчасть
+  // (сообщение+файл), максимум 5 за сессию, чтобы цикл ошибок не заспамил шину.
+  var errBudget = 5;
+  addEventListener("error", function (ev) {
+    try {
+      if (errBudget <= 0 || !ev || !ev.message) return;
+      errBudget--;
+      send("js_error", metaProps({
+        message: String(ev.message).slice(0, 200),
+        src: String(ev.filename || "").slice(0, 200),
+        line: ev.lineno || 0,
+      }));
+    } catch (_) {}
+  });
+  addEventListener("unhandledrejection", function (ev) {
+    try {
+      if (errBudget <= 0) return;
+      errBudget--;
+      var r = ev && ev.reason;
+      send("js_error", metaProps({
+        message: String((r && r.message) || r || "unhandledrejection").slice(0, 200),
+      }));
+    } catch (_) {}
+  });
+
+  // Rage click: 3+ клика в одну точку за 0.7с - человек тычет в неработающий
+  // элемент. Сигнал фрустрации, который не поймать ни одной метрикой сервера.
+  var clicks = [];
+  addEventListener("click", function (ev) {
+    try {
+      var now = Date.now();
+      clicks.push({ t: now, x: ev.clientX, y: ev.clientY });
+      clicks = clicks.filter(function (c) { return now - c.t < 700; });
+      if (clicks.length >= 3) {
+        var f = clicks[0];
+        if (Math.abs(ev.clientX - f.x) < 30 && Math.abs(ev.clientY - f.y) < 30) {
+          clicks = [];
+          send("rage_click", metaProps({ x: ev.clientX, y: ev.clientY }));
+        }
+      }
+      // разметка data-ra-event="имя" шлёт событие клика без кода на стороне клиента
+      var el = ev.target && ev.target.closest && ev.target.closest("[data-ra-event]");
+      if (el && el.dataset.raEvent) send(String(el.dataset.raEvent).slice(0, 60));
+    } catch (_) {}
+  }, { capture: true, passive: true });
+
   // Одностраничные приложения меняют адрес без перезагрузки: без этого хука
   // переход на страницу тарифов внутри SPA не давал события, и «смотрел цены»
   // как сигнал не работал вообще.
@@ -357,6 +536,8 @@
     var last = location.pathname;
     function onRoute() {
       if (location.pathname === last) return;
+      sendLeave();                         // время на ПРЕДЫДУЩЕЙ странице
+      resetPage();
       last = location.pathname;
       send("page_view");
       if (cfg.pages.test(last)) send("paywall_viewed");

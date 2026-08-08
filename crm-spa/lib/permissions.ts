@@ -44,7 +44,7 @@ export function creatableRoles(actorRole: UserRole): UserRole[] {
         "viewer",
       ];
     case "head_retention":
-      return ["head_department", "operator", "vip_manager", "affiliate"];
+      return ["head_department", "operator", "vip_manager", "affiliate", "support"];
     case "head_department":
       return ["operator"];
     case "affiliate_manager":
@@ -110,6 +110,7 @@ export function roleHome(role: UserRole): string {
     case "affiliate":
       return "/affiliate";
     case "support":
+      return "/users"; // SaaS: работа с клиентами - юзеры и инбокс
     case "viewer":
       return "/players"; // список игроков (короткая/маскированная карточка)
     case "marketing_manager":

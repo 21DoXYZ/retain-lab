@@ -1,4 +1,4 @@
-import { requireSegmentationRole } from "@/components/segmentation/guard";
+import { requireClientWorkRole } from "@/components/segmentation/guard";
 import { UserCardView } from "@/components/saas/UserCardView";
 
 /**
@@ -13,7 +13,7 @@ export default async function SaasUserCardPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireSegmentationRole();
+  await requireClientWorkRole();
   const { id } = await params;
   return <UserCardView identity={decodeURIComponent(id)} />;
 }

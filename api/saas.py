@@ -34,6 +34,13 @@ LEAK_ROLES = ('super_admin', 'head_retention', 'director', 'analyst',
 # Права на запись настроек (каналы, онбординг, автопилот) - только владельцы.
 CHANNEL_WRITE_ROLES = ('super_admin', 'director', 'head_retention')
 
+# Роль «работа с клиентом»: support видит юзеров и переписку, пишет людям
+# (инбокс, ручные касания, контакты) - и НИЧЕГО больше: ни кампаний, ни
+# офферов, ни настроек, ни денег. Владелец нанимает человека под общение,
+# не открывая ему бизнес.
+CLIENT_READ_ROLES = LEAK_ROLES + ('support',)
+CLIENT_WRITE_ROLES = CHANNEL_WRITE_ROLES + ('support',)
+
 # Пространства по умолчанию НЕТ: тенант приходит из скоупа пользователя или
 # ?tenant=. Для платформенного пользователя дефолт = единственное заведённое
 # пространство (пока клиент один), иначе он обязан выбрать.
@@ -629,7 +636,7 @@ def saas_onboarding_offers_reviewed():
 
 
 @bp.get('/saas/users')
-@require_auth(roles=LEAK_ROLES)
+@require_auth(roles=CLIENT_READ_ROLES)
 def saas_users():
     """Список юзеров SaaS-контура: identity + стадия + действие + скоры.
     ?stage=DUNNING - фильтр; сортировка: ценность на кону, затем MRR."""
@@ -2055,7 +2062,7 @@ def wa_personal_disconnect():
 # единственный путь отправки в личный канал, и он требует живого человека.
 
 @bp.get('/saas/wa/chats')
-@require_auth(roles=LEAK_ROLES)
+@require_auth(roles=CLIENT_READ_ROLES)
 def wa_chats():
     tenant = _tenant_arg()
     rows = q(
@@ -2105,7 +2112,7 @@ def wa_chats():
 
 
 @bp.get('/saas/wa/messages')
-@require_auth(roles=LEAK_ROLES)
+@require_auth(roles=CLIENT_READ_ROLES)
 def wa_messages():
     tenant = _tenant_arg()
     chat = str(request.args.get('chat') or '').strip()
@@ -2124,7 +2131,7 @@ def wa_messages():
 
 
 @bp.post('/saas/wa/reply')
-@require_auth(roles=CHANNEL_WRITE_ROLES)
+@require_auth(roles=CLIENT_WRITE_ROLES)
 def wa_reply():
     tenant, _err = _tenant_arg_write()
     if _err:
@@ -2144,7 +2151,7 @@ def wa_reply():
 
 
 @bp.post('/saas/wa/start-chat')
-@require_auth(roles=CHANNEL_WRITE_ROLES)
+@require_auth(roles=CLIENT_WRITE_ROLES)
 def wa_start_chat():
     """Написать ПЕРВЫМ на новый номер - вручную, живым человеком.
 
@@ -2230,7 +2237,7 @@ def _autopilot_on(tenant: str) -> bool:
 
 
 @bp.get('/saas/user')
-@require_auth(roles=LEAK_ROLES)
+@require_auth(roles=CLIENT_READ_ROLES)
 def saas_user_card():
     tenant = _tenant_arg()
     ident = str(request.args.get('identity') or '').strip()
@@ -2313,6 +2320,7 @@ def saas_user_card():
         WHERE tenant_id = {t:String}
           AND ((client_user_id = {c:String} AND {c:String} != '')
                OR (stripe_customer_id = {s:String} AND {s:String} != ''))
+          AND event_type != 'heartbeat'  -- пульс кормит last_seen, читать нечего
         ORDER BY ts DESC LIMIT 30
         """, {'t': tenant, 'c': cuid, 's': scid})[1]] if (cuid or scid) else []
 
@@ -2330,12 +2338,17 @@ def saas_user_card():
             {'t': tenant, 'c': f'{wa_addr}@c.us', 'l': f'{wa_addr}@lid'})[1]
         wa_chat = str(hit[0][0]) if hit else ''
 
+    from flask import g
+    role = str((getattr(g, 'api_user', None) or {}).get('role') or '')
     return api_json({
         'tenant': tenant, 'user': user, 'contacts': contacts,
         'email_suppressed': email_suppressed, 'enrollments': enrollments,
         'touches': touches, 'offers': offers, 'events': events,
         'campaigns': _campaign_titles(tenant), 'wa_chat': wa_chat,
         'autopilot': _autopilot_on(tenant),
+        # что может ЭТА роль: support пишет людям, но кампании не трогает
+        'can_touch': role in CLIENT_WRITE_ROLES,
+        'can_enroll': role in CHANNEL_WRITE_ROLES,
     })
 
 
@@ -2344,7 +2357,7 @@ def _now_ch() -> str:
 
 
 @bp.post('/saas/user/contact')
-@require_auth(roles=CHANNEL_WRITE_ROLES)
+@require_auth(roles=CLIENT_WRITE_ROLES)
 def saas_user_contact():
     """Завести контакт руками. Галочка согласия в форме - утверждение
     владельца, что канал дал согласие; без неё касания не пойдут (no_consent),
@@ -2381,7 +2394,7 @@ def saas_user_contact():
 
 
 @bp.post('/saas/user/touch')
-@require_auth(roles=CHANNEL_WRITE_ROLES)
+@require_auth(roles=CLIENT_WRITE_ROLES)
 def saas_user_touch():
     """Ручное касание одному человеку. Решение живого человека, поэтому
     выключенный автопилот его не глушит; согласие и супрессии - обязательны."""

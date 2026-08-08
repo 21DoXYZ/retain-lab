@@ -45,6 +45,8 @@ interface CardData {
   campaigns: { id: string; title: string }[];
   wa_chat: string;
   autopilot: boolean;
+  can_touch: boolean;
+  can_enroll: boolean;
 }
 
 const STAGE_TONE: Record<string, string> = {
@@ -233,6 +235,7 @@ export function UserCardView({ identity }: { identity: string }) {
       <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
         {/* ── левая колонка: написать + история ── */}
         <div className="flex min-w-0 flex-col gap-5">
+          {data.can_touch ? (
           <section className="rounded-ctl border border-hair bg-surface p-4">
             <h2 className="text-[13.5px] font-semibold text-ink">{t("saas.ucard.send.title")}</h2>
             <p className="mt-1 text-[12.5px] leading-relaxed text-steel">{t("saas.ucard.send.lead")}</p>
@@ -266,6 +269,7 @@ export function UserCardView({ identity }: { identity: string }) {
               </div>
             )}
           </section>
+          ) : null}
 
           <section className="rounded-ctl border border-hair bg-surface p-4">
             <h2 className="text-[13.5px] font-semibold text-ink">{t("saas.ucard.touches.title")}</h2>
@@ -321,9 +325,11 @@ export function UserCardView({ identity }: { identity: string }) {
           <section className="rounded-ctl border border-hair bg-surface p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-[13.5px] font-semibold text-ink">{t("saas.ucard.contacts.title")}</h2>
+              {data.can_touch ? (
               <button onClick={() => { setAddOpen(!addOpen); setAddErr(""); }} className={btnGhost}>
                 {addOpen ? t("ui.cancel") : t("saas.ucard.contacts.add")}
               </button>
+              ) : null}
             </div>
 
             <ul className="mt-2 flex flex-col gap-1.5 text-[12.5px]">
@@ -409,7 +415,7 @@ export function UserCardView({ identity }: { identity: string }) {
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-2 text-[11.5px] text-steel">
                       <span>{t("saas.ucard.camp.step", { n: String(e.step_idx) })}</span>
-                      {e.status === "active" ? (
+                      {e.status === "active" && data.can_enroll ? (
                         <button onClick={() => enrollAction(e.campaign_id, "exit")}
                                 disabled={campBusy}
                                 className="font-medium text-neg hover:underline disabled:opacity-40">
@@ -422,7 +428,7 @@ export function UserCardView({ identity }: { identity: string }) {
               </ul>
             )}
 
-            {enrollable.length > 0 ? (
+            {enrollable.length > 0 && data.can_enroll ? (
               <div className="mt-3 flex flex-col gap-2">
                 <select value={enrollId} onChange={(e) => setEnrollId(e.target.value)} className={inputCls}>
                   <option value="">{t("saas.ucard.camp.pick")}</option>
