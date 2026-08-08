@@ -144,17 +144,22 @@ def inbox():
     # Ссылка подписки на бота тенанта - ПОДПИСАННАЯ и собранная здесь: голый
     # id в ссылке позволял бы увести чужие уведомления в свой чат. tg_bot
     # остаётся для старых сниппетов (они строят легаси-ссылку сами).
-    tg_bot, tg_link = '', ''
+    tg_bot, tg_link, wa_link = '', '', ''
     try:
         from stripe_sync.channels_admin import load_tenants
         from stripe_sync.telegram_connect import connect_url
-        tg_bot = str((load_tenants().get(tenant, {}) or {}).get('telegram_bot_username') or '')
+        from stripe_sync.wa_templates import connect_url as wa_connect_url
+        tc = load_tenants().get(tenant, {}) or {}
+        tg_bot = str(tc.get('telegram_bot_username') or '')
         if tg_bot:
             tg_link = connect_url(tg_bot, tenant, user)
+        if tc.get('wa_phone_display'):
+            wa_link = wa_connect_url(str(tc['wa_phone_display']), tenant, user)
     except Exception:  # noqa: BLE001 - канал не настроен: просто нет кнопки
-        tg_bot, tg_link = '', ''
+        tg_bot, tg_link, wa_link = '', '', ''
 
-    return api_json({'tg_bot': tg_bot, 'tg_link': tg_link, 'messages': [
+    return api_json({'tg_bot': tg_bot, 'tg_link': tg_link, 'wa_link': wa_link,
+                     'messages': [
         {'message_id': r[0], 'title': r[1], 'body': r[2],
          'cta_label': r[3], 'cta_url': r[4]} for r in rows]})
 
@@ -293,3 +298,123 @@ def resend_webhook():
 
     return api_json({'status': 'ok'})
 
+
+
+# ── WhatsApp Cloud API: вебхук per-tenant ────────────────────────────────────
+# GET - верификация подписки (hub.challenge) при настройке приложения;
+# POST - статусы доставки, входящие сообщения, статусы шаблонов. Подпись
+# X-Hub-Signature-256 app secret'ом ЭТОГО тенанта: чужой апдейт не пройдёт.
+
+def _wa_conf(tenant: str) -> dict:
+    try:
+        from stripe_sync.channels_admin import load_tenants
+        return load_tenants().get(str(tenant), {}) or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _wa_verify_token(tenant: str) -> str:
+    from stripe_sync.email_delivery import UNSUB_SECRET
+    return hmac.new(UNSUB_SECRET.encode(), f"wawh|{tenant}".encode(),
+                    __import__('hashlib').sha256).hexdigest()[:32]
+
+
+@bp.route('/wa/webhook/<tenant>', methods=['GET'])
+def wa_webhook_verify(tenant: str):
+    from flask import Response
+    if request.args.get('hub.mode') == 'subscribe' and hmac.compare_digest(
+            request.args.get('hub.verify_token', ''), _wa_verify_token(tenant)):
+        return Response(request.args.get('hub.challenge', ''), mimetype='text/plain')
+    return api_json(error='forbidden', code=403)
+
+
+@bp.post('/wa/webhook/<tenant>')
+def wa_webhook(tenant: str):
+    from stripe_sync.whatsapp_cloud import (SUPPRESS_ERROR_CODES, parse_webhook,
+                                            verify_signature)
+
+    tc = _wa_conf(tenant)
+    secret = str(tc.get('wa_app_secret') or '')
+    if not secret:
+        return api_json(error='not_connected', code=404)
+    if not verify_signature(secret, request.get_data(),
+                            request.headers.get('X-Hub-Signature-256', '')):
+        return api_json(error='forbidden', code=403)
+
+    parsed = parse_webhook(request.get_json(silent=True) or {})
+    from datetime import datetime, timezone
+    now = datetime.now(tz=timezone.utc)
+    ch = None
+
+    def _ch():
+        nonlocal ch
+        if ch is None:
+            ch = _ch_client()
+        return ch
+
+    # СТАТУСЫ ДОСТАВКИ - в шину: по wa-id сообщения касание находится в send
+    # log (detail успешной отправки). Ошибка 131050 = человек запретил бизнесу
+    # писать себе: гасим согласие немедленно, fail-closed.
+    rows = []
+    for st in parsed['statuses']:
+        rows.append([tenant, f"wa-st-{st['wa_msg_id']}-{st['status']}",
+                     'wa_status', now, '', '', '', 'whatsapp', '',
+                     json.dumps({'wa_msg_id': st['wa_msg_id'],
+                                 'status': st['status'],
+                                 'error_code': st['error_code']})])
+        if st['error_code'] in SUPPRESS_ERROR_CODES and st['recipient']:
+            uid_rows = _ch().query(
+                'SELECT client_user_id FROM retention.contacts_current '
+                'WHERE tenant_id = %(t)s AND channel = %(c)s AND address = %(a)s',
+                parameters={'t': tenant, 'c': 'whatsapp',
+                            'a': st['recipient']}).result_rows
+            if uid_rows:
+                _ch().insert('retention.contacts',
+                             [[tenant, uid_rows[0][0], 'whatsapp',
+                               st['recipient'], 0, now, now]],
+                             column_names=['tenant_id', 'client_user_id',
+                                           'channel', 'address', 'consent',
+                                           'consent_ts', 'updated_at'])
+    if rows:
+        _ch().insert('retention.saas_events', rows,
+                     column_names=['tenant_id', 'event_id', 'event_type', 'ts',
+                                   'client_user_id', 'email_hash', 'email',
+                                   'source', 'stripe_customer_id', 'meta'])
+
+    # ВХОДЯЩИЕ. Сообщение с нашим кодом привязки = номер + аккаунт + железный
+    # opt-in (человек написал первым) одним действием. Без кода - фиксируем
+    # событие (окно 24ч открыто), но контакт не создаём: привязывать не к кому.
+    from stripe_sync.wa_templates import parse_connect_text
+    for msg in parsed['inbound']:
+        uid = parse_connect_text(tenant, msg['text'])
+        _ch().insert('retention.saas_events',
+                     [[tenant, f"wa-in-{msg['wa_msg_id']}", 'wa_inbound', now,
+                       uid, '', '', 'whatsapp', '',
+                       json.dumps({'from': msg['from'], 'type': msg['type']})]],
+                     column_names=['tenant_id', 'event_id', 'event_type', 'ts',
+                                   'client_user_id', 'email_hash', 'email',
+                                   'source', 'stripe_customer_id', 'meta'])
+        if uid:
+            _ch().insert('retention.contacts',
+                         [[tenant, uid, 'whatsapp', msg['from'], 1, now, now]],
+                         column_names=['tenant_id', 'client_user_id', 'channel',
+                                       'address', 'consent', 'consent_ts',
+                                       'updated_at'])
+            print(f"[wa] {tenant}: connect uid={uid} from={msg['from']}", flush=True)
+
+    # СТАТУСЫ ШАБЛОНОВ - в реестр tenants.json: слать можно только APPROVED,
+    # и отправка узнаёт об одобрении отсюда, а не по таймеру.
+    if parsed['templates']:
+        from stripe_sync.channels_admin import update_tenant
+        registry = dict(tc.get('wa_templates') or {})
+        for tpl in parsed['templates']:
+            if tpl['name'] in registry:
+                registry[tpl['name']] = {**registry[tpl['name']],
+                                         'status': tpl['event'],
+                                         'reason': tpl['reason']}
+        update_tenant(tenant, {'wa_templates': registry})
+        print(f"[wa] {tenant}: шаблоны {[(t['name'], t['event']) for t in parsed['templates']]}",
+              flush=True)
+
+    # Meta ретраит не-2xx: наш ответ всегда ok
+    return api_json({'ok': True})

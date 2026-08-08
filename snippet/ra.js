@@ -252,6 +252,7 @@
   // сервер старее сниппета.
   var tgBot = "";
   var tgLink = "";
+  var waLink = "";
 
   function telegramLink() {
     if (tgLink) return tgLink;
@@ -259,7 +260,31 @@
     return (tgBot && uid) ? "https://t.me/" + tgBot + "?start=" + encodeURIComponent(uid) : "";
   }
 
+  function applyConnect(selector, href, evName) {
+    var els = document.querySelectorAll(selector);
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (!href) { el.style.display = "none"; continue; }
+      el.style.display = "";
+      if (el.tagName === "A") {
+        el.setAttribute("href", href);
+        el.setAttribute("target", "_blank");
+        el.setAttribute("rel", "noopener");
+      }
+      if (!el.dataset.raBound) {
+        el.dataset.raBound = "1";
+        (function (h, name) {
+          el.addEventListener("click", function () {
+            send(name);
+            if (this.tagName !== "A") window.open(h, "_blank", "noopener");
+          });
+        })(href, evName);
+      }
+    }
+  }
+
   function applyTelegram() {
+    applyConnect("[data-ra-whatsapp]", waLink, "whatsapp_connect_clicked");
     var els = document.querySelectorAll("[data-ra-telegram]");
     var href = telegramLink();
     for (var i = 0; i < els.length; i++) {
@@ -293,6 +318,7 @@
     }).then(function (r) { return r.json(); }).then(function (j) {
       tgBot = (j && j.data && j.data.tg_bot) || "";
       tgLink = (j && j.data && j.data.tg_link) || "";
+      waLink = (j && j.data && j.data.wa_link) || "";
       applyTelegram();
       var msgs = (j && j.data && j.data.messages) || [];
       var hidden = hiddenIds();

@@ -124,6 +124,12 @@ class MessagingConfig:
     viber_sender: str = ""
     viber_message_type: int = 106   # текстовый тип; сверить с аккаунтом DT
     telegram_bot_token: str = ""
+    # WhatsApp Cloud API - per-tenant (WABA клиента, наш конвейер)
+    wa_token: str = ""
+    wa_phone_number_id: str = ""
+    wa_lang: str = "en"
+    wa_tenant: str = ""
+    wa_templates: tuple = ()        # реестр (имя, статус, кампания, шаг, params)
 
     @classmethod
     def from_env(cls) -> "MessagingConfig":
@@ -231,14 +237,41 @@ def send_viber(phone: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
                       {"Authorization": f"Basic {cfg.decision_api_key}"})
 
 
-def send_whatsapp(phone: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
+def send_whatsapp(phone: str, text: str, cfg: MessagingConfig,
+                  ctx: dict | None = None) -> tuple[bool, str]:
+    """WhatsApp Cloud API, только одобренные шаблоны.
+
+    Вне 24-часового окна Meta принимает ТОЛЬКО шаблон, а кампании удержания
+    почти всегда пишут первыми - поэтому свободный текст здесь не шлётся
+    вовсе. Шаблон ищется в реестре тенанта по (кампания, шаг); без
+    одобренного шаблона касание отбивается с причиной, а не молчит.
+    """
     if not normalize_phone(phone):
         return False, "invalid_phone"
+    if not (cfg.wa_token and cfg.wa_phone_number_id):
+        return False, "whatsapp_not_configured"
+    try:                                # борд пакетом, джобы плоско
+        from wa_templates import pick_template
+        from whatsapp_cloud import send_template
+    except ImportError:
+        from stripe_sync.wa_templates import pick_template  # type: ignore
+        from stripe_sync.whatsapp_cloud import send_template  # type: ignore
+
+    context = ctx or {}
+    name, param_names = pick_template(
+        cfg.wa_templates, str(context.get("campaign_id") or ""),
+        int(context.get("step_idx") or -1))
+    if not name:
+        return False, "wa_template_not_approved"
+    params = [str(context.get(k) or "") for k in param_names]
+    if any(not v for v in params):
+        # пустая подстановка = битая ссылка в мессенджере человека
+        return False, "unresolved_placeholder"
     if cfg.dry_run:
-        print(f"[whatsapp dry_run] to={phone} text={text[:60]!r}", flush=True)
+        print(f"[whatsapp dry_run] to={phone} template={name}", flush=True)
         return True, "dry_run"
-    # WhatsApp Business требует онбординга номера/шаблонов у DT - включим после
-    return False, "whatsapp_requires_waba_onboarding"
+    return send_template(cfg.wa_token, cfg.wa_phone_number_id, phone,
+                         name, cfg.wa_lang, params)
 
 
 def send_telegram(chat_id: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
@@ -266,7 +299,7 @@ def route_message(channel: str, address: str, subject: str, body: str,
     if channel == "viber":
         return send_viber(address, text, msg_cfg)
     if channel == "whatsapp":
-        return send_whatsapp(address, text, msg_cfg)
+        return send_whatsapp(address, text, msg_cfg, ctx)
     if channel == "telegram":
         return send_telegram(address, text, msg_cfg)
     return False, f"unknown_channel:{channel}"
@@ -309,9 +342,20 @@ def tenant_configs(tenant_id: str, email_cfg: EmailConfig,
         email_cfg = replace(email_cfg, email_from=str(tc["email_from"]))
     msg_over = {}
     for src, dst in (("sms_sender", "sms_sender"), ("viber_sender", "viber_sender"),
-                     ("telegram_bot_token", "telegram_bot_token")):
+                     ("telegram_bot_token", "telegram_bot_token"),
+                     ("wa_token", "wa_token"),
+                     ("wa_phone_number_id", "wa_phone_number_id"),
+                     ("wa_lang", "wa_lang")):
         if tc.get(src):
             msg_over[dst] = str(tc[src])
+    if tc.get("wa_templates"):
+        # реестр в кортеж: dataclass заморожен, dict в него не положить
+        msg_over["wa_templates"] = tuple(
+            (str(name), str(info.get("status") or ""),
+             str(info.get("campaign_id") or ""), int(info.get("step_idx") or -1),
+             int(info.get("version") or 1), tuple(info.get("params") or ()))
+            for name, info in dict(tc["wa_templates"]).items())
+    msg_over["wa_tenant"] = tenant_id
     if msg_over:
         msg_cfg = replace(msg_cfg, **msg_over)
     return email_cfg, msg_cfg

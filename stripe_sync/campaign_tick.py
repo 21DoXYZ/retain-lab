@@ -273,15 +273,25 @@ def tick(client, tenant: str) -> dict[str, int]:
     _tch = load_tenant_channels(tenant)
     tenant_tz = str(_tch.get("timezone") or "UTC")
     tg_bot = str(_tch.get("telegram_bot_username") or "")
+    wa_phone = str(_tch.get("wa_phone_display") or "")
 
     def _user_ctx(cuid: str) -> dict:
-        """Плейсхолдеры, зависящие от КОНКРЕТНОГО человека. Ссылка подписки
-        подписана: голый id в ссылке позволял бы увести чужие уведомления."""
-        if not (tg_bot and cuid):
-            return {}
-        from telegram_connect import connect_url
-        url = connect_url(tg_bot, tenant, cuid)
-        return {"telegram_connect_url": url} if url else {}
+        """Плейсхолдеры, зависящие от КОНКРЕТНОГО человека. Ссылки подписки
+        подписаны: голый id в ссылке позволял бы увести чужие уведомления."""
+        out: dict = {}
+        if not cuid:
+            return out
+        if tg_bot:
+            from telegram_connect import connect_url as tg_url
+            url = tg_url(tg_bot, tenant, cuid)
+            if url:
+                out["telegram_connect_url"] = url
+        if wa_phone:
+            from wa_templates import connect_url as wa_url
+            url = wa_url(wa_phone, tenant, cuid)
+            if url:
+                out["whatsapp_connect_url"] = url
+        return out
     now = _now_dt()
     stats = {"enrolled": 0, "control": 0, "steps": 0, "done": 0, "exited": 0}
 
@@ -397,7 +407,25 @@ def tick(client, tenant: str) -> dict[str, int]:
                                 ok, detail = route_message(
                                     channel, address, step.get("subject", ""),
                                     step["body"], email_cfg, msg_cfg,
-                                    _user_ctx(cuid))
+                                    {**_user_ctx(cuid),
+                                     # whatsapp шлёт ШАБЛОН по (кампания, шаг),
+                                     # а не текст - ему нужен адрес шага
+                                     "campaign_id": cid, "step_idx": i,
+                                     "app_url": email_cfg.app_url,
+                                     "card_update_url": email_cfg.card_update_url})
+                                if not ok and channel == "whatsapp":
+                                    from whatsapp_cloud import should_suppress
+                                    if should_suppress(detail):
+                                        # человек запретил бизнесу писать себе:
+                                        # fail-closed, как email-супрессии
+                                        client.insert(
+                                            "retention.contacts",
+                                            [[tenant, cuid, "whatsapp", address,
+                                              0, now, now]],
+                                            column_names=[
+                                                "tenant_id", "client_user_id",
+                                                "channel", "address", "consent",
+                                                "consent_ts", "updated_at"])
                                 # Провайдер лёг или придушил лимитом - касание НЕ
                                 # отработано: шаг остаётся созревшим, следующий тик
                                 # повторит. Иначе письмо о несписании терялось бы

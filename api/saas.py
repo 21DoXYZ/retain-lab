@@ -896,7 +896,12 @@ def _default_tenant() -> str:
     env = _os.environ.get('TENANT_ID', '').strip()
     if env:
         return env
-    known = sorted(_known_tenants())
+    # Сервисные пространства (сквозные самопроверки платформы) не считаются:
+    # появление ra-selftest не должно отбирать дефолт у единственного живого
+    # клиента - иначе у супер-админа 400 на каждом экране.
+    conf = ca.load_tenants()
+    known = sorted(t for t in _known_tenants()
+                   if not (conf.get(t, {}) or {}).get('service'))
     return known[0] if len(known) == 1 else ''
 
 
@@ -997,10 +1002,40 @@ def _channels_payload(tenant: str) -> dict:
          'telegram': {'bot_username': bot_user,
                       'connect_link': f'https://t.me/{bot_user}?start=' if bot_user else ''},
          **cov.get('telegram', {'contacts': 0, 'consented': 0})},
-        {'channel': 'whatsapp', 'provider': 'DecisionTelecom', 'state': 'coming_soon',
-         'detail': '', **cov.get('whatsapp', {'contacts': 0, 'consented': 0})},
+        _wa_channel_row(tenant, tch, cov),
     ]
     return {'tenant': tenant, 'channels': channels}
+
+
+def _wa_channel_row(tenant: str, tch: dict, cov: dict) -> dict:
+    """Строка WhatsApp: Cloud API (WABA клиента), статусы шаблонов, вебхук."""
+    connected = bool(tch.get('wa_token') and tch.get('wa_phone_number_id'))
+    registry = dict(tch.get('wa_templates') or {})
+    import hashlib as _hl
+    import hmac as _hm
+    from stripe_sync.email_delivery import UNSUB_SECRET as _us
+    host = _os.environ.get('SAAS_HOST', 'retivo.digital')
+    return {
+        'channel': 'whatsapp', 'provider': 'Meta Cloud API',
+        'state': 'active' if connected else 'not_connected',
+        'detail': str(tch.get('wa_phone_display') or ''),
+        'whatsapp': {
+            'phone_display': str(tch.get('wa_phone_display') or ''),
+            'has_waba': bool(tch.get('wa_waba_id')),
+            'has_app_secret': bool(tch.get('wa_app_secret')),
+            'webhook_url': f'https://{host}/public/wa/webhook/{tenant}',
+            'webhook_verify_token': _hm.new(
+                _us.encode(), f'wawh|{tenant}'.encode(),
+                _hl.sha256).hexdigest()[:32] if connected else '',
+            'templates': [
+                {'name': name, 'status': str(info.get('status') or ''),
+                 'campaign_id': str(info.get('campaign_id') or ''),
+                 'step_idx': int(info.get('step_idx') or 0),
+                 'category': str(info.get('category') or ''),
+                 'reason': str(info.get('reason') or '')}
+                for name, info in sorted(registry.items())],
+        },
+        **cov.get('whatsapp', {'contacts': 0, 'consented': 0})}
 
 
 @bp.get('/saas/channels')
@@ -1841,3 +1876,103 @@ def channels_telegram():
     print(f'[channels] {tenant}: telegram @{username} подключён, вебхук установлен',
           flush=True)
     return api_json(_channels_payload(tenant))
+
+
+# ── WhatsApp Cloud API: подключение и шаблоны ────────────────────────────────
+# Модель как с Resend: WABA и номер КЛИЕНТА, шлём его токеном. В треке A
+# конфиг заводим мы (обслуживание руками), позже здесь появится Embedded
+# Signup - кнопка «Connect WhatsApp».
+
+@bp.post('/saas/channels/whatsapp')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def channels_whatsapp():
+    """Сохранить конфиг Cloud API тенанта. Пустой token = отключить.
+
+    Токен проверяется живым запросом к номеру: сохранить нерабочий конфиг -
+    значит узнать об этом в момент несписания у клиента."""
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    token = str(body.get('wa_token') or '').strip()
+    if not token:
+        ca.update_tenant(tenant, {'wa_token': None, 'wa_phone_number_id': None,
+                                  'wa_phone_display': None, 'wa_waba_id': None,
+                                  'wa_app_secret': None, 'wa_templates': None})
+        return api_json({'ok': True, 'connected': False})
+
+    phone_id = str(body.get('wa_phone_number_id') or '').strip()
+    if not phone_id:
+        return _bad('wa_phone_number_id_required')
+    from stripe_sync.whatsapp_cloud import probe_number
+    ok, detail = probe_number(token, phone_id)
+    if not ok:
+        return _bad(f'wa_probe_failed:{detail}')
+
+    ca.update_tenant(tenant, {
+        'wa_token': token, 'wa_phone_number_id': phone_id,
+        'wa_phone_display': str(body.get('wa_phone_display') or detail or ''),
+        'wa_waba_id': str(body.get('wa_waba_id') or '').strip() or None,
+        'wa_app_secret': str(body.get('wa_app_secret') or '').strip() or None,
+    })
+    from stripe_sync.email_delivery import UNSUB_SECRET as _us
+    import hashlib as _hl
+    import hmac as _hm
+    verify_token = _hm.new(_us.encode(), f'wawh|{tenant}'.encode(),
+                           _hl.sha256).hexdigest()[:32]
+    print(f'[channels] {tenant}: whatsapp подключён, номер {detail}', flush=True)
+    return api_json({'ok': True, 'connected': True, 'phone': detail,
+                     # для настройки вебхука в приложении Meta
+                     'webhook_url': f"https://{_os.environ.get('SAAS_HOST', 'retivo.digital')}"
+                                    f"/public/wa/webhook/{tenant}",
+                     'webhook_verify_token': verify_token})
+
+
+@bp.post('/saas/channels/whatsapp/templates')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def channels_whatsapp_templates():
+    """Собрать шаблоны из текстов кампаний и отправить на одобрение Meta.
+
+    Идемпотентно: уже поданные (есть в реестре) не пересоздаются. Статусы
+    одобрения приходят вебхуком; здесь всё уходит как PENDING."""
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    tc = ca.load_tenants().get(tenant, {}) or {}
+    token = str(tc.get('wa_token') or '')
+    waba = str(tc.get('wa_waba_id') or '')
+    if not token or not waba:
+        return _bad('whatsapp_not_connected')
+
+    from stripe_sync.wa_templates import build_from_step
+    from stripe_sync.whatsapp_cloud import create_template
+    conf = _campaigns_conf(tenant)
+    registry = dict(tc.get('wa_templates') or {})
+    submitted, skipped = [], []
+    for camp in conf.get('campaigns', []):
+        for i, step in enumerate(camp.get('steps', [])):
+            # whatsapp-шаблоны имеют смысл для текстовых шагов
+            if step.get('action') not in ('email', 'message'):
+                continue
+            payload, reason = build_from_step(tenant, camp['campaign_id'], i, step)
+            if payload is None:
+                skipped.append({'campaign': camp['campaign_id'], 'step': i,
+                                'reason': reason})
+                continue
+            if payload['name'] in registry:
+                continue                     # уже подан - статус ведёт вебхук
+            ok, detail = create_template(token, waba, payload['name'],
+                                         payload['category'], payload['body'])
+            if ok:
+                registry[payload['name']] = {
+                    'status': 'PENDING', 'campaign_id': camp['campaign_id'],
+                    'step_idx': i, 'version': 1,
+                    'params': payload['param_names'],
+                    'category': payload['category']}
+                submitted.append(payload['name'])
+            else:
+                skipped.append({'campaign': camp['campaign_id'], 'step': i,
+                                'reason': detail})
+    ca.update_tenant(tenant, {'wa_templates': registry})
+    return api_json({'submitted': submitted, 'skipped': skipped,
+                     'registry': registry})

@@ -34,6 +34,12 @@ interface ChannelRow {
     webhook_secret_set?: boolean; webhook_url?: string; dns_records: DnsRecord[];
   };
   telegram?: { bot_username: string; connect_link: string };
+  whatsapp?: {
+    phone_display: string; has_waba: boolean; has_app_secret: boolean;
+    webhook_url: string; webhook_verify_token: string;
+    templates: { name: string; status: string; campaign_id: string;
+                 step_idx: number; category: string; reason: string }[];
+  };
 }
 
 type Payload = { channels: ChannelRow[] };
@@ -471,9 +477,16 @@ function ChannelCard({
         </p>
       )}
 
-      {/* ── WhatsApp: после WABA-онбординга ── */}
+      {/* ── WhatsApp: Cloud API, WABA клиента ── */}
       {row.channel === "whatsapp" && (
-        <p className="text-[13px] text-steel">{t("saas.channels.wa.note")}</p>
+        <WhatsappBody
+          row={row}
+          onSaved={() => {
+            void flaskFetch<Payload>("/api/v1/saas/channels")
+              .then(refresh)
+              .catch(() => {});
+          }}
+        />
       )}
 
       {err && <p className="text-[13px] text-neg">{err}</p>}
@@ -482,6 +495,121 @@ function ChannelCard({
         {t("saas.channels.reach", { n: row.consented })}
       </div>
     </Card>
+  );
+}
+
+/**
+ * WhatsApp: официальный Cloud API, WABA и номер принадлежат КЛИЕНТУ.
+ * Подключение (трек A) делает оператор платформы в Business Manager клиента -
+ * форма здесь для него; владелец видит статус, шаблоны и способы сбора
+ * подписчиков. Тексты касаний шлются ТОЛЬКО одобренными шаблонами Meta.
+ */
+function WhatsappBody({ row, onSaved }: { row: ChannelRow; onSaved: () => void }) {
+  const t = useT();
+  const wa = row.whatsapp;
+  const [form, setForm] = useState({ wa_token: "", wa_phone_number_id: "",
+    wa_phone_display: "", wa_waba_id: "", wa_app_secret: "" });
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+
+  const post = (path: string, body: Record<string, unknown>, done: (d: unknown) => void) => {
+    setBusy(true);
+    setNote("");
+    flaskFetch(path, { method: "POST", body })
+      .then((d) => { done(d); onSaved(); })
+      .catch((e: unknown) => setNote(e instanceof Error ? e.message : t("saas.channels.err.generic")))
+      .finally(() => setBusy(false));
+  };
+
+  if (row.state !== "active") {
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="text-[13px] leading-relaxed text-steel">{t("saas.channels.wa.lead")}</p>
+        {([["wa_token", true], ["wa_phone_number_id", true], ["wa_phone_display", false],
+           ["wa_waba_id", false], ["wa_app_secret", false]] as const).map(([k]) => (
+          <input key={k} className={inputCls + " font-mono text-[12.5px]"}
+                 placeholder={t(`saas.channels.wa.${k}` as MessageKey)}
+                 value={form[k]}
+                 onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))} />
+        ))}
+        <div>
+          <Button variant="brand" size="sm" loading={busy}
+                  disabled={!form.wa_token.trim() || !form.wa_phone_number_id.trim()}
+                  onClick={() => post("/api/v1/saas/channels/whatsapp", { ...form },
+                                      () => setNote(""))}>
+            {t("saas.channels.wa.connect")}
+          </Button>
+        </div>
+        {note && <p className="text-[12.5px] text-neg">{note}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* вебхук: адрес и verify token для приложения Meta */}
+      {wa?.webhook_url && (
+        <div className="rounded-ctl border border-hair bg-surface p-3">
+          <div className="text-[12.5px] font-medium text-ink">{t("saas.channels.wa.webhook")}</div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-ctl border border-hair2 bg-canvas px-[11px] py-[7px] font-mono text-[12px] text-slate">{wa.webhook_url}</code>
+            <CopyButton text={wa.webhook_url} />
+          </div>
+          {wa.webhook_verify_token && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-ctl border border-hair2 bg-canvas px-[11px] py-[7px] font-mono text-[12px] text-slate">{wa.webhook_verify_token}</code>
+              <CopyButton text={wa.webhook_verify_token} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* шаблоны: только APPROVED реально шлётся */}
+      <div className="rounded-ctl border border-hair bg-surface p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[12.5px] font-medium text-ink">{t("saas.channels.wa.templates")}</div>
+          <Button variant="ghost" size="sm" loading={busy}
+                  disabled={!wa?.has_waba}
+                  onClick={() => post("/api/v1/saas/channels/whatsapp/templates", {},
+                                      () => setNote(t("saas.channels.wa.submitted")))}>
+            {t("saas.channels.wa.submit")}
+          </Button>
+        </div>
+        {!wa?.templates?.length && (
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-steel">
+            {t(wa?.has_waba ? "saas.channels.wa.noTemplates" : "saas.channels.wa.noWaba")}
+          </p>
+        )}
+        {(wa?.templates ?? []).map((tp) => (
+          <div key={tp.name} className="mt-1.5 flex items-center gap-2 text-[12px]">
+            <span className={"rounded-full border px-2 py-0.5 text-[10.5px] font-semibold " +
+              (tp.status === "APPROVED" ? "border-[#abefc6] bg-[#ecfdf3] text-pos"
+                : tp.status === "REJECTED" ? "border-[#fecdca] bg-[#fffbfa] text-neg"
+                : "border-[#fedf89] bg-[#fffaeb] text-[#b54708]")}>
+              {tp.status || "PENDING"}
+            </span>
+            <span className="font-mono text-slate">{tp.campaign_id} · {t("saas.camp.step")} {tp.step_idx + 1}</span>
+            <span className="text-steel">{tp.category}</span>
+            {tp.reason && <span className="text-neg">{tp.reason}</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* сбор подписчиков: человек пишет первым */}
+      <div className="rounded-ctl border border-hair bg-surface p-3">
+        <div className="text-[12.5px] font-medium text-ink">{t("saas.channels.wa.collect")}</div>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-steel">{t("saas.channels.wa.collectDesc")}</p>
+        <div className="mt-2 flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-ctl border border-hair2 bg-canvas px-[11px] py-[7px] font-mono text-[12px] text-slate">{"{{whatsapp_connect_url}}"}</code>
+          <CopyButton text="{{whatsapp_connect_url}}" />
+        </div>
+        <div className="mt-1.5 flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-ctl border border-hair2 bg-canvas px-[11px] py-[7px] font-mono text-[12px] text-slate">{'<a data-ra-whatsapp>Get updates on WhatsApp</a>'}</code>
+          <CopyButton text='<a data-ra-whatsapp>Get updates on WhatsApp</a>' />
+        </div>
+      </div>
+      {note && <p className="text-[12.5px] text-slate">{note}</p>}
+    </div>
   );
 }
 
