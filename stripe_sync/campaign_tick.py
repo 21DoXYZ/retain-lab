@@ -165,16 +165,35 @@ def _retry_count(client, tenant: str, campaign_id: str, identity: str,
     return int(rows[0][0]) if rows else 0
 
 
+def _safe_cta(url: str) -> str:
+    """Ссылка кнопки баннера: https/относительная, никаких javascript: и
+    сырых плейсхолдеров. Пустая строка = кнопки не будет - это лучше кнопки,
+    ведущей в '{{app_url}}' или исполняющей код на сайте клиента."""
+    url = str(url or "").strip()
+    if not url or "{{" in url:
+        return ""
+    low = url.lower()
+    if low.startswith(("https://", "http://")) or url.startswith("/"):
+        return url
+    return ""
+
+
 def inapp_row(tenant: str, camp: dict, step: dict, step_idx: int, identity: str,
               cuid: str, now: datetime, ctx: dict) -> list:
     """Строка inapp_inbox для показа виджетом. message_id детерминированный -
-    повторный тик по тому же шагу схлопнется Replacing'ом, не задвоив баннер."""
+    повторный тик по тому же шагу схлопнется Replacing'ом, не задвоив баннер.
+
+    Тексты чистятся от сырых плейсхолдеров: баннер с «{{telegram_connect_url}}»
+    в теле - артефакт шаблона на экране живого человека."""
     ttl = timedelta(days=float(step.get("ttl_days", 7)))
+    import re as _re
+    strip = lambda t: _re.sub(r"\{\{\w+\}\}", "", t).strip()  # noqa: E731
     return [tenant, f"{camp['campaign_id']}:{step_idx}:{identity}", cuid, identity,
             camp["campaign_id"], step_idx,
-            render(step.get("subject", ""), ctx), render(step["body"], ctx),
-            render(step.get("cta_label", "Open"), ctx),
-            render(step.get("cta_url", "{{app_url}}"), ctx),
+            strip(render(step.get("subject", ""), ctx)),
+            strip(render(step["body"], ctx)),
+            strip(render(step.get("cta_label", "Open"), ctx)) or "Open",
+            _safe_cta(render(step.get("cta_url", "{{app_url}}"), ctx)),
             camp["entry_stage"], now + ttl, now]
 
 
@@ -249,8 +268,20 @@ def tick(client, tenant: str) -> dict[str, int]:
     # исполнитель бонусов = вебхук клиента из опросника (tenants.json)
     from executors import tenant_exec_config
     exec_cfg = tenant_exec_config(tenant, exec_cfg)
-    # часовой пояс аудитории тенанта - для тихих часов
-    tenant_tz = str(load_tenant_channels(tenant).get("timezone") or "UTC")
+    # часовой пояс аудитории тенанта - для тихих часов; бот - для ссылок
+    # подписки {{telegram_connect_url}} в письмах и баннерах
+    _tch = load_tenant_channels(tenant)
+    tenant_tz = str(_tch.get("timezone") or "UTC")
+    tg_bot = str(_tch.get("telegram_bot_username") or "")
+
+    def _user_ctx(cuid: str) -> dict:
+        """Плейсхолдеры, зависящие от КОНКРЕТНОГО человека. Ссылка подписки
+        подписана: голый id в ссылке позволял бы увести чужие уведомления."""
+        if not (tg_bot and cuid):
+            return {}
+        from telegram_connect import connect_url
+        url = connect_url(tg_bot, tenant, cuid)
+        return {"telegram_connect_url": url} if url else {}
     now = _now_dt()
     stats = {"enrolled": 0, "control": 0, "steps": 0, "done": 0, "exited": 0}
 
@@ -365,7 +396,8 @@ def tick(client, tenant: str) -> dict[str, int]:
                                 touches[identity] = (day + 1, week + 1)
                                 ok, detail = route_message(
                                     channel, address, step.get("subject", ""),
-                                    step["body"], email_cfg, msg_cfg)
+                                    step["body"], email_cfg, msg_cfg,
+                                    _user_ctx(cuid))
                                 # Провайдер лёг или придушил лимитом - касание НЕ
                                 # отработано: шаг остаётся созревшим, следующий тик
                                 # повторит. Иначе письмо о несписании терялось бы
@@ -396,7 +428,8 @@ def tick(client, tenant: str) -> dict[str, int]:
                                           step.get("subject", ""), "dry_run", "")
                             else:
                                 ctx = {"app_url": email_cfg.app_url,
-                                       "card_update_url": email_cfg.card_update_url}
+                                       "card_update_url": email_cfg.card_update_url,
+                                       **_user_ctx(cuid)}
                                 client.insert(
                                     "retention.inapp_inbox",
                                     [inapp_row(tenant, camp, step, i, identity,

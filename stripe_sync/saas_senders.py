@@ -2,8 +2,9 @@
 
 DRY_RUN (SIGNALS_DRY_RUN=1 по умолчанию): письмо печатается, в сеть не уходит.
 Реальный режим: RESEND_API_KEY + EMAIL_FROM (домен с DKIM/SPF — warm-up по
-плану Phase 4). Плейсхолдеры {{...}} рендерятся из контекста; неизвестные
-остаются как есть (видно в логе, что не хватает).
+плану Phase 4). Плейсхолдеры {{...}} рендерятся из контекста; касание с
+НЕРАЗРЕШЁННЫМ плейсхолдером отклоняется (unresolved_placeholder) - артефакт
+шаблона живому человеку не отправляется ни в каком режиме.
 """
 
 from __future__ import annotations
@@ -52,11 +53,25 @@ def render(template: str, ctx: dict) -> str:
                   lambda m: str(ctx.get(m.group(1), m.group(0))), template)
 
 
+def unresolved(text: str) -> bool:
+    """Остались ли в тексте сырые плейсхолдеры после рендера.
+
+    «Reply to {{telegram_connect_url}}» с фигурными скобками в письме - это
+    артефакт шаблона, показанный живому человеку: бот не подключён или в
+    тексте опечатка. Такое касание честнее не отправить и сказать почему,
+    чем отправить мусор.
+    """
+    return bool(re.search(r"\{\{\w+\}\}", text or ""))
+
+
 def send_email(to: str, subject: str, body: str, cfg: EmailConfig,
                ctx: dict | None = None) -> tuple[bool, str]:
     context = {"app_url": cfg.app_url, "card_update_url": cfg.card_update_url}
     context.update(ctx or {})
     subject_r, body_r = render(subject, context), render(body, context)
+    if unresolved(subject_r) or unresolved(body_r):
+        # артефакт шаблона живому человеку не отправляем ни в каком режиме
+        return False, "unresolved_placeholder"
 
     if cfg.dry_run:
         print(f"[email dry_run] to={to} subj={subject_r!r}", flush=True)
@@ -244,6 +259,8 @@ def route_message(channel: str, address: str, subject: str, body: str,
         return send_email(address, subject, body, email_cfg, ctx)
     text = render(body, {"app_url": email_cfg.app_url,
                          "card_update_url": email_cfg.card_update_url, **(ctx or {})})
+    if unresolved(text):
+        return False, "unresolved_placeholder"
     if channel == "sms":
         return send_sms(address, text, msg_cfg)
     if channel == "viber":

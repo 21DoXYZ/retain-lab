@@ -29,31 +29,44 @@ from player_board import q
 bp = Blueprint('api_public', __name__, url_prefix='/public')
 
 TOKENS_FILE = os.environ.get('TOKENS_FILE', '/secrets/tokens.json')
-_tok_cache = {'mtime': 0.0, 'tokens': set()}
+_tok_cache = {'mtime': 0.0, 'map': {}}
 
 
-def _valid_tokens() -> set[str]:
-    """Как у ingest: tokens.json (dict или list) с hot-reload, фолбэк env."""
-    env = {t.strip() for t in os.environ.get('INGEST_TOKEN', '').split(',') if t.strip()}
+def _token_map() -> dict:
+    """{токен: tenant_id} из tokens.json (hot-reload), как у ingest.
+
+    КЛЮЧ ФАЙЛА = ID ТЕНАНТА: токен привязан к своему пространству. Инбокс
+    отдаёт тексты баннеров и ссылку подписки на бота - токен ОДНОГО клиента
+    не имеет права читать их у другого. Платформенный INGEST_TOKEN из env
+    остаётся всетенантным фолбэком ('' = любой тенант).
+    """
+    env = {t.strip(): '' for t in os.environ.get('INGEST_TOKEN', '').split(',')
+           if t.strip()}
     try:
         mt = os.path.getmtime(TOKENS_FILE)
         if mt != _tok_cache['mtime']:
             with open(TOKENS_FILE) as fh:
                 data = json.load(fh)
-            vals = data.values() if isinstance(data, dict) else data
-            _tok_cache['tokens'] = {str(v) for v in vals if v}
+            if isinstance(data, dict):
+                _tok_cache['map'] = {str(v): str(k) for k, v in data.items() if v}
+            else:                        # старый формат-список: без привязки
+                _tok_cache['map'] = {str(v): '' for v in data if v}
             _tok_cache['mtime'] = mt
-        return _tok_cache['tokens'] or env
+        return {**env, **_tok_cache['map']} if _tok_cache['map'] else env
     except Exception:
-        return _tok_cache['tokens'] or env
+        return {**env, **_tok_cache['map']} if _tok_cache['map'] else env
 
 
-def _token_ok() -> bool:
+def _token_ok(tenant: str = '') -> bool:
+    """Токен валиден И принадлежит запрошенному тенанту (или всетенантный)."""
     h = request.headers.get('Authorization', '')
     if not h.startswith('Bearer '):
         return False
     got = h[7:]
-    return any(hmac.compare_digest(got, t) for t in _valid_tokens())
+    for tok, own in _token_map().items():
+        if hmac.compare_digest(got, tok):
+            return not own or not tenant or own == tenant
+    return False
 
 
 def _cors(resp):
@@ -101,9 +114,9 @@ def inbox():
     ip = request.headers.get('X-Real-Client-IP', request.remote_addr or '')
     if not _rate_ok(f"{ip}|{request.args.get('user', '')}"):
         return api_json(None, 429, 'rate_limited')
-    if not _token_ok():
-        return api_json(None, 401, 'unauthorized')
     tenant = (request.args.get('tenant') or '').strip()
+    if not _token_ok(tenant):
+        return api_json(None, 401, 'unauthorized')
     user = (request.args.get('user') or '').strip()
     if not tenant or not user:
         return api_json(None, 400, 'tenant_and_user_required')
@@ -128,15 +141,20 @@ def inbox():
         """,
         {'t': tenant, 'u': user})[1]
 
-    # username бота тенанта (публичен) - из него сниппет строит ссылку подписки
-    # с id ЭТОГО юзера: без id мы не поймём, чей это чат
+    # Ссылка подписки на бота тенанта - ПОДПИСАННАЯ и собранная здесь: голый
+    # id в ссылке позволял бы увести чужие уведомления в свой чат. tg_bot
+    # остаётся для старых сниппетов (они строят легаси-ссылку сами).
+    tg_bot, tg_link = '', ''
     try:
         from stripe_sync.channels_admin import load_tenants
+        from stripe_sync.telegram_connect import connect_url
         tg_bot = str((load_tenants().get(tenant, {}) or {}).get('telegram_bot_username') or '')
+        if tg_bot:
+            tg_link = connect_url(tg_bot, tenant, user)
     except Exception:  # noqa: BLE001 - канал не настроен: просто нет кнопки
-        tg_bot = ''
+        tg_bot, tg_link = '', ''
 
-    return api_json({'tg_bot': tg_bot, 'messages': [
+    return api_json({'tg_bot': tg_bot, 'tg_link': tg_link, 'messages': [
         {'message_id': r[0], 'title': r[1], 'body': r[2],
          'cta_label': r[3], 'cta_url': r[4]} for r in rows]})
 
@@ -274,3 +292,4 @@ def resend_webhook():
         print(f"[resend] {tenant}: {ev['address']} -> {ev['suppress_reason']}", flush=True)
 
     return api_json({'status': 'ok'})
+

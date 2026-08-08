@@ -510,3 +510,52 @@ def test_override_migration_drops_what_no_longer_fits():
     old = {"1": {"offer_id": "X"}}
     new, notes = remap_campaign("K5_upgrade", steps, old)
     assert new == {} and any("отброшена" in n for n in notes)
+
+
+# ── In-app: чистота того, что видит человек ──────────────────────────────────
+
+def test_banner_never_shows_raw_placeholders():
+    """«{{telegram_connect_url}}» в теле баннера - артефакт шаблона на экране
+    живого человека. Сырые плейсхолдеры вычищаются, битая ссылка - без кнопки."""
+    from datetime import datetime
+    from campaign_tick import inapp_row
+    camp = {"campaign_id": "K1_activation", "entry_stage": "ACTIVATE"}
+    step = {"subject": "Connect {{telegram_connect_url}}",
+            "body": "Get updates: {{telegram_connect_url}}",
+            "cta_label": "Open", "cta_url": "{{telegram_connect_url}}"}
+    row = inapp_row("t", camp, step, 0, "id1", "u1",
+                    datetime(2026, 8, 7, 12, 0), {"app_url": "https://a.io"})
+    subject, body, cta_label, cta_url = row[6], row[7], row[8], row[9]
+    assert "{{" not in subject and "{{" not in body
+    assert cta_url == ""                      # кнопки нет - лучше, чем битая
+
+
+def test_banner_cta_rejects_javascript_urls():
+    """Кнопка баннера живёт на САЙТЕ КЛИЕНТА: javascript:-ссылка из текста
+    кампании исполнила бы код у него на странице."""
+    from campaign_tick import _safe_cta
+    assert _safe_cta("javascript:alert(1)") == ""
+    assert _safe_cta("data:text/html,x") == ""
+    assert _safe_cta("https://app.io/upgrade") == "https://app.io/upgrade"
+    assert _safe_cta("/billing") == "/billing"
+    assert _safe_cta("") == ""
+
+
+def test_a_touch_with_an_unresolved_placeholder_is_not_sent():
+    """Письмо с «{{telegram_connect_url}}» скобками - мусор в ящике человека.
+
+    Отклоняется в любом режиме, включая dry-run: иначе проблему видно только
+    после включения автопилота.
+    """
+    from saas_senders import EmailConfig, MessagingConfig, route_message, send_email
+    cfg = EmailConfig(dry_run=True, app_url="https://a.io")
+    ok, detail = send_email("u@x.io", "Hi", "Join: {{telegram_connect_url}}", cfg)
+    assert not ok and detail == "unresolved_placeholder"
+    # заполненный контекст - отправляется
+    ok, _ = send_email("u@x.io", "Hi", "Join: {{telegram_connect_url}}", cfg,
+                       {"telegram_connect_url": "https://t.me/x?start=s"})
+    assert ok
+    # то же для не-email каналов
+    ok, detail = route_message("telegram", "5", "s", "Go {{nope}}",
+                               cfg, MessagingConfig(dry_run=True))
+    assert not ok and detail == "unresolved_placeholder"

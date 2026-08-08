@@ -146,6 +146,17 @@
   // Показ/клик/закрытие уходят событиями inapp_shown/clicked/dismissed - по ним
   // сервер гасит баннер навсегда; localStorage прячет его мгновенно.
   var KD = "ra_inapp_hidden";
+  var shownThisSession = {};
+
+  // Кнопка баннера не имеет права исполнять код на сайте клиента и вести в
+  // сырой плейсхолдер. Сервер уже чистит - это второй рубеж для старых данных.
+  function safeUrl(u) {
+    u = String(u || "");
+    if (!u || u.indexOf("{{") >= 0) return "";
+    var low = u.toLowerCase();
+    if (low.indexOf("https://") === 0 || low.indexOf("http://") === 0 || u.charAt(0) === "/") return u;
+    return "";
+  }
 
   function inboxBase() {
     if (w.inbox_base) return w.inbox_base;
@@ -191,9 +202,10 @@
     p.style.cssText = "opacity:.85";
     text.appendChild(p);
     bar.appendChild(text);
-    if (msg.cta_url) {
+    var cta = safeUrl(msg.cta_url);
+    if (cta) {
       var a = document.createElement("a");
-      a.href = msg.cta_url;
+      a.href = cta;
       a.textContent = msg.cta_label || "Open";
       a.style.cssText =
         "flex:none;background:#fff;color:#101828;border-radius:100px;padding:8px 16px;" +
@@ -211,23 +223,38 @@
     x.style.cssText =
       "flex:none;background:none;border:0;color:#fff;opacity:.6;font-size:22px;" +
       "line-height:1;cursor:pointer;padding:4px";
-    x.addEventListener("click", function () {
+    function dismiss() {
       send("inapp_dismissed", { meta: JSON.stringify({ message_id: msg.message_id }) });
       hideId(msg.message_id);
+      document.removeEventListener("keydown", onKey);
       bar.remove();
-    });
+    }
+    // Escape закрывает баннер с клавиатуры - тот же контракт, что у крестика
+    function onKey(ev) { if (ev.key === "Escape") dismiss(); }
+    x.addEventListener("click", dismiss);
+    document.addEventListener("keydown", onKey);
     bar.appendChild(x);
     document.body.appendChild(bar);
     if (!reduced) requestAnimationFrame(function () {
       requestAnimationFrame(function () { bar.style.transform = "translateY(0)"; });
     });
-    send("inapp_shown", { meta: JSON.stringify({ message_id: msg.message_id }) });
+    // показ считаем раз в сессию, а не на каждой странице: иначе у активного
+    // юзера метрика показов раздувается в десятки раз
+    if (!shownThisSession[msg.message_id]) {
+      shownThisSession[msg.message_id] = 1;
+      send("inapp_shown", { meta: JSON.stringify({ message_id: msg.message_id }) });
+    }
   }
 
   // ── Подписка на телеграм-бота тенанта ──────────────────────────────────
+  // Сервер отдаёт ГОТОВУЮ подписанную ссылку (tg_link): голый id в ссылке
+  // позволял бы увести чужие уведомления. tgBot - фолбэк для случая, когда
+  // сервер старее сниппета.
   var tgBot = "";
+  var tgLink = "";
 
   function telegramLink() {
+    if (tgLink) return tgLink;
     var uid = get(K);
     return (tgBot && uid) ? "https://t.me/" + tgBot + "?start=" + encodeURIComponent(uid) : "";
   }
@@ -265,6 +292,7 @@
       headers: { Authorization: "Bearer " + cfg.token },
     }).then(function (r) { return r.json(); }).then(function (j) {
       tgBot = (j && j.data && j.data.tg_bot) || "";
+      tgLink = (j && j.data && j.data.tg_link) || "";
       applyTelegram();
       var msgs = (j && j.data && j.data.messages) || [];
       var hidden = hiddenIds();
@@ -331,6 +359,12 @@
     } else {
       checkInbox();
     }
+    // Долгоживущая SPA-вкладка без перезагрузок иначе никогда не увидит новый
+    // баннер (несписание случается ПОСЛЕ загрузки страницы). Раз в 5 минут -
+    // дёшево и укладывается в rate-limit инбокса.
+    setInterval(function () {
+      try { if (!document.getElementById("ra-inapp")) checkInbox(); } catch (_) {}
+    }, 5 * 60 * 1000);
   } catch (err) {
     warn("init: " + err);      // сайт клиента продолжает работать в любом случае
   }
