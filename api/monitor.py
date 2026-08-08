@@ -592,6 +592,23 @@ def _keys_payload() -> dict:
         # на экране Get started), env остаётся фолбэком платформы.
         _tenant = _first_tenant()
         _tc = _tenant_conf(_tenant)
+        # Тот же ГОТОВЫЙ код вставки, что на Get started: два экрана с разными
+        # сниппетами (там живой токен, тут <token>) читались как два разных
+        # продукта. Токен сниппета публичный (write-key в открытом HTML).
+        from .saas import _snippet_token
+        _tok = _snippet_token(_tenant)
+        if _tenant and _tok:
+            out['ingest']['example_curl'] = (
+                f'<script src="https://{_SAAS_HOST}/snippet/ra.js"\n'
+                f'        data-endpoint="https://{_SAAS_HOST}/ingest/saas/events"\n'
+                f'        data-token="{_tok}" data-tenant="{_tenant}"></script>\n'
+                '\n'
+                f'curl -X POST https://{_SAAS_HOST}/ingest/saas/events \\\n'
+                f'  -H "Authorization: Bearer {_tok}" -H "Content-Type: application/json" \\\n'
+                '  -d \'{"event_id":"...","tenant_id":"' + _tenant +
+                '","event_type":"generation_completed",'
+                '"ts":"2026-08-05 12:00:00.000","client_user_id":"u_18342","tokens_spent":12}\''
+            )
         out['stripe'] = {
             'webhook_url': (f'https://{_SAAS_HOST}/stripe/webhook/{_tenant}'
                             if _tenant else ''),
@@ -613,6 +630,9 @@ def _first_tenant() -> str:
     try:
         with open(_os.environ.get('TOKENS_FILE', '/secrets/tokens.json')) as fh:
             keys = [k for k in _json.load(fh) if not k.startswith('_')]
+        # служебные пространства (ra-selftest) - не клиенты: их сниппет
+        # на этом экране показывать нельзя
+        keys = [k for k in keys if not _tenant_conf(k).get('service')]
         return sorted(keys)[0] if keys else ''
     except Exception:  # noqa: BLE001
         return ''
