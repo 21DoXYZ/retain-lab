@@ -601,7 +601,10 @@ def _keys_payload() -> dict:
             out['ingest']['example_curl'] = (
                 f'<script src="https://{_SAAS_HOST}/snippet/ra.js"\n'
                 f'        data-endpoint="https://{_SAAS_HOST}/ingest/saas/events"\n'
-                f'        data-token="{_tok}" data-tenant="{_tenant}"></script>\n'
+                f'        data-token="{_tok}" data-tenant="{_tenant}"\n'
+                f'        data-user-id="USER_ID" data-user-email="USER_EMAIL"></script>\n'
+                '<!-- USER_ID/USER_EMAIL: подставьте залогиненного юзера серверным\n'
+                '     шаблоном; либо из кода после логина: ra.identify("u_123","a@b.com") -->\n'
                 '\n'
                 f'curl -X POST https://{_SAAS_HOST}/ingest/saas/events \\\n'
                 f'  -H "Authorization: Bearer {_tok}" -H "Content-Type: application/json" \\\n'

@@ -329,10 +329,14 @@ def saas_onboarding():
     host = _os.environ.get('SAAS_HOST', '').strip()
     token = _snippet_token(tenant)
 
+    # Тег с ДЕКЛАРАТИВНОЙ привязкой юзера: серверный шаблон клиента подставит
+    # data-user-id/email залогиненного - события сразу крепятся к юзеру, без
+    # ручного ra.identify. Плейсхолдеры USER_ID/USER_EMAIL клиент заменит.
     snippet_html = (
         f'<script src="https://{host}/snippet/ra.js"\n'
         f'        data-endpoint="https://{host}/ingest/saas/events"\n'
-        f'        data-token="{token}" data-tenant="{tenant}"></script>'
+        f'        data-token="{token}" data-tenant="{tenant}"\n'
+        f'        data-user-id="USER_ID" data-user-email="USER_EMAIL"></script>'
     ) if host and token else ''
 
     live_customers = int(q(

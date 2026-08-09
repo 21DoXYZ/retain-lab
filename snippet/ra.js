@@ -6,7 +6,12 @@
  *           data-token="TENANT_INGEST_TOKEN" data-tenant="hubcontent"></script>
  *
  * Затем из продукта:
- *   ra.identify(userId, email)          // после логина; email хэшируется локально (sha256)
+ * ПРИВЯЗКА К ЮЗЕРУ (иначе события анонимны и не крепятся к человеку). Два пути:
+ *   1) декларативно в теге - серверный шаблон подставит логин:
+ *      data-user-id="{{user.id}}" data-user-email="{{user.email}}"
+ *   2) из кода приложения ПОСЛЕ логина:
+ *      ra.identify("user_12345", "user@example.com")
+ *   email хэшируется локально (sha256), сырой адрес страницу не покидает.
  *   ra.track('generation_completed', {tokens_spent: 12})
  *
  * Подписка на телеграм-бота: поставьте в разметку ЛЮБОЙ элемент с атрибутом
@@ -53,6 +58,12 @@
     endpoint: (s.dataset && s.dataset.endpoint) || w.endpoint || "",
     token: (s.dataset && s.dataset.token) || w.token || "",
     tenant: (s.dataset && s.dataset.tenant) || w.tenant || "",
+    // Декларативная привязка: залогиненного юзера можно отдать прямо в теге
+    // (серверный шаблон подставит) - тогда ra.identify() руками звать не надо.
+    //   data-user-id="{{user.id}}" data-user-email="{{user.email}}"
+    // или window.RA_CONFIG = { user_id, user_email }.
+    userId: (s.dataset && s.dataset.userId) || w.user_id || "",
+    userEmail: (s.dataset && s.dataset.userEmail) || w.user_email || "",
     // страницы, которые важны сами по себе (их помечаем отдельным типом)
     pages: /\/(pricing|plans|cancel)/i,
   };
@@ -1009,6 +1020,8 @@
 
   try {
     flushQueue();                     // недоставленное с прошлого визита
+    // Юзер передан в теге/конфиге - привязываем сразу, без ручного ra.identify.
+    if (cfg.userId) { try { window.ra.identify(cfg.userId, cfg.userEmail); } catch (_) {} }
     sessionId();
     // Просмотр страницы шлём ВСЕГДА: иначе на сайте с трафиком мы видим одно
     // событие на сессию, и клиенту честно кажется, что ничего не работает.
