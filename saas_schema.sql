@@ -90,6 +90,26 @@ CREATE MATERIALIZED VIEW retention.saas_events_mv TO retention.saas_events AS
 SELECT * FROM retention.saas_events_queue
 WHERE length(_error) = 0;
 
+-- Dead-letter: строки, не пережившие парсинг, раньше исчезали БЕССЛЕДНО -
+-- дрейф схемы или кривая интеграция теряли события без единого следа,
+-- полноту нельзя было ни доказать, ни переиграть. Теперь сырьё + причина.
+CREATE TABLE IF NOT EXISTS retention.saas_events_dead
+(
+    `raw`         String,
+    `error`       String,
+    `received_at` DateTime DEFAULT now()
+)
+ENGINE = MergeTree
+ORDER BY received_at
+TTL received_at + INTERVAL 90 DAY;
+
+DROP VIEW IF EXISTS retention.saas_events_dead_mv;
+CREATE MATERIALIZED VIEW retention.saas_events_dead_mv
+TO retention.saas_events_dead AS
+SELECT _raw_message AS raw, _error AS error, now() AS received_at
+FROM retention.saas_events_queue
+WHERE length(_error) > 0;
+
 -- ---------------------------------------------------------------- STRIPE RAW
 -- Снимки объектов Stripe (backfill + вебхуки). ReplacingMergeTree по updated_at:
 -- каждое обновление — новая строка, витрины читают argMax/FINAL.

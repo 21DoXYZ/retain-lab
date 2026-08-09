@@ -251,6 +251,22 @@ def snapshot(evt: dict[str, Any], tenant_id: str) -> tuple[str, dict[str, Any]] 
             "updated_at": now,
         }
 
+    if stripe_type in ("customer.created", "customer.updated"):
+        # Смена email в Stripe обязана доезжать: иначе жизненные письма
+        # уходят на СТАРЫЙ адрес, а склейка держится за мёртвый hash.
+        email = obj.get("email") or ""
+        return "stripe_customers", {
+            "tenant_id": tenant_id,
+            "customer_id": obj.get("id", "") or "",
+            "email": email,
+            "email_norm": normalize_email(email),
+            "email_hash": email_hash(email) if email else "",
+            "name": obj.get("name") or "",
+            "created_ts": ts_str(obj.get("created")),
+            "meta": "{}",
+            "updated_at": now,
+        }
+
     if stripe_type == "checkout.session.completed":
         details = obj.get("customer_details") or {}
         email = details.get("email") or obj.get("customer_email") or ""

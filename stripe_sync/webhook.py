@@ -132,17 +132,17 @@ def stripe_webhook(tenant_id: str = ""):
         return jsonify(error="signature verification failed"), 400
 
     row = map_event(dict(evt), tenant)
-    if row is None:
+    snap = snapshot(dict(evt), tenant)
+    if row is None and snap is None:
         return jsonify(status="ignored", type=evt.get("type", "")), 200
 
-    producer.produce(
-        TOPIC,
-        key=(row["stripe_customer_id"] or row["client_user_id"] or tenant),
-        value=json.dumps(row, separators=(",", ":")),
-    )
-    producer.flush(10)
-
-    snap = snapshot(dict(evt), tenant)
+    if row is not None:
+        producer.produce(
+            TOPIC,
+            key=(row["stripe_customer_id"] or row["client_user_id"] or tenant),
+            value=json.dumps(row, separators=(",", ":")),
+        )
+        producer.flush(10)
     if snap is not None:
         table, srow = snap
         try:
@@ -155,8 +155,9 @@ def stripe_webhook(tenant_id: str = ""):
             # событие уже в шине — снапшот догонит backfill/повторная доставка
             log.warning("snapshot insert failed (%s): %s", table, exc)
 
-    log.info("accepted %s -> %s", evt.get("type"), row["event_type"])
-    return jsonify(status="ok", event_type=row["event_type"]), 200
+    etype = row["event_type"] if row is not None else f"snapshot:{evt.get('type', '')}"
+    log.info("accepted %s -> %s", evt.get("type"), etype)
+    return jsonify(status="ok", event_type=etype), 200
 
 
 @app.get("/health")

@@ -191,3 +191,23 @@ def test_subscription_period_is_read_from_items():
                                 "created": 1785000000}}}
     _, row = snapshot(bare, "t")
     assert row["current_period_start"]
+
+
+def test_customer_updated_snapshots_the_new_email():
+    """Смена email в Stripe обязана доезжать: иначе письма уходят на старый
+    адрес, а склейка держится за мёртвый hash."""
+    from stripe_sync.mapper import normalize_email, snapshot
+    evt = {"type": "customer.updated", "created": 1786000000,
+           "data": {"object": {"id": "cus_9", "email": "New@Mail.Test",
+                                "name": "Ann", "created": 1780000000}}}
+    out = snapshot(evt, "t1")
+    assert out is not None
+    table, row = out
+    assert table == "stripe_customers"
+    assert row["customer_id"] == "cus_9"
+    assert row["email_norm"] == normalize_email("New@Mail.Test")
+    assert row["email_hash"] != ""
+    # customer без email (гостевой) - строка есть, hash честно пуст
+    evt["data"]["object"]["email"] = None
+    _t, row2 = snapshot(evt, "t1")
+    assert row2["email_hash"] == "" and row2["email_norm"] == ""

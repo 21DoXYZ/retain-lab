@@ -612,7 +612,8 @@ def _keys_payload() -> dict:
         out['stripe'] = {
             'webhook_url': (f'https://{_SAAS_HOST}/stripe/webhook/{_tenant}'
                             if _tenant else ''),
-            'events': ['checkout.session.completed', 'customer.subscription.created',
+            'events': ['checkout.session.completed', 'customer.created',
+                       'customer.updated', 'customer.subscription.created',
                        'customer.subscription.updated', 'customer.subscription.deleted',
                        'invoice.paid', 'invoice.payment_failed',
                        'charge.refunded', 'charge.dispute.created'],
