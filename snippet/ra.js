@@ -343,8 +343,12 @@
                    tokens_balance: 1, meta: 1 };
       var extra = null;
       for (var k in props) {
-        // только свои поля: у объекта из чужого кода бывает грязный прототип
-        if (!Object.prototype.hasOwnProperty.call(props, k) || (k in e)) continue;
+        // только свои поля: у объекта из чужого кода бывает грязный прототип.
+        // meta через защиту конверта ПРОПУСКАЕМ: e.meta={tz} ставится всегда,
+        // и без исключения слияние ниже недостижимо - deviceCtx, RFM и
+        // виталсы молча выбрасывались (найдено на живых данных hubcontent)
+        if (!Object.prototype.hasOwnProperty.call(props, k) ||
+            (k in e && k !== "meta")) continue;
         if (k === "meta") {
           // meta СЛИВАЕМ, не перезаписываем: в конверте уже лежит {tz},
           // событие со своей meta (rage/page_leave) не должно её потерять
