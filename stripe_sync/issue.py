@@ -70,7 +70,7 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
     rows = client.query(
         """
         SELECT identity_id, client_user_id, stripe_customer_id, sub_status,
-               stage,
+               stage, toFloat64(mrr),
                p_convert,   -- NULL = скора ещё нет; coalesce тут ЛОМАЛ гейты:
                p_churn      -- «не считали» превращалось в «риск нулевой»
         FROM retention.user_actions
@@ -81,7 +81,7 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
     if not rows:
         raise SystemExit(f"identity {identity_id} не найдена в user_actions")
     user = dict(zip(["identity_id", "client_user_id", "stripe_customer_id",
-                     "sub_status", "stage", "p_convert", "p_churn"], rows[0]))
+                     "sub_status", "stage", "mrr", "p_convert", "p_churn"], rows[0]))
 
     # subscription_id для Stripe-исполнителей
     sub = client.query(
@@ -106,6 +106,16 @@ def issue_offer(client, tenant_id: str, identity_id: str, offer_id: str,
     ok, reason = run_checks(offer, user, h14, history,
                             float(catalog.get("p_convert_cap", 0.7)),
                             float(catalog.get("churn_floor", 0.0)))
+    if not ok:
+        _log(client, tenant_id, offer, user, campaign_id, False, "rejected", reason)
+        return "rejected", reason
+
+    # Методология против этой конкретной выдачи: EV, лестница уступок, спящие
+    # собаки, кэп попыток, бюджет, причина ухода. До гейта вся эта математика
+    # жила только в превью на дашборде - деньги тратились мимо неё.
+    from offer_gate import gate as methodology_gate
+    ok, reason = methodology_gate(client, tenant_id, offer, user, campaign_id,
+                                  catalog.get("offers") or [])
     if not ok:
         _log(client, tenant_id, offer, user, campaign_id, False, "rejected", reason)
         return "rejected", reason
