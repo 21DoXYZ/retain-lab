@@ -384,10 +384,31 @@ WHERE e.client_user_id = '' AND e.stripe_customer_id = '' AND e.email_hash != ''
 -- Момент ценности УНИВЕРСАЛЕН: generation_completed (Hub Content) ИЛИ
 -- value_moment (канонич. имя для любого продукта, см. INTEGRATION-SAAS.md).
 -- Иначе ACTIVATE/SAVE-математика мертва для тенантов с другим словарём.
+-- Дедуплицированный поток per identity. Сниппет повторяет отправку при сбое
+-- сети, Stripe перепосылает вебхук на любой не-2xx - одно событие приходит
+-- дважды. Схлопываем по event_id ОДИН раз здесь: иначе удваивался расход
+-- юнитов (ложная стадия «упёрся в лимит»), число моментов ценности и всё
+-- поведение. Общий вход для фичей - и для любых будущих витрин.
+CREATE OR REPLACE VIEW retention.saas_events_deduped AS
+SELECT tenant_id, identity_id, event_id,
+       any(ts)           AS ts,
+       any(event_type)   AS event_type,
+       any(source)       AS source,
+       any(tokens_spent) AS tokens_spent,
+       any(meta)         AS meta
+FROM retention.saas_events_resolved
+GROUP BY tenant_id, identity_id, event_id;
+
 CREATE OR REPLACE VIEW retention.user_event_features AS
+-- Фичи одного человека ОДНИМ проходом по дедуплицированному потоку. Разбита
+-- на смысловые блоки (использование / биллинг / поведение / перформанс /
+-- намерение / контекст устройства). Разносить блоки по отдельным вьюхам с
+-- JOIN нельзя: каждая заново сканировала бы события (в N раз дороже) - здесь
+-- сознательно один проход. Потребители: scoring.py, карточка, user_actions.
 SELECT
     tenant_id,
     identity_id,
+    -- ── использование и жизненный цикл ──
     min(ts)                                                              AS first_seen,
     max(ts)                                                              AS last_seen,
     countIf(event_type IN ('generation_completed', 'value_moment'))                                  AS generations_total,
@@ -423,12 +444,13 @@ SELECT
           AND ts < now() - INTERVAL 7 DAY)
       + countIf(event_type = 'heartbeat' AND ts >= now() - INTERVAL 14 DAY
                 AND ts < now() - INTERVAL 7 DAY) * 120                   AS active_sec_prev_7d,
-    -- buy-intent: заходы на прайсинг (кросс-сессия из RFM), просмотры пейвола,
-    -- старты чекаута, скачивания (адаптация). Сильнейший - pricing_visits.
+    -- ── намерение купить (buy-intent) ──
+    -- заходы на прайсинг (кросс-сессия из RFM), пейвол, старт чекаута,
+    -- скачивания (адаптация). Сильнейший - pricing_visits.
     max(JSONExtractInt(meta, 'pricing_visits'))                          AS pricing_visits,
     max(JSONExtractInt(meta, 'visits'))                                  AS visit_count,
     countIf(event_type = 'download_click' AND ts >= now() - INTERVAL 14 DAY) AS downloads_14d,
-    -- перформанс как исход (тормоза = тихий отток): INP и LCP, худшее за 7д
+    -- ── перформанс как исход (тормоза = тихий отток): INP и LCP, худшее за 7д ──
     maxIf(JSONExtractInt(meta, 'inp'), event_type IN ('page_leave', 'heartbeat')
           AND ts >= now() - INTERVAL 7 DAY)                             AS inp_ms,
     maxIf(JSONExtractInt(meta, 'lcp'), event_type IN ('page_leave', 'heartbeat')
@@ -447,20 +469,7 @@ SELECT
     maxIf(JSONExtractInt(meta, 'apple_pay'), event_type = 'session_start') AS apple_pay,
     argMaxIf(JSONExtractInt(meta, 'datacenter'), ts,
              JSONExtractString(meta, 'geo', 'ip') != '')                 AS datacenter
-FROM (
-    -- ДЕДУПЛИКАЦИЯ. Сниппет повторяет отправку при сбое сети, Stripe
-    -- перепосылает вебхук на любой не-2xx - одно и то же событие приходит
-    -- дважды. Без схлопывания по event_id удваивался расход юнитов (ложная
-    -- стадия «упёрся в лимит») и число моментов ценности.
-    SELECT tenant_id, identity_id, event_id,
-           any(ts)           AS ts,
-           any(event_type)   AS event_type,
-           any(source)       AS source,
-           any(tokens_spent) AS tokens_spent,
-           any(meta)         AS meta
-    FROM retention.saas_events_resolved
-    GROUP BY tenant_id, identity_id, event_id
-)
+FROM retention.saas_events_deduped
 GROUP BY tenant_id, identity_id;
 
 -- Последний снимок подписки per customer.
