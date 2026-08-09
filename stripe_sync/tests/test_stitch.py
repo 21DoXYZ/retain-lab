@@ -155,3 +155,37 @@ def test_resnapshot_only_fills_the_gaps():
     assert rows[0][9].startswith("2026-08-01")          # начало периода = событие
     assert rows[0][10].startswith("2027-08-01")         # годовой шаг
     assert missing_rows(events, known={"sub_a", "sub_b"}, now=now) == []
+
+
+def test_r6_second_account_same_email_keeps_both_cuids():
+    """Второй аккаунт под тем же email раньше СИРОТИЛ: выживал последний
+    cuid, события первого навсегда не привязывались. Теперь оба в массиве."""
+    from stripe_sync.stitch import EventKey, build_identities
+    ids, unmatched = build_identities("t", [], [
+        EventKey(client_user_id="acc_A", email_hash="h1", last_ts="2026-01-01"),
+        EventKey(client_user_id="acc_B", email_hash="h1", last_ts="2026-02-01"),
+    ])
+    assert len(ids) == 1
+    i = ids[0]
+    assert set(i.client_user_ids) == {"acc_A", "acc_B"}
+    assert i.client_user_id == "acc_B"          # основной = последний
+    assert unmatched == []                       # никто не сирота
+
+
+def test_first_seen_survives_anon_to_known_merge():
+    """Аноним гулял с 1 марта, представился 10-го: first_seen канонической
+    личности = 1 марта (из cuid-личности/событий), не время склейки."""
+    from stripe_sync.stitch import Identity, resolve_first_seen
+    canonical = Identity("t", "id-canon", email_hash="h1",
+                         client_user_id="u1", client_user_ids=["u1"])
+    first = resolve_first_seen(
+        canonical,
+        seen_before={},                                  # каноническая - новая
+        prev_first_by_cuid={"u1": "2026-03-01 10:00:00.000"},
+        event_first_by_cuid={"u1": "2026-03-01 09:58:00.000"},
+        event_first_by_hash={"h1": "2026-03-10 12:00:00.000"},
+        now_ts="2026-03-10 12:00:00.000")
+    assert first == "2026-03-01 09:58:00.000"    # самый ранний след
+    # без следов - честно время прогона
+    fresh = Identity("t", "id-x")
+    assert resolve_first_seen(fresh, {}, {}, {}, {}, "2026-08-01") == "2026-08-01"

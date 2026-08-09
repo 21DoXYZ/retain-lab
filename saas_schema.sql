@@ -175,13 +175,19 @@ CREATE TABLE IF NOT EXISTS retention.identities
     `email_hash`         String,
     `email_norm`         String,                    -- есть только если источник дал email (Stripe)
     `stripe_customer_id` String,
-    `client_user_id`     String,
+    `client_user_id`     String,                    -- основной (для join'ов)
+    `client_user_ids`    Array(String) DEFAULT [],  -- ВСЕ аккаунты человека:
+                                                    -- второй cuid под тем же
+                                                    -- email раньше сиротел
     `sources`            Array(LowCardinality(String)),
     `first_seen`         DateTime64(3),
     `updated_at`         DateTime64(3)
 )
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (tenant_id, identity_id);
+ALTER TABLE retention.identities
+    ADD COLUMN IF NOT EXISTS `client_user_ids` Array(String) DEFAULT []
+    AFTER `client_user_id`;
 
 -- Очередь несшитого: то, что не удалось привязать автоматически (acceptance §1.3
 -- требует ≥95% авто-склейки — остаток виден здесь, разбирается руками/правилами).
@@ -272,9 +278,20 @@ SELECT tenant_id, identity_id,
        argMax(email_hash, updated_at)         AS email_hash,
        argMax(email_norm, updated_at)         AS email_norm,
        argMax(stripe_customer_id, updated_at) AS stripe_customer_id,
-       argMax(client_user_id, updated_at)     AS client_user_id
+       argMax(client_user_id, updated_at)     AS client_user_id,
+       argMax(client_user_ids, updated_at)    AS client_user_ids
 FROM retention.identities
 GROUP BY tenant_id, identity_id;
+
+-- Развёртка аккаунтов: (tenant, alias-cuid) -> identity. Через неё события
+-- ВТОРОГО аккаунта человека находят его identity - раньше они сиротели.
+CREATE OR REPLACE VIEW retention.identity_aliases AS
+SELECT tenant_id, identity_id, alias
+FROM retention.identities_current
+ARRAY JOIN arrayDistinct(
+    arrayConcat(client_user_ids,
+                if(client_user_id != '', [client_user_id], []))) AS alias
+WHERE alias != '';
 
 -- Каждое событие → identity по старшему доступному ключу (ровно один матч):
 -- client_user_id > stripe_customer_id > email_hash.
@@ -321,10 +338,10 @@ ORDER BY (tenant_id, ts)
 TTL ts + INTERVAL 30 DAY;
 
 CREATE OR REPLACE VIEW retention.saas_events_resolved AS
-SELECT i.identity_id AS identity_id, e.*
+SELECT a.identity_id AS identity_id, e.*
 FROM retention.saas_events e
-JOIN retention.identities_current i
-  ON e.tenant_id = i.tenant_id AND e.client_user_id = i.client_user_id
+JOIN retention.identity_aliases a
+  ON e.tenant_id = a.tenant_id AND e.client_user_id = a.alias
 WHERE e.client_user_id != ''
 UNION ALL
 SELECT i.identity_id, e.*

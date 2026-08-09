@@ -47,8 +47,21 @@ class Identity:
     email_hash: str = ""
     email_norm: str = ""
     stripe_customer_id: str = ""
-    client_user_id: str = ""
+    client_user_id: str = ""      # основной (последний увиденный) - для join'ов
+    # ВСЕ client_user_id этого человека (R6). У людей бывает второй аккаунт
+    # под тем же email: раньше выживал только последний cuid, и события
+    # второго аккаунта НАВСЕГДА не привязывались ни к кому - usage занижался,
+    # стадии врали. Теперь резолв идёт по массиву (identity_aliases).
+    client_user_ids: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)
+
+
+def _add_cuid(ident: "Identity", cuid: str) -> None:
+    if not cuid:
+        return
+    ident.client_user_id = cuid          # основной = последний увиденный
+    if cuid not in ident.client_user_ids:
+        ident.client_user_ids.append(cuid)
 
 
 def _iid(tenant_id: str, key: str) -> str:
@@ -103,8 +116,7 @@ def build_identities(
         # R3 — прямой stripe_customer_id в событии
         if k.stripe_customer_id and k.stripe_customer_id in by_customer:
             ident = by_customer[k.stripe_customer_id]
-            if k.client_user_id and not ident.client_user_id:
-                ident.client_user_id = k.client_user_id
+            _add_cuid(ident, k.client_user_id)
             _add_source(ident, "snippet" if k.client_user_id else "stripe")
             continue
 
@@ -122,8 +134,7 @@ def build_identities(
                 tenant_id, _iid(tenant_id, k.email_hash), email_hash=k.email_hash,
             )
             by_hash[k.email_hash] = ident
-            if k.client_user_id:
-                ident.client_user_id = k.client_user_id
+            _add_cuid(ident, k.client_user_id)
             # открытый адрес (серверное событие) - без него письма неоплатившим
             # юзерам невозможны: из хеша адрес не восстановить
             if k.email_norm and not ident.email_norm:
@@ -149,6 +160,7 @@ def build_identities(
             ident = by_cuid.get(k.client_user_id) or Identity(
                 tenant_id, _iid(tenant_id, f"cuid:{k.client_user_id}"),
                 client_user_id=k.client_user_id,
+                client_user_ids=[k.client_user_id],
             )
             by_cuid[k.client_user_id] = ident
             _add_source(ident, "snippet")
@@ -156,6 +168,22 @@ def build_identities(
     identities = list({id(i): i for i in [*by_hash.values(), *by_customer.values(),
                                           *by_cuid.values()]}.values())
     return identities, unmatched
+
+
+def resolve_first_seen(i: Identity, seen_before: dict,
+                       prev_first_by_cuid: dict, event_first_by_cuid: dict,
+                       event_first_by_hash: dict, now_ts: str) -> str:
+    """Самая ранняя встреча человека по ВСЕМ его следам: прежняя личность
+    (в т.ч. анонимная cuid-личность до склейки) и минимальный ts событий.
+    Время прогона джоба - только последний фолбэк."""
+    candidates = [seen_before.get(i.identity_id)]
+    for cuid in i.client_user_ids or ([i.client_user_id] if i.client_user_id else []):
+        candidates.append(prev_first_by_cuid.get(cuid))
+        candidates.append(event_first_by_cuid.get(cuid))
+    if i.email_hash:
+        candidates.append(event_first_by_hash.get(i.email_hash))
+    real = [c for c in candidates if c]
+    return min(real) if real else now_ts
 
 
 def _add_source(ident: Identity, source: str) -> None:
@@ -204,7 +232,33 @@ def run_stitch(client, tenant_id: str, now_ts: str) -> dict[str, int]:
         "WHERE tenant_id = %(t)s GROUP BY identity_id",
         parameters={"t": tenant_id}).result_rows}
 
+    # first_seen ПЕРЕЖИВАЕТ склейку аноним->известный: у cuid-личности и у
+    # канонической разные identity_id, и первая встреча терялась - ломались
+    # окна активации ровно на воронке signup. Носим её через client_user_id
+    # и дополнительно затравливаем из МИНИМАЛЬНОГО ts событий: правда о
+    # первой встрече лежит в событиях, а не во времени прогона джоба.
+    prev_first_by_cuid = {r[0]: str(r[1]) for r in client.query(
+        "SELECT client_user_id, toString(min(first_seen)) "
+        "FROM retention.identities "
+        "WHERE tenant_id = %(t)s AND client_user_id != '' "
+        "GROUP BY client_user_id",
+        parameters={"t": tenant_id}).result_rows}
+    event_first_by_cuid = {r[0]: str(r[1]) for r in client.query(
+        "SELECT client_user_id, toString(min(ts)) FROM retention.saas_events "
+        "WHERE tenant_id = %(t)s AND client_user_id != '' "
+        "GROUP BY client_user_id",
+        parameters={"t": tenant_id}).result_rows}
+    event_first_by_hash = {r[0]: str(r[1]) for r in client.query(
+        "SELECT email_hash, toString(min(ts)) FROM retention.saas_events "
+        "WHERE tenant_id = %(t)s AND email_hash != '' GROUP BY email_hash",
+        parameters={"t": tenant_id}).result_rows}
+
     identities, unmatched = build_identities(tenant_id, customers, event_keys)
+
+    def first_seen_of(i) -> str:
+        return resolve_first_seen(i, seen_before, prev_first_by_cuid,
+                                  event_first_by_cuid, event_first_by_hash,
+                                  now_ts)
 
     if identities:
         # ЧИСТКА УСТАРЕВШИХ. Джоб пересобирает картину заново, но раньше только
@@ -222,11 +276,13 @@ def run_stitch(client, tenant_id: str, now_ts: str) -> dict[str, int]:
         client.insert(
             "retention.identities",
             [[i.tenant_id, i.identity_id, i.email_hash, i.email_norm,
-              i.stripe_customer_id, i.client_user_id, i.sources,
-              seen_before.get(i.identity_id) or now_ts, now_ts]
+              i.stripe_customer_id, i.client_user_id,
+              i.client_user_ids or ([i.client_user_id] if i.client_user_id else []),
+              i.sources, first_seen_of(i), now_ts]
              for i in identities],
             column_names=["tenant_id", "identity_id", "email_hash", "email_norm",
-                          "stripe_customer_id", "client_user_id", "sources",
+                          "stripe_customer_id", "client_user_id",
+                          "client_user_ids", "sources",
                           "first_seen", "updated_at"],
         )
     if unmatched:
