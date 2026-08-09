@@ -18,6 +18,16 @@ interface HomeData {
   stages: Record<string, number>;
   at_risk_now: number;
   dunning_mrr: number;
+  pulse?: {
+    online_now: number; active_today: number; active_7d: number;
+    paying: number; trialing: number; signups_7d: number;
+    generations_today: number; generations_7d: number;
+  };
+  measured?: {
+    revenue_usd: number | null; provider_cost_usd: number | null;
+    margin_pct: number | null; unit_cost_usd: number | null;
+    window_days: number | null;
+  } | null;
   campaigns: { active_enrollments: number; holdout: number; touches_7d: number };
   setup: { stripe_connected: boolean; snippet_connected: boolean; channels_connected: boolean; offers_ready: boolean; autopilot: boolean };
 }
@@ -96,6 +106,74 @@ export function HomeView() {
 
       {!loading && noData ? (
         <p className="text-[13px] text-steel">{t("saas.home.noData")}</p>
+      ) : null}
+
+      {/* Живой пульс: клик по плитке ведёт в /users с уже включённым срезом */}
+      {data?.pulse ? (
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[1px] text-primary mb-3">
+            {t("saas.home.pulse")}
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Link href="/users" className="rounded-card border border-hair2 bg-canvas px-4 py-3.5 transition-colors hover:border-pos">
+              <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-steel">
+                <span className="h-1.5 w-1.5 rounded-full bg-pos animate-pulse" />
+                {t("saas.home.pulse.online")}
+              </div>
+              <div className="mt-1 font-mono text-[20px] font-semibold text-pos">{data.pulse.online_now}</div>
+            </Link>
+            <div className="rounded-card border border-hair2 bg-canvas px-4 py-3.5">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.pulse.activeToday")}</div>
+              <div className="mt-1 font-mono text-[20px] font-semibold text-ink">{data.pulse.active_today}</div>
+              <div className="text-[11px] text-steel">{t("saas.home.pulse.active7d", { n: data.pulse.active_7d })}</div>
+            </div>
+            <div className="rounded-card border border-hair2 bg-canvas px-4 py-3.5">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.pulse.signups7d")}</div>
+              <div className="mt-1 font-mono text-[20px] font-semibold text-ink">{data.pulse.signups_7d}</div>
+              <div className="text-[11px] text-steel">{t("saas.home.pulse.payTrial", { p: data.pulse.paying, tr: data.pulse.trialing })}</div>
+            </div>
+            <div className="rounded-card border border-hair2 bg-canvas px-4 py-3.5">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.pulse.gens")}</div>
+              <div className="mt-1 font-mono text-[20px] font-semibold text-ink">{data.pulse.generations_today}</div>
+              <div className="text-[11px] text-steel">{t("saas.home.pulse.gens7d", { n: data.pulse.generations_7d })}</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Измеренная экономика: цифры по факту, не оценки владельца */}
+      {data?.measured && data.measured.revenue_usd != null ? (
+        <Card className="p-5">
+          <div className="flex items-baseline justify-between gap-3 mb-3">
+            <div className="text-[15px] font-semibold text-ink">{t("saas.home.measured.title")}</div>
+            <span className="font-mono text-[12px] text-steel">
+              {t("saas.home.measured.window", { d: data.measured.window_days ?? 90 })}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.measured.revenue")}</div>
+              <div className="mt-0.5 font-mono text-[17px] font-semibold text-ink">{usd(data.measured.revenue_usd ?? 0)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.measured.cost")}</div>
+              <div className="mt-0.5 font-mono text-[17px] font-semibold text-neg">{usd(data.measured.provider_cost_usd ?? 0)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.measured.margin")}</div>
+              <div className={"mt-0.5 font-mono text-[17px] font-semibold " + ((data.measured.margin_pct ?? 0) > 30 ? "text-pos" : "text-neg")}>
+                {(data.measured.margin_pct ?? 0).toFixed(1)}%
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.measured.unitCost")}</div>
+              <div className="mt-0.5 font-mono text-[17px] font-semibold text-ink">
+                {data.measured.unit_cost_usd != null ? "$" + data.measured.unit_cost_usd.toFixed(4) : "-"}
+              </div>
+            </div>
+          </div>
+          <p className="mt-3 text-[12px] text-steel">{t("saas.home.measured.note")}</p>
+        </Card>
       ) : null}
 
       {!loading && goliveDone < golive.length ? (

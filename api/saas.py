@@ -234,6 +234,28 @@ def home():
         "SELECT count() FROM saas_events WHERE tenant_id = {t:String} AND source = 'snippet'",
         {'t': tenant})[1][0][0])
 
+    # Живой пульс: кто в продукте прямо сейчас и насколько база жива.
+    pr = q(
+        "SELECT countIf(toUnixTimestamp(last_seen) > 0"
+        f"  AND dateDiff('second', last_seen, now()) < {ONLINE_THRESHOLD_S}),"
+        " countIf(toUnixTimestamp(last_seen) > 0 AND last_seen >= now() - INTERVAL 1 DAY),"
+        " countIf(toUnixTimestamp(last_seen) > 0 AND last_seen >= now() - INTERVAL 7 DAY),"
+        " countIf(sub_status IN ('active', 'past_due')),"
+        " countIf(sub_status = 'trialing')"
+        " FROM user_actions WHERE tenant_id = {t:String}", {'t': tenant})[1][0]
+    ur = q(
+        "SELECT uniqExactIf(identity_id, event_type = 'signup' AND ts >= now() - INTERVAL 7 DAY),"
+        " countIf(event_type = 'generation_completed' AND ts >= today()),"
+        " countIf(event_type = 'generation_completed' AND ts >= now() - INTERVAL 7 DAY)"
+        " FROM saas_events_resolved WHERE tenant_id = {t:String}", {'t': tenant})[1][0]
+    pulse = {'online_now': int(pr[0] or 0), 'active_today': int(pr[1] or 0),
+             'active_7d': int(pr[2] or 0), 'paying': int(pr[3] or 0),
+             'trialing': int(pr[4] or 0), 'signups_7d': int(ur[0] or 0),
+             'generations_today': int(ur[1] or 0), 'generations_7d': int(ur[2] or 0)}
+
+    # Измеренная экономика (product_sync -> knowledge): {} - замера ещё нет
+    measured = _measured_costs(tenant)
+
     return api_json({
         'tenant': tenant,
         'mrr': round(mrr, 2),
@@ -241,6 +263,14 @@ def home():
         'stages': stages,
         'at_risk_now': stages.get('DUNNING', 0) + stages.get('SAVE', 0),
         'dunning_mrr': round(dunning_mrr, 2),
+        'pulse': pulse,
+        'measured': {
+            'revenue_usd': measured.get('measured_revenue_usd'),
+            'provider_cost_usd': measured.get('measured_provider_cost_usd'),
+            'margin_pct': measured.get('measured_margin_pct'),
+            'unit_cost_usd': measured.get('measured_unit_cost_usd'),
+            'window_days': measured.get('measured_window_days'),
+        } if measured else None,
         'campaigns': {'active_enrollments': int(camp[0] or 0),
                       'holdout': int(camp[1] or 0),
                       'touches_7d': touches_7d},
@@ -672,12 +702,36 @@ def saas_users():
     ?stage=DUNNING - фильтр; сортировка: ценность на кону, затем MRR."""
     tenant = _tenant_arg()
     stage = (request.args.get('stage') or '').upper()
+    online_only = str(request.args.get('online') or '') in ('1', 'true')
+    search = str(request.args.get('q') or '').strip().lower()[:120]
+    seen = str(request.args.get('seen') or '').strip()        # 1d | 7d | 30d
+    pay = str(request.args.get('status') or '').strip()       # paying|trial|free
 
     where = "tenant_id = {t:String}"
     params = {'t': tenant}
     if stage:
         where += " AND stage = {s:String}"
         params['s'] = stage
+    if online_only:
+        # «сейчас на сайте»: последнее событие младше порога presence
+        where += (" AND toUnixTimestamp(last_seen) > 0"
+                  f" AND dateDiff('second', last_seen, now()) < {ONLINE_THRESHOLD_S}")
+    if search:
+        # поиск по почте / id юзера / Stripe-клиенту, без регистра
+        where += (" AND (positionCaseInsensitive(email_norm, {srch:String}) > 0"
+                  " OR positionCaseInsensitive(client_user_id, {srch:String}) > 0"
+                  " OR positionCaseInsensitive(stripe_customer_id, {srch:String}) > 0)")
+        params['srch'] = search
+    if seen in ('1d', '7d', '30d'):
+        days = {'1d': 1, '7d': 7, '30d': 30}[seen]
+        where += (" AND toUnixTimestamp(last_seen) > 0"
+                  f" AND last_seen >= now() - INTERVAL {days} DAY")
+    if pay == 'paying':
+        where += " AND sub_status IN ('active', 'past_due')"
+    elif pay == 'trial':
+        where += " AND sub_status = 'trialing'"
+    elif pay == 'free':
+        where += " AND sub_status NOT IN ('active', 'past_due', 'trialing')"
 
     rows = q(
         f"""
@@ -709,6 +763,13 @@ def saas_users():
         "SELECT stage, count() FROM user_actions WHERE tenant_id = {t:String} GROUP BY stage",
         {'t': tenant})[1]}
 
+    # счётчик «сейчас на сайте» для чипа фильтра - всегда по всем, не по срезу
+    online_count = int(q(
+        "SELECT count() FROM user_actions WHERE tenant_id = {t:String}"
+        " AND toUnixTimestamp(last_seen) > 0"
+        f" AND dateDiff('second', last_seen, now()) < {ONLINE_THRESHOLD_S}",
+        {'t': tenant})[1][0][0])
+
     # Плашка «это демо-данные» появляется, только если мы РЕАЛЬНО насыпали
     # моков. Раньше признаком было «нет живых клиентов Stripe» - и плашка врала
     # дважды: на пустом тенанте и у клиента, который поставил сниппет раньше,
@@ -721,7 +782,7 @@ def saas_users():
     demo = mock_customers > 0
 
     return api_json({'tenant': tenant, 'stages': stages, 'users': users,
-                     'demo': demo})
+                     'online_count': online_count, 'demo': demo})
 
 
 @bp.get('/saas/offers')
