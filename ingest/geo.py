@@ -120,6 +120,57 @@ def geo_from_ip(ip: str) -> dict:
     return out
 
 
+_asn_reader = None
+_asn_tried = False
+
+
+def _asn():
+    global _asn_reader, _asn_tried
+    if _asn_tried:
+        return _asn_reader
+    _asn_tried = True
+    path = os.environ.get("GEOIP_ASN_DB", "/secrets/GeoLite2-ASN.mmdb")
+    if not os.path.exists(path):
+        return None
+    try:
+        import maxminddb
+        _asn_reader = maxminddb.open_database(path)
+    except Exception:               # noqa: BLE001
+        _asn_reader = None
+    return _asn_reader
+
+
+# ASN известных дата-центров/хостингов = не живой юзер (бот/VPN/скрейпер).
+_DC_HINTS = ("amazon", "google", "microsoft", "digitalocean", "ovh", "hetzner",
+             "linode", "vultr", "cloudflare", "akamai", "oracle", "alibaba",
+             "tencent", "leaseweb", "contabo", "hosting", "datacenter",
+             "data center", "colo", "server")
+
+
+def asn_of(ip: str) -> dict:
+    """{asn, isp, datacenter} из IP. {} без базы/матча."""
+    if not ip:
+        return {}
+    r = _asn()
+    if r is None:
+        return {}
+    try:
+        rec = r.get(ip) or {}
+    except Exception:               # noqa: BLE001
+        return {}
+    out = {}
+    num = rec.get("autonomous_system_number")
+    org = rec.get("autonomous_system_organization")
+    if num:
+        out["asn"] = int(num)
+    if org:
+        out["isp"] = str(org)[:60]
+        low = org.lower()
+        if any(h in low for h in _DC_HINTS):
+            out["datacenter"] = 1
+    return out
+
+
 def resolve(headers, remote_addr: str, tz: str) -> dict:
     """Гео события: {ip, country, region?, city?, geo_src, tz_country, vpn?}.
 
@@ -144,4 +195,5 @@ def resolve(headers, remote_addr: str, tz: str) -> dict:
     elif tz_country:
         out["country"] = tz_country
         out["geo_src"] = "tz"
+    out.update(asn_of(ip))          # провайдер/ASN + флаг дата-центра
     return out

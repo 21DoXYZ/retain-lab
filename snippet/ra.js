@@ -37,6 +37,9 @@
  * Ещё: GPU-строка (уровень устройства), батарея (Android), время суток/дня,
  * тип навигации, динамика скролла (reversals), dwell по секциям, колебание
  * до первого действия (ttfi), активное время, смена сети/offline.
+ * iPhone/Safari: userAgentData/deviceMemory/battery/connection/GPU/CLS
+ * там пусты - закрыто серверным разбором UA (ОС/браузер/тип на шлюзе) +
+ * iOS-версия из UA, apple_pay/pay_api (платёжная готовность), dnt/cookies.
  * Приватность: НИКОГДА не собираем тексты, значения полей (в т.ч. пароли),
  * заголовки страниц и сырой email - только sha256(email), техконтекст и гео.
  */
@@ -221,6 +224,28 @@
       }
       // бот-фильтр для чистоты данных (не фича юзера)
       if (navigator.webdriver) d.bot = 1;
+      // iOS: userAgentData в WebKit нет вовсе - версию ОС парсим из UA,
+      // тип устройства определяем явно (модель Apple не отдаёт никак).
+      var uas = navigator.userAgent || "";
+      d.ios = /iPhone|iPad|iPod/.test(uas) ? 1 : 0;
+      if (d.ios || d.platform === "MacIntel") {
+        var mo = uas.match(/OS (\d+[_\d]*) like Mac/);
+        if (mo && !d.os_ver) d.os_ver = mo[1].replace(/_/g, ".");
+        d.ipad = (/iPad/.test(uas)
+                  || (d.platform === "MacIntel" && navigator.maxTouchPoints > 1)) ? 1 : 0;
+      }
+      // Платёжная готовность: карта в Apple/Google Pay = транзакционный юзер +
+      // уровень устройства. canMakePayments не требует промпта. Работает там,
+      // где батарея/сеть/память на iPhone молчат.
+      try {
+        if (window.ApplePaySession && ApplePaySession.canMakePayments
+            && ApplePaySession.canMakePayments()) d.apple_pay = 1;
+      } catch (_) {}
+      if (window.PaymentRequest) d.pay_api = 1;
+      // сегменты: приватность и стоимость трафика
+      d.dnt = (navigator.doNotTrack === "1" || window.doNotTrack === "1") ? 1 : 0;
+      d.cookies = navigator.cookieEnabled ? 1 : 0;
+      d.reduced_data = mq("(prefers-reduced-data: reduce)");
     } catch (_) {}
     return d;
   }

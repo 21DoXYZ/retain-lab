@@ -114,6 +114,7 @@ REQUIRED_SAAS = {"event_id", "tenant_id", "event_type", "ts"}
 
 from event_time import sane_ts  # noqa: E402
 from geo import resolve as geo_resolve  # noqa: E402
+from ua import parse_ua  # noqa: E402
 # Сниппет ra.js постит с сайта тенанта (кросс-домен) — браузеру нужен CORS.
 # Токен «публичного класса» (как ключи аналитик), поэтому echo-origin допустим;
 # сузить до доменов тенантов: SAAS_CORS_ORIGINS="https://app.x.com,https://y.io".
@@ -335,6 +336,10 @@ def ingest_saas():
         except (ValueError, TypeError):
             pass
     geo = geo_resolve(request.headers, request.remote_addr or "", _tz)
+    # Разбор UA-заголовка: ОС/браузер/тип/бот. На iPhone/Safari клиентские
+    # device-API пусты, а UA есть всегда - так гео и семейство ОС не зависят
+    # от того, что смог отдать браузер.
+    ua = parse_ua(request.headers.get("User-Agent", ""))
 
     now_utc = datetime.now(tz=timezone.utc)
     for e in events:
@@ -345,11 +350,14 @@ def ingest_saas():
         # Браузер шлёт только email_hash; настоящий адрес приходит из Stripe.
         e.pop("email", None)
         e["ts"] = sane_ts(e.get("ts"), now_utc)
-        if geo:
+        if geo or ua:
             try:
                 m = json.loads(e.get("meta") or "{}")
                 if isinstance(m, dict):
-                    m.setdefault("geo", geo)
+                    if geo:
+                        m.setdefault("geo", geo)
+                    if ua:
+                        m.setdefault("ua", ua)
                     e["meta"] = json.dumps(m, separators=(",", ":"))
             except (ValueError, TypeError):
                 pass
