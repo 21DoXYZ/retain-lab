@@ -30,6 +30,12 @@ SELECT
     coalesce(f.tokens_spent_month, 0)               AS tokens_spent_month,
     if(f.last_seen IS NULL OR toUnixTimestamp(f.last_seen) = 0,
        999, dateDiff('day', f.last_seen, now()))    AS days_since_seen,
+    if(f.first_seen IS NULL OR toUnixTimestamp(f.first_seen) = 0,
+       0, dateDiff('day', f.first_seen, now()))     AS tenure_days,
+    coalesce(f.rage_clicks_7d, 0)                   AS rage_clicks_7d,
+    coalesce(f.js_errors_7d, 0)                     AS js_errors_7d,
+    coalesce(f.active_sec_7d, 0)                    AS active_sec_7d,
+    coalesce(f.active_sec_prev_7d, 0)               AS active_sec_prev_7d,
     coalesce(f.last_payment_failed > f.last_invoice_paid, 0)    AS failed_recent,
     coalesce(f.last_cancel_scheduled > f.last_invoice_paid, 0)  AS cancel_scheduled
 FROM retention.identities_current i

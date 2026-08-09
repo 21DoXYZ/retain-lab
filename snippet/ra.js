@@ -159,9 +159,26 @@
       page: location.pathname,
     };
     if (props) {
+      // Поля-колонки (tokens_spent и пр.) кладём как есть; ВСЁ остальное - в
+      // meta-JSON: шина отбрасывает неизвестные колонки молча, и кастомные
+      // свойства ra.track(...) раньше просто исчезали.
+      var COLS = { amount: 1, currency: 1, plan_id: 1, subscription_id: 1,
+                   invoice_id: 1, charge_id: 1, status: 1, tokens_spent: 1,
+                   tokens_balance: 1, meta: 1 };
+      var extra = null;
       for (var k in props) {
         // только свои поля: у объекта из чужого кода бывает грязный прототип
-        if (Object.prototype.hasOwnProperty.call(props, k) && !(k in e)) e[k] = props[k];
+        if (!Object.prototype.hasOwnProperty.call(props, k) || (k in e)) continue;
+        if (COLS[k]) { e[k] = props[k]; }
+        else { (extra = extra || {})[k] = props[k]; }
+      }
+      if (extra) {
+        var base = {};
+        if (e.meta) { try { base = JSON.parse(e.meta) || {}; } catch (_) {} }
+        for (var k2 in extra) {
+          if (Object.prototype.hasOwnProperty.call(extra, k2)) base[k2] = extra[k2];
+        }
+        try { e.meta = JSON.stringify(base); } catch (_) {}
       }
     }
     post(e, 1);
@@ -176,9 +193,11 @@
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.token },
         body: JSON.stringify(e),
       }).then(function (r) {
-        if (r.status >= 500 && retries > 0) setTimeout(function () { post(e, retries - 1); }, 2000);
+        if ((r.status >= 500 || r.status === 429) && retries > 0)
+          setTimeout(function () { post(e, retries - 1); }, 2000 + Math.random() * 1000);
       }).catch(function () {
-        if (retries > 0) setTimeout(function () { post(e, retries - 1); }, 2000);
+        if (retries > 0)
+          setTimeout(function () { post(e, retries - 1); }, 2000 + Math.random() * 1000);
       });
     } catch (_) {}
   }
@@ -459,7 +478,25 @@
     var secs = Math.round((Date.now() - pageEnter) / 1000);
     if (secs < 2) return;                  // мгновенный отскок не считаем уходом
     leaveSent = true;
-    send("page_leave", metaProps({ seconds: secs, scroll_pct: maxScroll }));
+    var props = metaProps({ seconds: secs, scroll_pct: maxScroll });
+    // На уходе со страницы fetch часто обрывается браузером - beacon доживает.
+    // Авторизацию beacon нести не умеет, поэтому токен уходит в query
+    // (токен публичного класса, он и так в HTML страницы).
+    if (navigator.sendBeacon && cfg.endpoint && cfg.tenant) {
+      try {
+        var e = { event_id: uuid(), tenant_id: cfg.tenant,
+                  event_type: "page_leave", ts: iso(new Date()),
+                  source: "snippet", client_user_id: get(K) || "",
+                  email_hash: get(KH) || "", session_id: sessionId(),
+                  page: location.pathname, meta: props.meta };
+        var url = cfg.endpoint + (cfg.endpoint.indexOf("?") < 0 ? "?" : "&") +
+                  "token=" + encodeURIComponent(cfg.token);
+        if (navigator.sendBeacon(url, new Blob([JSON.stringify(e)],
+                                               { type: "application/json" })))
+          return;
+      } catch (_) {}
+    }
+    send("page_leave", props);
   }
 
   function resetPage() {

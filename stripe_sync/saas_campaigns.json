@@ -74,8 +74,8 @@
           {
             "delay_h": 48,
             "action": "email",
-            "subject": "We added extra trial days",
-            "body": "Need more time to decide? Your trial got extended. Meanwhile, try the advanced features: {{app_url}}"
+            "subject": "Still deciding? See what you would keep",
+            "body": "Your work and settings stay with you on any paid plan. If something held you back from upgrading, just reply - a human reads this. {{app_url}}"
           },
           {
             "delay_h": 120,

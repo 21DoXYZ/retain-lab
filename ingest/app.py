@@ -86,12 +86,19 @@ def _valid_tokens():
     return set(_token_map()) or ENV_TOKENS
 
 
+def _presented_token():
+    """Токен из заголовка либо из ?token= (sendBeacon не умеет заголовков;
+    токен публичного класса и так лежит в HTML страницы)."""
+    h = request.headers.get("Authorization", "")
+    if h.startswith("Bearer "):
+        return h[7:]
+    return request.args.get("token", "")
+
+
 def _token_tenant():
     """Тенант предъявленного токена; '' - токен из env-фолбэка (любой тенант)."""
-    h = request.headers.get("Authorization", "")
-    if not h.startswith("Bearer "):
-        return ""
-    return _token_map().get(h[7:], "")
+    tok = _presented_token()
+    return _token_map().get(tok, "") if tok else ""
 SASL_PASS = os.environ.get("SASL_PASS", "")
 MAX_BATCH = int(os.environ.get("MAX_BATCH", "1000"))
 # Сниппет v2 шлёт богатый meta-JSON - зловредная страница могла бы слать
@@ -145,10 +152,9 @@ def _auth_ok():
     toks = _valid_tokens()
     if not toks:
         return not REQUIRE_AUTH   # нет токенов: локально — открыто; в проде (REQUIRE_AUTH) — отказ
-    h = request.headers.get("Authorization", "")
-    if not h.startswith("Bearer "):
+    got = _presented_token()
+    if not got:
         return False
-    got = h[7:]
     return any(hmac.compare_digest(got, t) for t in toks)   # timing-safe
 
 
@@ -321,6 +327,10 @@ def ingest_saas():
     for e in events:
         # жёсткое присваивание, не setdefault: source из браузера - не факт
         e["source"] = "snippet"
+        # Открытый email с ПУБЛИЧНОГО токена не принимаем: злоумышленник мог бы
+        # подменить адрес жертвы и увести её жизненные письма на свой ящик.
+        # Браузер шлёт только email_hash; настоящий адрес приходит из Stripe.
+        e.pop("email", None)
         e["ts"] = sane_ts(e.get("ts"), now_utc)
         key = e.get("client_user_id") or e.get("stripe_customer_id") or e["tenant_id"]
         producer.produce(SAAS_TOPIC, key=str(key), value=json.dumps(e), on_delivery=_cb)

@@ -368,7 +368,20 @@ SELECT
     maxIf(ts, event_type = 'billing.invoice_paid' AND source = 'stripe')    AS last_invoice_paid,
     maxIf(ts, event_type = 'billing.subscription_cancel_scheduled'
               AND source = 'stripe')                                        AS last_cancel_scheduled,
-    maxIf(ts, event_type NOT LIKE 'billing.%')                           AS last_product_seen
+    maxIf(ts, event_type NOT LIKE 'billing.%')                           AS last_product_seen,
+    -- поведение сниппета v2 (meta-JSON): фрустрация и время в продукте -
+    -- ранние сигналы ухода, которых нет в метриках использования
+    countIf(event_type = 'rage_click' AND ts >= now() - INTERVAL 7 DAY)  AS rage_clicks_7d,
+    countIf(event_type = 'js_error' AND ts >= now() - INTERVAL 7 DAY)    AS js_errors_7d,
+    sumIf(JSONExtractInt(meta, 'seconds'),
+          event_type = 'page_leave' AND ts >= now() - INTERVAL 7 DAY)
+      + countIf(event_type = 'heartbeat'
+                AND ts >= now() - INTERVAL 7 DAY) * 120                  AS active_sec_7d,
+    sumIf(JSONExtractInt(meta, 'seconds'),
+          event_type = 'page_leave' AND ts >= now() - INTERVAL 14 DAY
+          AND ts < now() - INTERVAL 7 DAY)
+      + countIf(event_type = 'heartbeat' AND ts >= now() - INTERVAL 14 DAY
+                AND ts < now() - INTERVAL 7 DAY) * 120                   AS active_sec_prev_7d
 FROM (
     -- ДЕДУПЛИКАЦИЯ. Сниппет повторяет отправку при сбое сети, Stripe
     -- перепосылает вебхук на любой не-2xx - одно и то же событие приходит
@@ -378,7 +391,8 @@ FROM (
            any(ts)           AS ts,
            any(event_type)   AS event_type,
            any(source)       AS source,
-           any(tokens_spent) AS tokens_spent
+           any(tokens_spent) AS tokens_spent,
+           any(meta)         AS meta
     FROM retention.saas_events_resolved
     GROUP BY tenant_id, identity_id, event_id
 )
