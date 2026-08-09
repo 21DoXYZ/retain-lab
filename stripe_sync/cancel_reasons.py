@@ -120,26 +120,24 @@ def pending(client, tenant: str, limit: int = 50) -> list:
 def classify(items: list, context: dict | None = None) -> tuple[dict, str]:
     if not items:
         return {}, "nothing_to_do"
-    provider, api_key = resolve_provider()
-    if not provider:
-        return {}, "ai_not_configured"
-    call = _call_anthropic if provider == "anthropic" else _call_openai
     payload = [{"id": i["event_id"], "text": i["text"]} for i in items]
-    # Продуктовый контекст обязателен: «не хватает функции» и «плохое
-    # качество» различимы только на языке КОНКРЕТНОГО продукта.
+    # Продуктовый контекст помогает («не хватает функции» vs «плохое качество»
+    # различимы на языке продукта), но не обязателен: у нового тенанта профиля
+    # ещё нет, а причины классифицировать надо - allow_no_context.
     try:
         from business_context import context_block
+        from llm_stage import call as llm_call
     except ImportError:
         from stripe_sync.business_context import context_block  # type: ignore
+        from stripe_sync.llm_stage import call as llm_call  # type: ignore
     ctx_text = context_block(context) + "\n" if context else ""
-    try:
-        text = call(api_key, SYSTEM,
-                    ctx_text + "Classify these cancellation reasons:\n"
-                    + json.dumps(payload, ensure_ascii=False))
-    except urllib.error.HTTPError as exc:
-        return {}, f"ai_http_{exc.code}"
-    except Exception as exc:  # noqa: BLE001
-        return {}, f"ai_{type(exc).__name__}"
+    text, note = llm_call(
+        SYSTEM,
+        ctx_text + "Classify these cancellation reasons:\n"
+        + json.dumps(payload, ensure_ascii=False),
+        allow_no_context=True)
+    if note:
+        return {}, note
     out, rejected = parse_classification(text, {i["event_id"] for i in items})
     if rejected:
         print(f"[cancel_reasons] отбраковано: {rejected}", flush=True)

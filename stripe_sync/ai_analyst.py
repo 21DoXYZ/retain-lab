@@ -218,30 +218,28 @@ def analyze(client, tenant: str, campaigns: dict, days: int = 7) -> tuple[list, 
     facts = collect_facts(client, tenant, days)
     if not has_data(facts):
         return [], "no_data"
-    provider, api_key = resolve_provider()
-    if not provider:
-        return [], "ai_not_configured"
-    call = _call_anthropic if provider == "anthropic" else _call_openai
-    # Бизнес-контекст обязателен: rewrite_copy без него советует голосом
-    # генерик-SaaS, а не ЭТОГО продукта (методология §8).
+    # Бизнес-контекст обязателен (методология §9): rewrite_copy без него
+    # советует голосом генерик-SaaS, а не ЭТОГО продукта.
     try:
         from business_context import business_context, context_block
+        from llm_stage import call as llm_call, record_run
     except ImportError:
         from stripe_sync.business_context import (business_context,  # type: ignore
                                                   context_block)
+        from stripe_sync.llm_stage import call as llm_call, record_run  # type: ignore
     ctx = business_context(client, tenant)
     user = (context_block(ctx)
             + "\nFACTS (last %d days, tenant %s):\n" % (days, tenant)
             + json.dumps(facts, ensure_ascii=False, default=str)
             + "\nCampaign step counts: " + json.dumps(campaigns)
             + "\nProduce the insights now.")
-    try:
-        text = call(api_key, SYSTEM, user)
-    except urllib.error.HTTPError as exc:
-        return [], f"ai_http_{exc.code}"
-    except Exception as exc:  # noqa: BLE001
-        return [], f"ai_{type(exc).__name__}"
+    text, note = llm_call(SYSTEM, user)
+    if note:
+        record_run(client, tenant, "analyst", "error", note=note)
+        return [], note
     insights, rejected = parse_insights(text, campaigns)
+    record_run(client, tenant, "analyst", "ok",
+               kept=len(insights), rejected=len(rejected))
     if rejected:
         print(f"[ai_analyst] отбраковано: {rejected}", flush=True)
     return [{**i, "evidence": facts} for i in insights], ("" if insights else "ai_empty")

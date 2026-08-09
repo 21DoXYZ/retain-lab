@@ -921,3 +921,21 @@ SELECT tenant_id, stage,
        dateDiff('minute', maxIf(started_at, pipeline_runs.status = 'ok'), now()) AS ok_age_min
 FROM retention.pipeline_runs
 GROUP BY tenant_id, stage;
+
+-- LLM-стадии: исход каждого обращения к модели (llm_stage.record_run).
+-- Галлюцинации и пустые ответы видны единообразно: сколько принято/отбраковано
+-- доменной валидацией (схемы офферов, copy_review, коды-не-проза).
+CREATE TABLE IF NOT EXISTS retention.llm_runs
+(
+    `tenant_id` LowCardinality(String),
+    `stage`     LowCardinality(String),   -- offers | copy | analyst | cancel
+    `status`    LowCardinality(String),   -- ok | error
+    `kept`      Int64,
+    `rejected`  Int64,
+    `note`      String,
+    `ts`        DateTime64(3)
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (tenant_id, stage, ts)
+TTL toDateTime(ts) + INTERVAL 90 DAY;

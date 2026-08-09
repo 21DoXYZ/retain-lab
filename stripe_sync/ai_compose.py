@@ -31,17 +31,16 @@ _TIMEOUT = 60
 AI_PREFIX = "AI_"
 
 
-def resolve_provider(env: dict | None = None) -> tuple[str, str]:
-    """(provider, api_key). Anthropic приоритетнее, OpenAI - фолбэк.
-    ('', '') = AI выключен."""
-    e = env if env is not None else os.environ
-    a = str(e.get("ANTHROPIC_API_KEY", "") or "").strip()
-    if a:
-        return "anthropic", a
-    o = str(e.get("OPENAI_API_KEY", "") or "").strip()
-    if o:
-        return "openai", o
-    return "", ""
+# Транспорт и резолв провайдера - единая дверь llm_stage (методология §9:
+# один контракт на все LLM-вызовы). Ре-экспорт для обратной совместимости:
+# ai_analyst / cancel_reasons / site_scan импортируют это отсюда.
+try:
+    from llm_stage import (_call_anthropic, _call_openai,  # noqa: F401
+                           call as llm_call, record_run, resolve_provider)
+except ImportError:  # пакетный контекст (board)
+    from stripe_sync.llm_stage import (_call_anthropic, _call_openai,  # noqa: F401
+                                       call as llm_call, record_run,
+                                       resolve_provider)
 
 # Мастер-промпт офферов v2. База: knowledge/lifecycle_playbook.md (§2 иерархия,
 # §4 типы бизнесов, §6 ограничители). role - для точной привязки к кампаниям.
@@ -117,37 +116,6 @@ def build_user_prompt(answers: dict, avg_price: float,
         + f"\nAverage plan price from Stripe: ${avg_price:.2f}"
         + "\nCompose the offer set now."
     )
-
-
-def _call_anthropic(api_key: str, system: str, user: str) -> str:
-    payload = json.dumps({
-        "model": ANTHROPIC_MODEL, "max_tokens": 1500,
-        "system": system,
-        "messages": [{"role": "user", "content": user}],
-    }).encode()
-    req = urllib.request.Request(
-        ANTHROPIC_URL, data=payload, method="POST",
-        headers={"Content-Type": "application/json",
-                 "x-api-key": api_key, "anthropic-version": "2023-06-01"})
-    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-        data = json.loads(resp.read().decode())
-    return "".join(b.get("text", "") for b in data.get("content", []))
-
-
-def _call_openai(api_key: str, system: str, user: str) -> str:
-    payload = json.dumps({
-        "model": OPENAI_MODEL, "max_tokens": 1500,
-        "response_format": {"type": "json_object"},
-        "messages": [{"role": "system", "content": system},
-                     {"role": "user", "content": user}],
-    }).encode()
-    req = urllib.request.Request(
-        OPENAI_URL, data=payload, method="POST",
-        headers={"Content-Type": "application/json",
-                 "Authorization": f"Bearer {api_key}"})
-    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-        data = json.loads(resp.read().decode())
-    return ((data.get("choices") or [{}])[0].get("message") or {}).get("content", "")
 
 
 def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], list[str]]:
@@ -342,22 +310,15 @@ def parse_ai_copy(text: str, profile: dict | None = None) -> dict:
 
 def ai_compose_copy(answers: dict, context: dict | None = None) -> tuple[dict, str]:
     """Тексты кампаний под продукт. ({}, note) при сбое - остаёмся на шаблонах."""
-    provider, api_key = resolve_provider()
-    if not provider:
-        return {}, "ai_not_configured"
-    call = _call_anthropic if provider == "anthropic" else _call_openai
     try:
         from business_context import context_block
     except ImportError:
         from stripe_sync.business_context import context_block  # type: ignore
     ctx = context if context is not None else {"claimed": answers, "measured": {}}
     user = context_block(ctx) + "\nWrite the copy now."
-    try:
-        text = call(api_key, COPY_SYSTEM, user)
-    except urllib.error.HTTPError as exc:
-        return {}, f"ai_http_{exc.code}"
-    except Exception as exc:
-        return {}, f"ai_{type(exc).__name__}"
+    text, note = llm_call(COPY_SYSTEM, user)   # §9: контекст обязателен - в user
+    if note:
+        return {}, note
     out = parse_ai_copy(text, profile=answers)
     return out, "" if out else "ai_empty"
 
@@ -366,16 +327,9 @@ def ai_compose(answers: dict, avg_price: float,
                context: dict | None = None) -> tuple[list[dict], str]:
     """(офферы, note). Пустой список + note при любом сбое - вызывающий
     остаётся на детерминированной сборке."""
-    provider, api_key = resolve_provider()
-    if not provider:
-        return [], "ai_not_configured"
-    call = _call_anthropic if provider == "anthropic" else _call_openai
-    try:
-        text = call(api_key, SYSTEM, build_user_prompt(answers, avg_price, context))
-    except urllib.error.HTTPError as exc:
-        return [], f"ai_http_{exc.code}"
-    except Exception as exc:
-        return [], f"ai_{type(exc).__name__}"
+    text, note = llm_call(SYSTEM, build_user_prompt(answers, avg_price, context))
+    if note:
+        return [], note
     offers, rejected = parse_ai_offers(text, float(answers.get("max_discount_pct") or 0))
     if rejected:
         print(f"[ai_compose] отбраковано: {rejected}", flush=True)
