@@ -317,6 +317,12 @@
       session_id: sessionId(),
       page: location.pathname,
     };
+    // Таймзона в meta КАЖДОГО события: сервер выводит из неё страну (гео), а
+    // не только из session_start - иначе country был бы лишь на первом событии.
+    try {
+      var _tz = (Intl.DateTimeFormat().resolvedOptions() || {}).timeZone || "";
+      if (_tz) e.meta = JSON.stringify({ tz: _tz });
+    } catch (_) {}
     if (props) {
       // Поля-колонки (tokens_spent и пр.) кладём как есть; ВСЁ остальное - в
       // meta-JSON: шина отбрасывает неизвестные колонки молча, и кастомные
@@ -328,7 +334,18 @@
       for (var k in props) {
         // только свои поля: у объекта из чужого кода бывает грязный прототип
         if (!Object.prototype.hasOwnProperty.call(props, k) || (k in e)) continue;
-        if (COLS[k]) { e[k] = props[k]; }
+        if (k === "meta") {
+          // meta СЛИВАЕМ, не перезаписываем: в конверте уже лежит {tz},
+          // событие со своей meta (rage/page_leave) не должно её потерять
+          var cur = {};
+          if (e.meta) { try { cur = JSON.parse(e.meta) || {}; } catch (_) {} }
+          var add = props.meta;
+          if (typeof add === "string") { try { add = JSON.parse(add); } catch (_) { add = {}; } }
+          for (var mk in add) {
+            if (Object.prototype.hasOwnProperty.call(add, mk)) cur[mk] = add[mk];
+          }
+          try { e.meta = JSON.stringify(cur); } catch (_) {}
+        } else if (COLS[k]) { e[k] = props[k]; }
         else { (extra = extra || {})[k] = props[k]; }
       }
       if (extra) {
