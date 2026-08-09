@@ -527,6 +527,7 @@ def tick(client, tenant: str) -> dict[str, int]:
                                          # whatsapp шлёт ШАБЛОН по (кампания, шаг),
                                          # а не текст - ему нужен адрес шага
                                          "campaign_id": cid, "step_idx": i,
+                                         "cta_label": step.get("cta_label", ""),
                                          "app_url": email_cfg.app_url,
                                          "card_update_url": email_cfg.card_update_url})
                                     if not ok and channel == "whatsapp":

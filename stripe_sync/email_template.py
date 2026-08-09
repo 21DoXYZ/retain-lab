@@ -54,10 +54,17 @@ def preheader(text: str, limit: int = MAX_PREHEADER) -> str:
     return clean[:limit].rstrip(" ,;:-")
 
 
+def _safe_logo(raw: str) -> str:
+    """Логотип - только https-картинка. javascript:/data: в письме не место."""
+    url = str(raw or "").strip()
+    return url if url.lower().startswith("https://") else ""
+
+
 def render(subject: str, body: str, unsubscribe: str, brand: str = "",
-           cta_label: str = "", brand_color: str = "") -> str:
+           cta_label: str = "", brand_color: str = "", logo_url: str = "") -> str:
     """HTML письма. Все стили инлайном - иначе почтовики их выбрасывают."""
     color = _safe_color(brand_color)
+    logo = _safe_logo(logo_url)
     text, link = split_cta(body)
     label = (cta_label or "").strip() or "Open"
     esc = _html.escape(text)
@@ -95,8 +102,12 @@ def render(subject: str, body: str, unsubscribe: str, brand: str = "",
         'style="max-width:520px;background:#ffffff;border-radius:14px;'
         'padding:26px 24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,'
         'Roboto,Arial,sans-serif;font-size:15px;color:#101828">'
-        + (f'<tr><td style="padding-bottom:14px;font-size:13px;font-weight:600;'
-           f'letter-spacing:.2px;color:{color}">{head}</td></tr>' if head else "")
+        + (f'<tr><td style="padding-bottom:16px">'
+           f'<img src="{logo}" alt="{head}" height="28" '
+           f'style="display:block;border:0;max-height:28px"></td></tr>'
+           if logo else
+           (f'<tr><td style="padding-bottom:14px;font-size:13px;font-weight:600;'
+            f'letter-spacing:.2px;color:{color}">{head}</td></tr>' if head else ""))
         + (f'<tr><td style="padding-bottom:12px;font-size:19px;font-weight:700;'
            f'line-height:1.3">{title}</td></tr>' if title else "")
         + f'<tr><td>{paragraphs}{button}</td></tr>'

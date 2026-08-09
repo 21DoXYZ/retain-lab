@@ -91,7 +91,7 @@ def text_to_html(body: str, unsubscribe: str, brand: str = "") -> str:
 
 def build_email_payload(to: str, subject: str, body: str, email_from: str,
                         unsubscribe: str, brand: str = "", cta_label: str = "",
-                        brand_color: str = "") -> dict:
+                        brand_color: str = "", logo_url: str = "") -> dict:
     """Тело запроса к Resend: и HTML, и текст (клиенты без HTML), плюс
     заголовки отписки - их читают Gmail/Outlook и показывают свою кнопку."""
     try:                                    # борд импортирует пакетом, джобы плоско
@@ -102,7 +102,7 @@ def build_email_payload(to: str, subject: str, body: str, email_from: str,
         "from": email_from,
         "to": [to],
         "subject": subject,
-        "html": render(subject, body, unsubscribe, brand, cta_label, brand_color),
+        "html": render(subject, body, unsubscribe, brand, cta_label, brand_color, logo_url),
         "text": f"{body.strip()}\n\n---\nUnsubscribe: {unsubscribe}",
         "headers": {
             "List-Unsubscribe": f"<{unsubscribe}>",

@@ -33,6 +33,8 @@ class EmailConfig:
     tenant_id: str = ""          # для ссылки отписки (подпись по тенанту)
     saas_host: str = ""          # домен платформы: там живёт /public/unsubscribe
     brand: str = ""              # имя продукта в подвале письма
+    brand_color: str = ""        # цвет кнопки/акцентов (#rrggbb из tenants.json)
+    logo_url: str = ""           # логотип в шапке письма (https, опционально)
 
     @classmethod
     def from_env(cls) -> "EmailConfig":
@@ -86,7 +88,9 @@ def send_email(to: str, subject: str, body: str, cfg: EmailConfig,
 
     unsub = unsub_url(cfg.saas_host or "retivo.digital", cfg.tenant_id or "", to)
     payload = json.dumps(build_email_payload(
-        to, subject_r, body_r, cfg.email_from, unsub, cfg.brand)).encode()
+        to, subject_r, body_r, cfg.email_from, unsub, cfg.brand,
+        cta_label=str((ctx or {}).get("cta_label") or ""),
+        brand_color=cfg.brand_color, logo_url=cfg.logo_url)).encode()
     req = urllib.request.Request(
         "https://api.resend.com/emails", data=payload, method="POST",
         headers={"Content-Type": "application/json",
@@ -332,7 +336,9 @@ def tenant_configs(tenant_id: str, email_cfg: EmailConfig,
     tc = load_tenant_channels(tenant_id)
     brand = str((tc.get("onboarding_answers") or {}).get("product_name")
                 or tc.get("product_name") or "")
-    email_cfg = replace(email_cfg, tenant_id=tenant_id, brand=brand)
+    email_cfg = replace(email_cfg, tenant_id=tenant_id, brand=brand,
+                        brand_color=str(tc.get("brand_color") or ""),
+                        logo_url=str(tc.get("logo_url") or ""))
     # Ключ Resend: СВОЙ аккаунт клиента важнее платформенного. Так клиент сам
     # платит за отправку, сам владеет репутацией домена и видит свою
     # статистику - а мы не отвечаем за чужой контент своим аккаунтом.
