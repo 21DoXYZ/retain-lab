@@ -88,6 +88,33 @@ def next_step_time(steps: list[dict], enrolled_at: datetime, step_idx: int,
     return max(planned, now + timedelta(hours=max(gap_h, 0.0)))
 
 
+def enroll_entry(camp: dict, stage: str, buy_intent: float,
+                 churn: float) -> str:
+    """Куда зачислять этого человека в эту кампанию. '' - не зачислять.
+
+    Возвращает entry_stage для записи (по нему же считается выход). Две двери:
+      • основная - человек в целевой стадии кампании И проходит сигнальные
+        гейты (entry_gates: min_churn/min_buy_intent) - чтобы не тратить
+        дорогую последовательность на тех, кому она не нужна;
+      • also_enroll - сигнал важнее стадии: горячий на прайсинге (высокий
+        buy_intent) плательщик из соседней стадии заслуживает апгрейд-толчок,
+        а не общую рассылку. entry_stage для него - его СОБСТВЕННАЯ стадия
+        (по ней и выйдет), цель кампании считается своим окном.
+    """
+    gates = camp.get("entry_gates") or {}
+    if stage == camp["entry_stage"]:
+        if churn < float(gates.get("min_churn", 0)):
+            return ""
+        if buy_intent < float(gates.get("min_buy_intent", 0)):
+            return ""
+        return stage
+    ae = camp.get("also_enroll") or {}
+    if (stage in (ae.get("from_stages") or [])
+            and buy_intent >= float(ae.get("buy_intent_min", 2))):
+        return stage
+    return ""
+
+
 def exit_status(current_stage: str, entry_stage: str, step_idx: int,
                 n_steps: int) -> str | None:
     """None = остаётся active."""
@@ -340,9 +367,12 @@ def tick(client, tenant: str) -> dict[str, int]:
     now = _now_dt()
     stats = {"enrolled": 0, "control": 0, "steps": 0, "done": 0, "exited": 0}
 
-    stages = {r[0]: (r[1], r[2], r[3]) for r in client.query(
-        "SELECT identity_id, stage, email_norm, client_user_id FROM retention.user_actions "
-        "WHERE tenant_id = %(t)s", parameters={"t": tenant}).result_rows}
+    stages = {r[0]: (r[1], r[2], r[3], float(r[4] or 0), float(r[5] or 0))
+              for r in client.query(
+        "SELECT identity_id, stage, email_norm, client_user_id, "
+        "coalesce(buy_intent, 0), coalesce(p_churn, 0) "
+        "FROM retention.user_actions WHERE tenant_id = %(t)s",
+        parameters={"t": tenant}).result_rows}
 
     # Подавление email: кому писать НЕЛЬЗЯ (отписался, пожаловался, баунс).
     # Fail-closed: сомнений нет - адрес в списке, значит письма не будет.
@@ -412,12 +442,15 @@ def tick(client, tenant: str) -> dict[str, int]:
         ).result_rows}
 
         # 1. ENROLL
-        for identity, (stage, _email, _cuid) in stages.items():
-            if stage != camp["entry_stage"] or identity in enrolled:
+        for identity, (stage, _email, _cuid, _buy, _churn) in stages.items():
+            if identity in enrolled:
+                continue
+            entry = enroll_entry(camp, stage, _buy, _churn)
+            if not entry:
                 continue
             control = holdout_split(tenant, cid, identity, control_pct)
             row = {"identity_id": identity, "control": 1 if control else 0,
-                   "entry_stage": stage, "step_idx": 0,
+                   "entry_stage": entry, "step_idx": 0,
                    "next_step_at": next_step_time(steps, now, 0),
                    "status": "active", "enrolled_at": now}
             _save(client, tenant, cid, row)
@@ -431,7 +464,7 @@ def tick(client, tenant: str) -> dict[str, int]:
                 continue
             enrolled_at = row["enrolled_at"] if isinstance(row["enrolled_at"], datetime) \
                 else datetime.fromisoformat(str(row["enrolled_at"]))
-            stage_now, email, cuid = stages.get(identity, ("", "", ""))
+            stage_now, email, cuid = stages.get(identity, ("", "", "", 0, 0))[:3]
 
             for i in due_steps(steps, enrolled_at, int(row["step_idx"]), now):
                 step = steps[i]

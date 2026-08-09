@@ -178,7 +178,10 @@ class FakeCH:
             return _Res([["exited" if ident in getattr(self, "exited", set())
                           else "active"]])
         if "user_actions" in sql:
-            return _Res(self.stages)
+            # витрина отдаёт 6 колонок (+buy_intent,+p_churn); фикстуры дают
+            # 4 - дополняем нулями скоров, чтобы отбор по сигналам не падал
+            return _Res([list(r) + [0, 0] if len(r) == 4 else list(r)
+                         for r in self.stages])
         if "email_suppressions_current" in sql:
             return _Res([])
         if "contacts_current" in sql:
@@ -659,3 +662,34 @@ def test_channel_ladder_declared_in_default_dunning():
     assert k3.get("align_retries") is True
     laddered = [s for s in k3["steps"] if s.get("channels")]
     assert laddered and all(s["channels"][0] == "email" for s in laddered)
+
+
+# ── Сигналы в решениях: buy_intent/churn меняют отбор (архитектура №1) ────────
+
+def test_enroll_gate_blocks_low_churn_from_save():
+    """Дорогую save-последовательность не тратим на нерисковых (min_churn)."""
+    from stripe_sync.campaign_tick import enroll_entry
+    save = {"campaign_id": "K4_save", "entry_stage": "SAVE",
+            "entry_gates": {"min_churn": 0.25}}
+    assert enroll_entry(save, "SAVE", 0.0, 0.6) == "SAVE"     # рисковый - да
+    assert enroll_entry(save, "SAVE", 0.0, 0.1) == ""         # спокойный - нет
+
+
+def test_also_enroll_hot_pricing_gets_upgrade_across_stage():
+    """Горячий на прайсинге плательщик (MONITOR) попадает в апгрейд - сигнал
+    важнее стадии; entry_stage = его СОБСТВЕННАЯ стадия (по ней выйдет)."""
+    from stripe_sync.campaign_tick import enroll_entry
+    up = {"campaign_id": "K5_upgrade", "entry_stage": "UPGRADE",
+          "also_enroll": {"buy_intent_min": 0.6, "from_stages": ["MONITOR"]}}
+    assert enroll_entry(up, "UPGRADE", 0.0, 0.0) == "UPGRADE"   # обычный вход
+    assert enroll_entry(up, "MONITOR", 0.7, 0.0) == "MONITOR"   # горячий - тоже
+    assert enroll_entry(up, "MONITOR", 0.3, 0.0) == ""          # прохладный - нет
+    assert enroll_entry(up, "CONVERT", 0.9, 0.0) == ""          # не из from_stages
+
+
+def test_no_gates_is_plain_stage_match():
+    """Кампания без сигнальных условий - прежнее поведение (стадия == вход)."""
+    from stripe_sync.campaign_tick import enroll_entry
+    k1 = {"campaign_id": "K1_activation", "entry_stage": "ACTIVATE"}
+    assert enroll_entry(k1, "ACTIVATE", 0.0, 0.0) == "ACTIVATE"
+    assert enroll_entry(k1, "MONITOR", 0.9, 0.9) == ""

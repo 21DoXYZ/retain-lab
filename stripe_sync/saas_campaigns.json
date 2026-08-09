@@ -211,6 +211,9 @@
           "event_type": "billing.subscription_canceled",
           "window_days": 30,
           "invert": true
+        },
+        "entry_gates": {
+          "min_churn": 0.25
         }
       },
       {
@@ -250,6 +253,12 @@
         "goal": {
           "event_type": "billing.subscription_upgraded",
           "window_days": 30
+        },
+        "also_enroll": {
+          "buy_intent_min": 0.6,
+          "from_stages": [
+            "MONITOR"
+          ]
         }
       },
       {
