@@ -37,7 +37,10 @@ interface Campaign {
   stats: { enrolled: number; active: number; holdout: number; done: number; exited: number; touches: number };
 }
 
+interface CopyFlag { code: string; level: string }
+
 interface Payload {
+  copy_flags?: CopyFlag[];
   autopilot: boolean;
   platform_dry_run: boolean;
   control_pct: number;
@@ -98,6 +101,7 @@ function StepRow({
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [flags, setFlags] = useState<CopyFlag[]>([]);
   const [subject, setSubject] = useState(step.subject);
   const [body, setBody] = useState(step.body);
   const [ctaLabel, setCtaLabel] = useState(step.cta_label);
@@ -117,6 +121,7 @@ function StepRow({
       .then((p) => {
         refresh(p);
         setEditing(false);
+        setFlags(p.copy_flags ?? []);   // методология §8 о сохранённом тексте
       })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : t("saas.channels.err.generic")))
       .finally(() => setBusy(false));
@@ -138,6 +143,19 @@ function StepRow({
                 ? `${t("saas.camp.offer")}: ${step.offer_title || step.offer_id}`
                 : "")}
             <SourceBadge source={step.source} />
+            {flags.length > 0 && (
+              <span className="mt-1 block">
+                {flags.map((f) => (
+                  <span key={f.code}
+                        className={"mr-2 inline-block rounded-md border px-1.5 py-0.5 text-[11px] font-medium " +
+                          (f.level === "fatal"
+                            ? "border-[#fecdca] bg-[#fef3f2] text-neg"
+                            : "border-[#fedf89] bg-[#fffaeb] text-[#b54708]")}>
+                    {t(`saas.copyflag.${f.code}` as MessageKey)}
+                  </span>
+                ))}
+              </span>
+            )}
           </div>
           {!editing && (
             <button

@@ -76,9 +76,26 @@ const STAGE_TONE: Record<string, string> = {
 
 const SEND_STATUS_TONE: Record<string, string> = {
   sent: "text-pos", queued: "text-pos", issued: "text-pos",
-  dry_run: "text-steel", holdout: "text-steel",
+  dry_run: "text-steel", holdout: "text-steel", skipped: "text-steel",
   rejected: "text-neg", retry: "text-[#b54708]",
 };
+
+// Причина отказа - машинный код (методология: коды, не фразы). Здесь коды
+// становятся человеческим текстом; неизвестный код показываем как есть.
+function reasonText(t: (k: MessageKey) => string, raw: string): string {
+  if (!raw) return "";
+  if (raw.startsWith("methodology:")) {
+    try {
+      const code = String(JSON.parse(raw.slice(12)).code || "");
+      return t(`saas.mreason.${code}` as MessageKey);
+    } catch { return raw; }
+  }
+  if (raw.startsWith("opened_step_")) return t("saas.mreason.opened_step");
+  const known = ["awaiting_retry", "quiet_hours", "freq_cap_day", "freq_cap_week",
+                 "no_contact", "no_consent", "suppressed", "no_offer_bound",
+                 "low_churn_risk", "unresolved_placeholder"];
+  return known.includes(raw) ? t(`saas.mreason.${raw}` as MessageKey) : raw;
+}
 
 function usd(n: number): string {
   return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -354,7 +371,7 @@ export function UserCardView({ identity }: { identity: string }) {
                     </span>
                     <span className={"shrink-0 font-mono text-[11.5px] " + (SEND_STATUS_TONE[s.status] ?? "text-steel")}
                           title={s.reason || undefined}>
-                      {s.status}{s.reason ? ` (${s.reason})` : ""}
+                      {s.status}{s.reason ? ` (${reasonText(t, s.reason)})` : ""}
                     </span>
                   </li>
                 ))}
@@ -521,7 +538,8 @@ export function UserCardView({ identity }: { identity: string }) {
                 {data.offers.map((o, i) => (
                   <li key={i} className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 truncate font-mono text-[12px] text-slate">{o.offer_id}</span>
-                    <span className={"shrink-0 font-mono text-[11px] " + (SEND_STATUS_TONE[o.status] ?? "text-steel")}>
+                    <span className={"shrink-0 font-mono text-[11px] " + (SEND_STATUS_TONE[o.status] ?? "text-steel")}
+                          title={o.reason ? reasonText(t, o.reason) : undefined}>
                       {o.status}
                     </span>
                   </li>

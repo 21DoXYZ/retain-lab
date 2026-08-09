@@ -1004,6 +1004,9 @@ def _channels_payload(tenant: str) -> dict:
                    # этот URL клиент вставляет в Resend - Webhooks
                    'webhook_url': (f'https://{_host()}/public/resend/webhook?tenant={tenant}'
                                    if _host() else ''),
+                   # брендинг писем: цвет кнопки/шапки и его происхождение
+                   'brand_color': tch.get('brand_color', ''),
+                   'brand_color_source': tch.get('brand_color_source', ''),
                    'dns_records': tch.get('email_dns_records', [])}},
         {'channel': 'inapp', 'provider': 'Site snippet',
          'state': 'active' if snippet_alive and identified else 'not_connected',
@@ -1324,7 +1327,28 @@ def saas_campaign_step_edit():
 
     ovr.set_campaign_step(tenant, cid, idx, patch)
     print(f'[edit] {tenant}: {cid} step {idx} обновлён {sorted(patch)}', flush=True)
-    return api_json(_campaigns_payload(tenant))
+
+    # Методология текстов §8 и для рукописных шагов: владельца не блокируем
+    # (его текст - его право), но флаги показываем сразу при сохранении.
+    copy_flags = []
+    if 'subject' in patch or 'body' in patch:
+        try:
+            from stripe_sync.business_context import business_context
+            from stripe_sync.copy_review import review_step
+            payload_now = _campaigns_payload(tenant)
+            step_now = next(
+                (st for c in payload_now.get('campaigns', [])
+                 if c.get('campaign_id') == cid
+                 for j, st in enumerate(c.get('steps', [])) if j == idx), {})
+            profile = business_context(None, tenant).get('claimed') or {}
+            role = 'inapp' if step_now.get('action') == 'inapp' else 'email'
+            copy_flags = review_step(step_now.get('subject', ''),
+                                     step_now.get('body', ''), cid, role, profile)
+        except Exception as exc:  # noqa: BLE001 - ревью не роняет сохранение
+            print(f'[edit] {tenant}: copy_review пропущен: {exc}', flush=True)
+    out = _campaigns_payload(tenant)
+    out['copy_flags'] = copy_flags
+    return api_json(out)
 
 
 @bp.post('/saas/offers/update')

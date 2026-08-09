@@ -32,6 +32,7 @@ interface ChannelRow {
   email?: {
     domain: string; from: string; own_account?: boolean;
     webhook_secret_set?: boolean; webhook_url?: string; dns_records: DnsRecord[];
+    brand_color?: string; brand_color_source?: string;
   };
   telegram?: { bot_username: string; connect_link: string };
   whatsapp?: {
@@ -299,6 +300,23 @@ function ChannelCard({
                 </Button>
               </div>
             </Step>
+
+            {/* Брендинг писем: цвет извлечён сканом сайта, письма красятся им */}
+            {row.email?.brand_color && (
+              <div className="flex items-center gap-2 rounded-ctl border border-hair bg-surface p-3.5 text-[12.5px]">
+                <span className="inline-block h-4 w-4 rounded-full border border-hair2"
+                      style={{ background: row.email.brand_color }} />
+                <span className="text-slate">
+                  {t("saas.channels.email.brand")}{" "}
+                  <code className="font-mono text-[12px]">{row.email.brand_color}</code>
+                </span>
+                <span className="text-steel">
+                  {row.email.brand_color_source === "scan"
+                    ? t("saas.channels.email.brandFromScan")
+                    : t("saas.channels.email.brandManual")}
+                </span>
+              </div>
+            )}
 
             {/* Отчёты о доставке: важно, но не на первом экране - прячем в раскрывашку */}
             {own && row.email?.webhook_url && (
