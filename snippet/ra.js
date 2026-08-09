@@ -32,6 +32,11 @@
  * Вовлечённость: download_click, outbound_click, copy_event(len), field_focus
  * (имя поля, НЕ значение), form_submit, media_play/complete, tab_switches.
  * Атрибуция: gclid/gbraid/wbraid/fbclid/msclkid/ttclid/li_fat_id + entry/exit.
+ * RFM (кросс-сессия, localStorage): visits, days_known, days_since_last,
+ * pricing_visits (повторные заходы на прайсинг - сильнейший buy-intent).
+ * Ещё: GPU-строка (уровень устройства), батарея (Android), время суток/дня,
+ * тип навигации, динамика скролла (reversals), dwell по секциям, колебание
+ * до первого действия (ttfi), активное время, смена сети/offline.
  * Приватность: НИКОГДА не собираем тексты, значения полей (в т.ч. пароли),
  * заголовки страниц и сырой email - только sha256(email), техконтекст и гео.
  */
@@ -104,6 +109,7 @@
   // события несут её в meta. Первое session_start может уйти без модели -
   // heartbeat/page_leave её уже добавят.
   var hicues = {};
+  var envx = {};                       // GPU/батарея - резолвятся при старте
   (function () {
     try {
       var ua = navigator.userAgentData;
@@ -119,7 +125,60 @@
         }).catch(function () {});
       }
     } catch (_) {}
+    // GPU-строка: лучший прокси уровня устройства (кошелька) на Android.
+    // Провал создания WebGL-контекста = самый дешёвый девайс, это тоже сигнал.
+    try {
+      var cv = document.createElement("canvas");
+      var gl = cv.getContext("webgl") || cv.getContext("experimental-webgl");
+      if (gl) {
+        var dbg = gl.getExtension("WEBGL_debug_renderer_info");
+        if (dbg) envx.gpu = String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || "").slice(0, 80);
+      } else { envx.gpu = "none"; }
+    } catch (_) {}
+    // Батарея: на Chrome-Android промпта НЕТ. Низкий заряд без зарядки =
+    // скорая смерть сессии (не считать обрыв за намерение уйти); зарядка+wifi
+    // = «лежачее» окно, лучшее для апселла.
+    try {
+      if (navigator.getBattery) {
+        navigator.getBattery().then(function (b) {
+          envx.batt = Math.round(b.level * 100);
+          envx.charging = b.charging ? 1 : 0;
+        }).catch(function () {});
+      }
+    } catch (_) {}
   })();
+
+  // ── RFM: кросс-сессионные счётчики. Давность+частота - самые проверенные
+  // предикторы оттока в мире, а стоят 15 строк. localStorage per-browser -
+  // это НИЖНЯЯ оценка возвратов, не идентификатор.
+  var KV = "ra_visits", KL = "ra_last", KFS = "ra_first", KPV = "ra_pricing";
+  var PRICING_RE = /\/(pricing|plans|billing|upgrade|tarif|price)/i;
+
+  function rfm() {
+    var out = {};
+    try {
+      var now = Date.now();
+      var visits = parseInt(get(KV) || "0", 10) + 1;
+      set(KV, String(visits));
+      out.visits = visits;
+      var first = parseInt(get(KFS) || "0", 10);
+      if (!first) { set(KFS, String(now)); first = now; }
+      out.days_known = Math.floor((now - first) / 86400000);
+      var last = parseInt(get(KL) || "0", 10);
+      if (last) out.days_since_last = Math.floor((now - last) / 86400000);
+      set(KL, String(now));
+      // повторные заходы на прайсинг между сессиями - сильнейший buy-intent
+      if (PRICING_RE.test(location.pathname)) {
+        var pv = parseInt(get(KPV) || "0", 10) + 1;
+        set(KPV, String(pv));
+        out.pricing_visits = pv;
+      } else {
+        var pvp = parseInt(get(KPV) || "0", 10);
+        if (pvp) out.pricing_visits = pvp;
+      }
+    } catch (_) {}
+    return out;
+  }
 
   function deviceCtx() {
     var d = {};
@@ -192,6 +251,19 @@
     for (var k in utm) if (Object.prototype.hasOwnProperty.call(utm, k)) m[k] = utm[k];
     m.load_ms = loadMs();
     m.first = firstTouch();
+    // GPU/батарея (если уже отрезолвились), RFM, локальное время суток
+    for (var ek in envx)
+      if (Object.prototype.hasOwnProperty.call(envx, ek)) m[ek] = envx[ek];
+    var r = rfm();
+    for (var rk in r)
+      if (Object.prototype.hasOwnProperty.call(r, rk)) m[rk] = r[rk];
+    try {
+      var d = new Date();
+      m.local_hour = d.getHours();
+      m.dow = d.getDay();
+      var nav = performance.getEntriesByType("navigation")[0];
+      if (nav && nav.type) m.nav_type = nav.type;   // navigate|reload|back_forward
+    } catch (_) {}
     return m;
   }
 
@@ -553,6 +625,18 @@
   var lastActivity = Date.now();
   var leaveSent = false;
 
+  // Колебание перед первым действием: долгая пауза до первого осмысленного
+  // взаимодействия - чистейший предвестник отказа и рычаг для A/B копии.
+  var firstInteractAt = 0;
+  function noteInteract() {
+    if (!firstInteractAt) firstInteractAt = Date.now();
+  }
+
+  // Динамика скролла поверх уже собираемого потока: развороты и рывки =
+  // «не могу найти» = растерянность; ровный медленный скролл = чтение.
+  var scrollReversals = 0, lastScrollY = 0, lastScrollDir = 0, activeMs = 0;
+  var lastTick = Date.now();
+
   function scrollPct() {
     try {
       var doc = document.documentElement;
@@ -563,7 +647,11 @@
   }
 
   function noteActivity() {
-    lastActivity = Date.now();
+    var now = Date.now();
+    // активное время: суммируем промежутки между действиями, если пауза < 30с
+    // (свой idle-детектор без промпт-API); «оставил вкладку на диване» не в счёт
+    if (now - lastActivity < 30000) activeMs += now - lastActivity;
+    lastActivity = now;
     var p = scrollPct();
     if (p > maxScroll) maxScroll = p;
   }
@@ -571,6 +659,71 @@
   ["scroll", "mousemove", "keydown", "touchstart", "click"].forEach(function (ev) {
     addEventListener(ev, noteActivity, { passive: true, capture: true });
   });
+  ["keydown", "touchstart", "click"].forEach(function (ev) {
+    addEventListener(ev, noteInteract, { passive: true, capture: true });
+  });
+  addEventListener("scroll", function () {
+    try {
+      var y = scrollY, dir = y > lastScrollY ? 1 : (y < lastScrollY ? -1 : 0);
+      if (dir && lastScrollDir && dir !== lastScrollDir) scrollReversals++;
+      if (dir) lastScrollDir = dir;
+      lastScrollY = y;
+    } catch (_) {}
+  }, { passive: true });
+
+  // Dwell по секциям: ЧТО именно человека зацепило (цены/фичи/FAQ), а не
+  // просто глубина скролла. Секции - [data-ra-section] или заголовки h2/h3.
+  var sectionMs = {}, sectionSeen = {};
+  (function () {
+    try {
+      if (!window.IntersectionObserver) return;
+      var io = new IntersectionObserver(function (ents) {
+        var now = Date.now();
+        ents.forEach(function (e) {
+          var el = e.target;
+          var name = (el.getAttribute && (el.getAttribute("data-ra-section")
+                      || (el.textContent || "").trim().slice(0, 40))) || "";
+          if (!name) return;
+          if (e.isIntersecting) { sectionSeen[name] = now; }
+          else if (sectionSeen[name]) {
+            sectionMs[name] = (sectionMs[name] || 0) + (now - sectionSeen[name]);
+            delete sectionSeen[name];
+          }
+        });
+      }, { threshold: 0.5 });
+      var scan = function () {
+        var els = document.querySelectorAll("[data-ra-section], h2, h3");
+        for (var i = 0; i < els.length && i < 40; i++) io.observe(els[i]);
+      };
+      if (document.readyState === "loading")
+        document.addEventListener("DOMContentLoaded", scan);
+      else scan();
+    } catch (_) {}
+  })();
+
+  function topSections() {
+    var now = Date.now(), out = [];
+    for (var k in sectionSeen)                   // ещё видимые - досчитать
+      if (Object.prototype.hasOwnProperty.call(sectionSeen, k))
+        sectionMs[k] = (sectionMs[k] || 0) + (now - sectionSeen[k]);
+    for (var n in sectionMs)
+      if (Object.prototype.hasOwnProperty.call(sectionMs, n))
+        out.push([n, Math.round(sectionMs[n] / 1000)]);
+    out.sort(function (a, b) { return b[1] - a[1]; });
+    return out.slice(0, 5).filter(function (x) { return x[1] >= 1; });
+  }
+
+  // Смена сети (wifi<->cellular) и online/offline: обрыв середины сессии
+  // предсказывает bounce и объясняет всплеск INP/LCP не по нашей вине.
+  try {
+    var conn = navigator.connection;
+    if (conn && conn.addEventListener)
+      conn.addEventListener("change", function () {
+        send("network_change", metaProps({ net: conn.effectiveType || "",
+          downlink: conn.downlink || 0, save_data: conn.saveData ? 1 : 0 }));
+      });
+  } catch (_) {}
+  addEventListener("offline", function () { send("net_offline"); });
 
   // Сколько секунд человек РЕАЛЬНО провёл на странице - главный сигнал
   // вовлечённости. Шлём на уходе (закрытие, скрытие вкладки, SPA-переход).
@@ -606,6 +759,9 @@
     pageEnter = Date.now();
     maxScroll = scrollPct();
     leaveSent = false;
+    // попутевые счётчики - заново на каждой странице SPA
+    firstInteractAt = 0; scrollReversals = 0; activeMs = 0;
+    lastActivity = Date.now(); sectionMs = {}; sectionSeen = {};
   }
 
   addEventListener("pagehide", sendLeave);
@@ -777,7 +933,11 @@
   // Web Vitals финализируются к уходу - их несёт page_leave (см. sendLeave).
   function vitalsSnapshot() {
     return { lcp: vitals.lcp, cls: Math.round(vitals.cls * 1000) / 1000,
-             inp: vitals.inp, load_ms: loadMs(), tab_switches: tabSwitches };
+             inp: vitals.inp, load_ms: loadMs(), tab_switches: tabSwitches,
+             active_sec: Math.round(activeMs / 1000),
+             scroll_reversals: scrollReversals,
+             ttfi_ms: firstInteractAt ? firstInteractAt - pageEnter : 0,
+             sections: topSections() };
   }
 
   // Одностраничные приложения меняют адрес без перезагрузки: без этого хука
