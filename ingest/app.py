@@ -94,6 +94,10 @@ def _token_tenant():
     return _token_map().get(h[7:], "")
 SASL_PASS = os.environ.get("SASL_PASS", "")
 MAX_BATCH = int(os.environ.get("MAX_BATCH", "1000"))
+# Сниппет v2 шлёт богатый meta-JSON - зловредная страница могла бы слать
+# мегабайты. Кап на событие и на весь запрос: парсер читает тело в память
+# ДО валидации, без лимита это DoS-вектор.
+MAX_META_BYTES = int(os.environ.get("MAX_META_BYTES", "8192"))
 
 REQUIRED = {"event_id", "event_type", "casino_player_id", "ts"}
 
@@ -134,6 +138,7 @@ producer = Producer({
 })
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_BODY_BYTES", str(512 * 1024)))
 
 
 def _auth_ok():
@@ -297,9 +302,25 @@ def ingest_saas():
         if err is not None:
             errs.append(str(err))
 
+    # Токен сниппета ПУБЛИЧНЫЙ (лежит в HTML сайта клиента) - значит, всё,
+    # что приходит сюда, потенциально прислал кто угодно из браузера.
+    # billing.* здесь запрещены наглухо: поддельный invoice_paid глушил бы
+    # настоящий дуннинг, поддельный payment_failed - запускал кампанию по
+    # платящему клиенту. Правда о деньгах приходит ТОЛЬКО из Stripe-вебхука.
+    for i, e in enumerate(events):
+        if str(e.get("event_type", "")).startswith("billing."):
+            _record_reject(e, "billing_via_stripe_only")
+            return jsonify(error="billing.* events come only from the Stripe "
+                                 "webhook", index=i), 403
+        meta = e.get("meta")
+        if meta is not None and len(str(meta)) > MAX_META_BYTES:
+            return jsonify(error=f"meta too large (max {MAX_META_BYTES})",
+                           index=i), 413
+
     now_utc = datetime.now(tz=timezone.utc)
     for e in events:
-        e.setdefault("source", "snippet")
+        # жёсткое присваивание, не setdefault: source из браузера - не факт
+        e["source"] = "snippet"
         e["ts"] = sane_ts(e.get("ts"), now_utc)
         key = e.get("client_user_id") or e.get("stripe_customer_id") or e["tenant_id"]
         producer.produce(SAAS_TOPIC, key=str(key), value=json.dumps(e), on_delivery=_cb)

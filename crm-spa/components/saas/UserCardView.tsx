@@ -34,6 +34,20 @@ interface Touch { campaign_id: string; step_idx: number; action: string; detail:
 interface OfferRow { offer_id: string; campaign_id: string; status: string; reason: string; cost_estimate: number; issued_at: string }
 interface EventRow { event_type: string; ts: string; amount: number; plan_id: string; page: string }
 
+interface Behavior {
+  active_min_14d: number;
+  pages_14d: number;
+  rage_14d: number;
+  errors_14d: number;
+  utm_source: string;
+  ref: string;
+  platform: string;
+  mobile: number;
+  lang: string;
+  tz: string;
+  top_pages: { page: string; views: number }[];
+}
+
 interface CardData {
   user: CardUser;
   contacts: Contact[];
@@ -44,6 +58,7 @@ interface CardData {
   events: EventRow[];
   campaigns: { id: string; title: string }[];
   wa_chat: string;
+  behavior: Behavior | null;
   autopilot: boolean;
   can_touch: boolean;
   can_enroll: boolean;
@@ -268,6 +283,57 @@ export function UserCardView({ identity }: { identity: string }) {
                 </div>
               </div>
             )}
+          </section>
+          ) : null}
+
+          {data.behavior ? (
+          <section className="rounded-ctl border border-hair bg-surface p-4">
+            <h2 className="text-[13.5px] font-semibold text-ink">{t("saas.ucard.beh.title")}</h2>
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { k: "saas.ucard.beh.time", v: data.behavior.active_min_14d + " " + t("saas.ucard.beh.min"), warn: false },
+                { k: "saas.ucard.beh.pages", v: String(data.behavior.pages_14d), warn: false },
+                { k: "saas.ucard.beh.rage", v: String(data.behavior.rage_14d), warn: data.behavior.rage_14d > 0 },
+                { k: "saas.ucard.beh.errors", v: String(data.behavior.errors_14d), warn: data.behavior.errors_14d > 0 },
+              ].map((b) => (
+                <div key={b.k} className="rounded-ctl border border-hair2 bg-canvas p-2.5">
+                  <div className="text-[10.5px] font-medium uppercase tracking-wide text-steel">{t(b.k as MessageKey)}</div>
+                  <div className={"mt-0.5 font-mono text-[14px] font-semibold " + (b.warn ? "text-neg" : "text-ink")}>{b.v}</div>
+                </div>
+              ))}
+            </div>
+            <dl className="mt-3 flex flex-col gap-1 text-[12.5px]">
+              {data.behavior.utm_source || data.behavior.ref ? (
+                <div className="flex gap-2">
+                  <dt className="w-[90px] shrink-0 text-steel">{t("saas.ucard.beh.source")}</dt>
+                  <dd className="min-w-0 truncate font-mono text-[12px] text-slate">
+                    {data.behavior.utm_source || data.behavior.ref}
+                  </dd>
+                </div>
+              ) : null}
+              {data.behavior.platform ? (
+                <div className="flex gap-2">
+                  <dt className="w-[90px] shrink-0 text-steel">{t("saas.ucard.beh.device")}</dt>
+                  <dd className="text-slate">
+                    {data.behavior.platform}{data.behavior.mobile ? " · mobile" : ""}
+                    {data.behavior.lang ? " · " + data.behavior.lang : ""}
+                    {data.behavior.tz ? " · " + data.behavior.tz : ""}
+                  </dd>
+                </div>
+              ) : null}
+              {data.behavior.top_pages.length ? (
+                <div className="flex gap-2">
+                  <dt className="w-[90px] shrink-0 text-steel">{t("saas.ucard.beh.topPages")}</dt>
+                  <dd className="min-w-0 flex-1">
+                    {data.behavior.top_pages.map((p) => (
+                      <span key={p.page} className="mr-3 inline-block font-mono text-[11.5px] text-slate">
+                        {p.page} <span className="text-steel">×{p.views}</span>
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
           </section>
           ) : null}
 

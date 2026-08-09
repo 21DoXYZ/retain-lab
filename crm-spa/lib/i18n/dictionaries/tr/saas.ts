@@ -665,4 +665,13 @@ export const saas: Partial<Messages> = {
   "saas.ucard.camp.hint": "",
   "saas.ucard.offers.title": "",
   "saas.ucard.offers.empty": "",
+  "saas.ucard.beh.title": "",
+  "saas.ucard.beh.time": "",
+  "saas.ucard.beh.min": "",
+  "saas.ucard.beh.pages": "",
+  "saas.ucard.beh.rage": "",
+  "saas.ucard.beh.errors": "",
+  "saas.ucard.beh.source": "",
+  "saas.ucard.beh.device": "",
+  "saas.ucard.beh.topPages": "",
 };

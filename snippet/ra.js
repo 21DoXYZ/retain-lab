@@ -28,6 +28,8 @@
  */
 (function () {
   "use strict";
+  if (window.ra) return;   // повторная вставка тега не должна дублировать
+                           // слушатели, hearbeat-интервалы и обёртку pushState
   var s = document.currentScript || {};
   var w = window.RA_CONFIG || {};   // альтернатива data-атрибутам (SPA/динамический конфиг)
   var cfg = {

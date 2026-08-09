@@ -678,4 +678,13 @@ export const saas = {
   "saas.ucard.camp.hint": "Ручное зачисление всегда боевое (без холдаута). Дальше шаги ведёт автопилот со всеми гардами: согласие, частота, тихие часы.",
   "saas.ucard.offers.title": "Офферы",
   "saas.ucard.offers.empty": "Офферов не выдавалось.",
+  "saas.ucard.beh.title": "Поведение за 14 дней",
+  "saas.ucard.beh.time": "В продукте",
+  "saas.ucard.beh.min": "мин",
+  "saas.ucard.beh.pages": "Страниц",
+  "saas.ucard.beh.rage": "Rage clicks",
+  "saas.ucard.beh.errors": "JS-ошибки",
+  "saas.ucard.beh.source": "Источник",
+  "saas.ucard.beh.device": "Устройство",
+  "saas.ucard.beh.topPages": "Страницы",
 };

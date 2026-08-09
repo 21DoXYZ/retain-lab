@@ -679,4 +679,13 @@ export const saas: Partial<Messages> = {
   "saas.ucard.camp.hint": "Manual enrollment is always live (no holdout). From there autopilot runs the steps with all guards: consent, frequency caps, quiet hours.",
   "saas.ucard.offers.title": "Offers",
   "saas.ucard.offers.empty": "No offers issued.",
+  "saas.ucard.beh.title": "Behavior, last 14 days",
+  "saas.ucard.beh.time": "In product",
+  "saas.ucard.beh.min": "min",
+  "saas.ucard.beh.pages": "Pages",
+  "saas.ucard.beh.rage": "Rage clicks",
+  "saas.ucard.beh.errors": "JS errors",
+  "saas.ucard.beh.source": "Source",
+  "saas.ucard.beh.device": "Device",
+  "saas.ucard.beh.topPages": "Pages",
 };

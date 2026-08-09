@@ -362,9 +362,12 @@ SELECT
     countIf(event_type = 'cancel_flow_started'
             AND ts >= now() - INTERVAL 14 DAY)                           AS cancel_flow_14d,
     sumIf(tokens_spent, ts >= toStartOfMonth(now()))                     AS tokens_spent_month,
-    maxIf(ts, event_type = 'billing.payment_failed')                     AS last_payment_failed,
-    maxIf(ts, event_type = 'billing.invoice_paid')                       AS last_invoice_paid,
-    maxIf(ts, event_type = 'billing.subscription_cancel_scheduled')      AS last_cancel_scheduled,
+    -- billing.* только из Stripe: шлюз чужие billing-события отбивает, но
+    -- витрина не доверяет и историческим строкам (второй рубеж)
+    maxIf(ts, event_type = 'billing.payment_failed' AND source = 'stripe')  AS last_payment_failed,
+    maxIf(ts, event_type = 'billing.invoice_paid' AND source = 'stripe')    AS last_invoice_paid,
+    maxIf(ts, event_type = 'billing.subscription_cancel_scheduled'
+              AND source = 'stripe')                                        AS last_cancel_scheduled,
     maxIf(ts, event_type NOT LIKE 'billing.%')                           AS last_product_seen
 FROM (
     -- ДЕДУПЛИКАЦИЯ. Сниппет повторяет отправку при сбое сети, Stripe
@@ -374,6 +377,7 @@ FROM (
     SELECT tenant_id, identity_id, event_id,
            any(ts)           AS ts,
            any(event_type)   AS event_type,
+           any(source)       AS source,
            any(tokens_spent) AS tokens_spent
     FROM retention.saas_events_resolved
     GROUP BY tenant_id, identity_id, event_id

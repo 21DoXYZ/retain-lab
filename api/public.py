@@ -104,8 +104,10 @@ def _rate_ok(key: str) -> bool:
         return False
     bucket.append(now)
     _rl[key] = bucket
-    if len(_rl) > 10000:   # защита памяти от мусорных ключей
-        _rl.clear()
+    if len(_rl) > 10000:   # защита памяти: чистим только протухшие вёдра,
+        for k in [k for k, v in _rl.items()   # сброс всех разом обнулял лимиты
+                  if not v or v[-1] <= now - _RL_WIN]:   # платформы целиком
+            _rl.pop(k, None)
     return True
 
 

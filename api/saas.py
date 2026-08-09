@@ -2324,6 +2324,70 @@ def saas_user_card():
         ORDER BY ts DESC LIMIT 30
         """, {'t': tenant, 'c': cuid, 's': scid})[1]] if (cuid or scid) else []
 
+    # Поведение из сниппета v2: время в продукте, источник прихода, фрустрация.
+    # Всё лежит в meta-JSON событий - агрегируем на лету, витрин не плодим.
+    behavior = None
+    if cuid:
+        # События ДО ra.identify() уходят без client_user_id (session_start и
+        # первый page_view почти всегда раньше логина). Пришиваем их через
+        # сессию: события той же session_id, где человек позже опознался, - его.
+        own = ("(client_user_id = {c:String} OR (session_id != '' AND session_id IN ("
+               "SELECT DISTINCT session_id FROM saas_events "
+               "WHERE tenant_id = {t:String} AND client_user_id = {c:String} "
+               "AND session_id != '')))")
+        agg = q(
+            f"""
+            SELECT
+              sumIf(JSONExtractInt(meta, 'seconds'), event_type = 'page_leave'),
+              countIf(event_type = 'heartbeat') * 2,
+              countIf(event_type = 'page_view'),
+              countIf(event_type = 'rage_click'),
+              countIf(event_type = 'js_error')
+            FROM saas_events
+            WHERE tenant_id = {{t:String}} AND {own}
+              AND ts > now() - INTERVAL 14 DAY
+            """, {'t': tenant, 'c': cuid})[1][0]
+        import math as _math
+        active_min = _math.ceil(_flt(agg[0]) / 60) + int(_flt(agg[1]))
+        # источник: первый session_start с контекстом = как человек пришёл
+        src = q(
+            f"""
+            SELECT JSONExtractString(meta, 'utm_source'),
+                   JSONExtractString(meta, 'ref'),
+                   JSONExtractString(meta, 'platform'),
+                   JSONExtractInt(meta, 'mobile'),
+                   JSONExtractString(meta, 'lang'),
+                   JSONExtractString(meta, 'tz'),
+                   JSONExtractString(JSONExtractRaw(meta, 'first'), 'utm_source'),
+                   JSONExtractString(JSONExtractRaw(meta, 'first'), 'ref')
+            FROM saas_events
+            WHERE tenant_id = {{t:String}} AND {own}
+              AND event_type = 'session_start' AND meta != ''
+            ORDER BY ts DESC LIMIT 1
+            """, {'t': tenant, 'c': cuid})[1]
+        top_pages = [{'page': p[0], 'views': int(p[1])} for p in q(
+            f"""
+            SELECT page, count() FROM saas_events
+            WHERE tenant_id = {{t:String}} AND {own}
+              AND event_type = 'page_view' AND page != ''
+              AND ts > now() - INTERVAL 14 DAY
+            GROUP BY page ORDER BY count() DESC LIMIT 5
+            """, {'t': tenant, 'c': cuid})[1]]
+        s0 = src[0] if src else ('', '', '', 0, '', '', '', '')
+        behavior = {
+            'active_min_14d': active_min,
+            'pages_14d': int(agg[2] or 0),
+            'rage_14d': int(agg[3] or 0),
+            'errors_14d': int(agg[4] or 0),
+            'utm_source': str(s0[6] or s0[0] or ''),
+            'ref': str(s0[7] or s0[1] or ''),
+            'platform': str(s0[2] or ''), 'mobile': int(s0[3] or 0),
+            'lang': str(s0[4] or ''), 'tz': str(s0[5] or ''),
+            'top_pages': top_pages,
+        }
+        if not (active_min or behavior['pages_14d'] or src):
+            behavior = None      # сниппет-данных нет - блок не показываем
+
     # личный WhatsApp: если адрес контакта совпадает с тредом инбокса,
     # карточка даёт прямой переход в переписку
     wa_chat = ''
@@ -2345,6 +2409,7 @@ def saas_user_card():
         'email_suppressed': email_suppressed, 'enrollments': enrollments,
         'touches': touches, 'offers': offers, 'events': events,
         'campaigns': _campaign_titles(tenant), 'wa_chat': wa_chat,
+        'behavior': behavior,
         'autopilot': _autopilot_on(tenant),
         # что может ЭТА роль: support пишет людям, но кампании не трогает
         'can_touch': role in CLIENT_WRITE_ROLES,
