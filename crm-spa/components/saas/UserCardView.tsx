@@ -126,6 +126,22 @@ const btnGhost =
   "rounded-full border border-hair2 bg-canvas px-3.5 py-1.5 text-[12.5px] font-semibold " +
   "text-slate transition-colors hover:border-primary disabled:opacity-40";
 
+function tenantQ(sep: string): string {
+  // tenant из URL страницы (?tenant=) - для deep-link на карточку конкретного
+  // пространства (напр. демо ra-selftest); обычному клиенту не нужен.
+  try {
+    const tn = new URLSearchParams(window.location.search).get("tenant");
+    return tn ? sep + "tenant=" + encodeURIComponent(tn) : "";
+  } catch { return ""; }
+}
+
+function tenantBody(): Record<string, string> {
+  try {
+    const tn = new URLSearchParams(window.location.search).get("tenant");
+    return tn ? { tenant: tn } : {};
+  } catch { return {}; }
+}
+
 export function UserCardView({ identity }: { identity: string }) {
   const t = useT();
   const [data, setData] = useState<CardData | null>(null);
@@ -133,7 +149,7 @@ export function UserCardView({ identity }: { identity: string }) {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
-    flaskFetch<CardData>(`/api/v1/saas/user?identity=${encodeURIComponent(identity)}`)
+    flaskFetch<CardData>(`/api/v1/saas/user?identity=${encodeURIComponent(identity)}${tenantQ("&")}`)
       .then((d) => { setData(d); setError(""); })
       .catch((e: unknown) => setError(flaskErrorText(e, t, "common.loadFailed")))
       .finally(() => setLoading(false));
@@ -153,7 +169,7 @@ export function UserCardView({ identity }: { identity: string }) {
     setAddBusy(true); setAddErr("");
     flaskFetch("/api/v1/saas/user/contact", {
       method: "POST",
-      body: { identity, channel: addChannel, address: addAddress, consent: addConsent },
+      body: { identity, channel: addChannel, address: addAddress, consent: addConsent, ...tenantBody() },
     })
       .then(() => { setAddOpen(false); setAddAddress(""); load(); })
       .catch((e: unknown) => setAddErr(flaskErrorText(e, t, "common.saveFailed")))
@@ -187,7 +203,7 @@ export function UserCardView({ identity }: { identity: string }) {
     setSendBusy(true); setSendErr(""); setSendOk("");
     flaskFetch<{ status: string }>("/api/v1/saas/user/touch", {
       method: "POST",
-      body: { identity, channel: chan, subject, body: msg },
+      body: { identity, channel: chan, subject, body: msg, ...tenantBody() },
     })
       .then((r) => {
         setMsg(""); setSubject("");
@@ -206,7 +222,7 @@ export function UserCardView({ identity }: { identity: string }) {
   const enrollAction = (campaign_id: string, action: "enroll" | "exit") => {
     setCampBusy(true); setCampErr("");
     flaskFetch("/api/v1/saas/user/enroll", {
-      method: "POST", body: { identity, campaign_id, action },
+      method: "POST", body: { identity, campaign_id, action, ...tenantBody() },
     })
       .then(() => { setEnrollId(""); load(); })
       .catch((e: unknown) => setCampErr(flaskErrorText(e, t, "common.saveFailed")))

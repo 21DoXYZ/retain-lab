@@ -879,3 +879,45 @@ CREATE TABLE IF NOT EXISTS retention.wa_messages
 )
 ENGINE = ReplacingMergeTree(ts)
 ORDER BY (tenant_id, chat_id, wa_msg_id);
+
+-- ============================================================================
+-- Дирижёр конвейера: журнал прогонов стадий (ops_loop.py). Каждая стадия
+-- пишет сюда исход - и по нему следующая стадия проверяет свежесть входа
+-- (DAG зависимостей), а владелец/оператор видит здоровье всего контура.
+-- Без этого крон крутил стадии по часам вслепую: стадия могла тихо посчитать
+-- на устаревших данных, если предыдущая упала.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS retention.pipeline_runs
+(
+    `tenant_id`      LowCardinality(String),
+    `stage`          LowCardinality(String),
+    `status`         LowCardinality(String),  -- ok | error | timeout | skipped
+    `detail`         String,                   -- хвост вывода / причина скипа
+    `input_fresh`    UInt8,                    -- 1 = вход был свежим на момент запуска
+    `skipped_reason` String,                   -- stale_dep:<stage> и т.п.
+    `rows`           Int64,                     -- сколько обработано (если стадия говорит)
+    `duration_s`     Float64,
+    `started_at`     DateTime64(3)
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(started_at)
+ORDER BY (tenant_id, stage, started_at)
+TTL toDateTime(started_at) + INTERVAL 90 DAY;
+
+-- Текущее здоровье: последний прогон каждой стадии по тенанту + его возраст.
+CREATE OR REPLACE VIEW retention.pipeline_health AS
+SELECT tenant_id, stage,
+       argMax(status, started_at)         AS status,
+       argMax(detail, started_at)         AS detail,
+       argMax(input_fresh, started_at)    AS input_fresh,
+       argMax(skipped_reason, started_at) AS skipped_reason,
+       argMax(rows, started_at)           AS rows,
+       argMax(duration_s, started_at)     AS duration_s,
+       max(started_at)                    AS last_run,
+       dateDiff('minute', max(started_at), now()) AS age_min,
+       -- последний УСПЕШНЫЙ прогон отдельно: стадия могла упасть последний раз,
+       -- но её выход всё ещё свежий с предыдущего успеха
+       maxIf(started_at, pipeline_runs.status = 'ok')   AS last_ok,
+       dateDiff('minute', maxIf(started_at, pipeline_runs.status = 'ok'), now()) AS ok_age_min
+FROM retention.pipeline_runs
+GROUP BY tenant_id, stage;

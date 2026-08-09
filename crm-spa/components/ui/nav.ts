@@ -227,6 +227,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { key: "leak-audit", href: "/leak-audit", emoji: "💸", label: "nav.leakAudit", roles: [...ANALYSTS, "finance"] },
       { key: "uplift", href: "/uplift", emoji: "📈", label: "nav.uplift", roles: [...ANALYSTS, "finance"] },
       { key: "insights", href: "/insights", emoji: "🧠", label: "nav.insights", roles: [...ANALYSTS, "finance"] },
+      { key: "pipeline", href: "/pipeline", emoji: "🩺", label: "nav.pipeline", roles: [...ANALYSTS, "finance"] },
       { key: "overview", href: "/overview", emoji: "📊", label: "nav.overview", roles: MONEY },
       // Конструктор отчётов (W5-T4). Роли = REPORT_ROLES в api/reports.py (1:1):
       // MONEY (super_admin/head_retention/director/finance/analyst) + marketing_manager.

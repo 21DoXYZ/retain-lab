@@ -2685,3 +2685,65 @@ def saas_user_enroll():
     print(f'[user_card] {tenant}: {identity} enrolled into {cid} manually',
           flush=True)
     return api_json({'ok': True, 'status': 'active'})
+
+
+# ── Здоровье конвейера: дирижёр сверху видим владельцу ───────────────────────
+# Каждая стадия (сбор->ститч->фичи->скоринг->офферы/кампании->замер) пишет в
+# pipeline_runs. Здесь - последний прогон каждой + свежесть, чтобы было видно,
+# считаются ли цифры на актуальных данных или контур где-то встал.
+
+# Ожидаемый порядок стадий + человеко-понятные имена (i18n на фронте по ключу).
+_PIPELINE_STAGES = [
+    ('stitch', 'identity'), ('plans', 'plans'), ('contacts', 'contacts'),
+    ('users_sync', 'users'), ('cancel_reasons', 'reasons'),
+    ('scoring', 'scoring'), ('campaign_tick', 'campaigns'),
+    ('uplift_report', 'uplift'), ('ai_analyst', 'analyst'),
+]
+
+# Окно свежести выхода стадии (часы) - зеркало ops_loop.STAGES.fresh_h.
+_STAGE_FRESH_H = {
+    'stitch': 2, 'plans': 26, 'contacts': 26, 'users_sync': 26,
+    'cancel_reasons': 26, 'scoring': 26, 'campaign_tick': 26,
+    'uplift_report': 24, 'ai_analyst': 24,
+}
+
+
+@bp.get('/saas/pipeline')
+@require_auth(roles=LEAK_ROLES)
+def saas_pipeline():
+    """Здоровье конвейера: последний прогон каждой стадии + свежесть."""
+    tenant = _tenant_arg()
+    rows = {r[0]: r for r in q(
+        """
+        SELECT stage, status, detail, input_fresh, skipped_reason,
+               rows, duration_s, toString(last_run), age_min,
+               toString(last_ok), ok_age_min
+        FROM pipeline_health WHERE tenant_id = {t:String}
+        """, {'t': tenant})[1]}
+
+    stages = []
+    for stage, label in _PIPELINE_STAGES:
+        r = rows.get(stage)
+        if not r:
+            stages.append({'stage': stage, 'label': label, 'status': 'never',
+                           'fresh': False})
+            continue
+        ok_age_min = int(_flt(r[10]))
+        fresh_h = _STAGE_FRESH_H.get(stage, 26)
+        # свежесть = последний УСПЕХ в окне (стадия могла упасть последней, но
+        # её выход ещё годен с прошлого успеха)
+        fresh = bool(r[9]) and ok_age_min <= fresh_h * 60
+        stages.append({
+            'stage': stage, 'label': label, 'status': str(r[1]),
+            'detail': str(r[2]), 'skipped_reason': str(r[4]),
+            'rows': int(_flt(r[5])), 'duration_s': round(_flt(r[6]), 1),
+            'last_run': str(r[7]), 'age_min': int(_flt(r[8])),
+            'last_ok': str(r[9]), 'ok_age_min': ok_age_min,
+            'fresh_h': fresh_h, 'fresh': fresh,
+        })
+    # общий вердикт: контур здоров, если КАЖДАЯ стадия свежа (или ещё не
+    # наступало её расписание - тогда 'never' не роняет вердикт до первого прогона)
+    ran = [s for s in stages if s['status'] != 'never']
+    healthy = bool(ran) and all(s['fresh'] for s in ran)
+    return api_json({'tenant': tenant, 'stages': stages, 'healthy': healthy,
+                     'ran': len(ran), 'total': len(stages)})
