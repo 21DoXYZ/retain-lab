@@ -115,7 +115,10 @@ def test_negative_ev_is_refused(monkeypatch):
     ok, reason = og.gate(FakeCH(), "t", _offer(cost_estimate=200.0),
                          _user(mrr=9.0, p_churn=0.7), "K4_save")
     assert not ok
-    assert "negative_value" in reason or "stake_too_small" in reason
+    # v4: жизнь короче (лестница lifecycle_months) - бюджет кончается раньше,
+    # чем EV уходит в минус; любой из кодов = «дорогой подарок отбит»
+    assert ("negative_value" in reason or "stake_too_small" in reason
+            or "budget_spent" in reason)
 
 
 # ── кэп попыток: пожизненный счётчик, не 14 дней ─────────────────────────────

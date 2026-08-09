@@ -58,8 +58,11 @@ def test_churn_stacks_cancel_and_decay():
                           generations_prev_7d=6, generations_7d=1,
                           cancel_flow_14d=1))
     assert abs(s["p_churn"] - 0.68) < 1e-9        # 0.08 + 0.30 + 0.30
-    # LTV = MRR x ожидаемая жизнь (1/p_churn), не фиксированные 6 месяцев
-    assert s["ltv_estimate"] == round(49 * expected_months(0.68), 2)
+    # LTV v4: скор МОДУЛИРУЕТ прайорную базу оттока, а не заменяет её
+    from heuristics import lifecycle_months
+    months, basis = lifecycle_months(0.68)
+    assert s["ltv_estimate"] == round(49 * months, 2)
+    assert basis == "prior"                       # без ctx - честный прайор
 
 
 def test_failed_payment_is_a_fact_not_a_score():
@@ -106,12 +109,45 @@ def test_engagement_time_collapse_raises_churn():
 
 
 def test_ltv_lifetime_is_survival_based_and_capped():
-    assert expected_months(0.08) == 12.5          # 1/0.08
+    assert expected_months(0.08) == 12.5          # 1/0.08 (ставка гейта)
     assert expected_months(0.02) == 24.0          # кап сверху
     assert expected_months(0.95) >= 1.0           # кап снизу
+    # v4 без ctx: базовый скор 0.08 = множитель 1 - жизнь 1/прайор(0.06)=16.7,
+    # но потолок доказуемости без наблюдений = 12 мес
     base = compute_scores(_f(sub_status="active", plan_mrr=100,
                              generations_7d=1, generations_prev_7d=1))
-    assert base["ltv_estimate"] == round(100 * 12.5, 2)
+    assert base["ltv_estimate"] == round(100 * 12.0, 2)
+    assert base["ltv_basis"] == "prior"
+
+
+def test_ltv_v4_measured_base_beats_prior():
+    """Измеренный отток тенанта - основа; скор поведения лишь множитель."""
+    from heuristics import lifecycle_months
+    # здоровый юзер (скор на базовой линии) при измеренном оттоке 10%/мес
+    # и годе наблюдений: ровно 1/0.10 = 10 месяцев, basis measured
+    months, basis = lifecycle_months(0.08, {"base_churn_m": 0.10, "obs_months": 12})
+    assert (months, basis) == (10.0, "measured")
+    # рискованный юзер того же тенанта живёт КОРОЧЕ, но база та же измеренная
+    risky, _ = lifecycle_months(0.58, {"base_churn_m": 0.10, "obs_months": 12})
+    assert risky < months
+
+
+def test_ltv_v4_horizon_capped_by_observed_history():
+    """Продукту 2 месяца - не обещаем 16 месяцев жизни: потолок 2x видимого."""
+    from heuristics import lifecycle_months
+    months, _ = lifecycle_months(0.08, {"base_churn_m": None, "obs_months": 2})
+    assert months == 4.0                          # 2 мес наблюдений -> кап 4
+    long_obs, _ = lifecycle_months(0.02, {"base_churn_m": 0.02, "obs_months": 36})
+    assert long_obs == 24.0                       # общий потолок 24 держится
+
+
+def test_ltv_v4_trial_uses_tenant_avg_price():
+    """У триала mrr=0 - LTV считается от среднего чека, взвешен на p_convert."""
+    s = compute_scores(_f(sub_status="trialing", generations_total=5,
+                          paywall_views=1, checkout_starts=1),
+                       {"base_churn_m": None, "obs_months": 6, "avg_price": 99.0})
+    assert s["ltv_estimate"] > 0
+    assert s["ltv_estimate"] == round(99.0 * 6.0 * s["p_convert"], 2)
 
 
 def test_power_burn_and_habit():

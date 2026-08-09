@@ -21,13 +21,23 @@ buy_intent - намерение купить из кросс-сессионны�
 
 from __future__ import annotations
 
-VERSION = "heur-v3"
+VERSION = "heur-v4"
 
-# Ожидаемое время жизни: p_churn трактуем как месячный риск. Кап сверху -
-# «вечных» клиентов не бывает; кап снизу - даже уходящий платит этот месяц.
+# Ожидаемое время жизни. КАК СЧИТАЕМ (v4, после разбора «откуда $1,238»):
+# v3 делил 1 на p_churn - но p_churn это БАЛЛЬНЫЙ СКОР поведения, а не
+# калиброванная месячная вероятность: 1/скор давал 12.5 месяцев из
+# захардкоженной константы 0.08, без единого факта об удержании тенанта.
+# v4: база = ИЗМЕРЕННАЯ месячная отписка тенанта (ушедшие / подписко-месяцы,
+# считает scoring.py по stripe_subscriptions); скор поведения лишь МОДУЛИРУЕТ
+# её множителем риска; горизонт ОГРАНИЧЕН наблюдаемой историей - не обещаем
+# дольше, чем 2x того, что видели своими глазами. Мало данных - прайор по
+# типу бизнеса с честной пометкой basis='prior'.
 LTV_MAX_MONTHS = 24.0
 LTV_MIN_MONTHS = 1.0
 TRIAL_PRIOR_MONTHS = 6.0   # у триала своей истории удержания ещё нет
+PRIOR_CHURN_M = 0.06       # прайор месячной отписки SaaS (5-7% рынок), пока
+                           # своей когорты мало; вытесняется измеренной
+CHURN_SCORE_BASELINE = 0.08  # скор «здорового» платящего: множитель риска = 1
 
 PAYING_STATUSES = {"active", "past_due"}
 
@@ -36,15 +46,44 @@ def _clamp(x: float, lo: float = 0.01, hi: float = 0.95) -> float:
     return max(lo, min(hi, x))
 
 
+def lifecycle_months(p_churn_score: float, ctx: dict | None = None) -> tuple[float, str]:
+    """(ожидаемые месяцы жизни, basis) из скора риска + контекста тенанта.
+
+    ctx (scoring.py, tenant_lifecycle): base_churn_m - измеренная месячная
+    отписка (None = мало данных), obs_months - сколько месяцев мы вообще
+    наблюдаем подписки тенанта. Скор -> множитель к базе (0.5..2.5, нейтрален
+    на CHURN_SCORE_BASELINE): поведение усиливает или ослабляет базовый темп,
+    но не подменяет его собой."""
+    ctx = ctx or {}
+    base = ctx.get("base_churn_m")
+    basis = "measured" if base is not None else "prior"
+    base = float(base) if base is not None else PRIOR_CHURN_M
+
+    mult = 1.0 + (float(p_churn_score) - CHURN_SCORE_BASELINE) * 2.0
+    mult = max(0.5, min(2.5, mult))
+    churn_m = max(0.01, min(0.5, base * mult))
+
+    # потолок доказуемости: видели N месяцев - не обещаем больше 2N
+    obs = float(ctx.get("obs_months") or 0.0)
+    cap = max(3.0, min(LTV_MAX_MONTHS, obs * 2.0)) if obs > 0 else 12.0
+    months = max(LTV_MIN_MONTHS, min(cap, 1.0 / churn_m))
+    return round(months, 1), basis
+
+
 def expected_months(p_churn_monthly: float) -> float:
-    """Месяцы ожидаемой жизни из месячного риска ухода."""
+    """Месяцы жизни из месячного риска (для ставки в гейте офферов).
+    Для LTV использовать lifecycle_months - там база измеренная."""
     if p_churn_monthly <= 0:
         return LTV_MAX_MONTHS
     return max(LTV_MIN_MONTHS, min(LTV_MAX_MONTHS, 1.0 / p_churn_monthly))
 
 
-def compute_scores(f: dict) -> dict:
-    """f: фичи одной identity (см. scoring.py FEATURE_QUERY). Возвращает скоры."""
+def compute_scores(f: dict, ctx: dict | None = None) -> dict:
+    """f: фичи одной identity (см. scoring.py FEATURE_QUERY). Возвращает скоры.
+
+    ctx - жизненный цикл ТЕНАНТА (tenant_lifecycle в scoring.py): измеренная
+    месячная отписка, наблюдаемые месяцы, средний чек. Без ctx LTV честно
+    живёт на прайорах (basis='prior')."""
     status = f.get("sub_status") or ""
     paying = status in PAYING_STATUSES
     trialing = status == "trialing"
@@ -108,13 +147,18 @@ def compute_scores(f: dict) -> dict:
     else:
         p_churn = 0.0
 
-    # LTV v2: MRR × ожидаемые месяцы жизни (выживание, не фиксированный
-    # горизонт). Это ВЫРУЧКА - в маржу переводит слой офферов (economics.py),
-    # у которого есть себестоимость тенанта; здесь её честно нет.
+    # LTV v4: MRR × месяцы жизни, где темп ухода ИЗМЕРЕН по когорте тенанта,
+    # скор поведения его модулирует, а горизонт ограничен видимой историей.
+    # Это ВЫРУЧКА - в маржу переводит слой офферов (economics.py), у которого
+    # есть себестоимость тенанта; здесь её честно нет.
+    months, ltv_basis = lifecycle_months(p_churn, ctx)
     if paying:
-        ltv = mrr * expected_months(p_churn)
+        ltv = mrr * months
     elif trialing:
-        ltv = mrr * TRIAL_PRIOR_MONTHS * p_convert
+        # у триала mrr обычно 0 - берём средний чек тенанта; и это ставка на
+        # конверсию, поэтому весь горизонт дисконтируется её вероятностью
+        price = mrr or float((ctx or {}).get("avg_price") or 0.0)
+        ltv = price * min(TRIAL_PRIOR_MONTHS, months) * p_convert
     else:
         ltv = 0.0
 
@@ -156,6 +200,8 @@ def compute_scores(f: dict) -> dict:
         "p_convert": round(p_convert, 4),
         "p_churn": round(p_churn, 4),
         "ltv_estimate": round(ltv, 2),
+        "ltv_months": months,
+        "ltv_basis": ltv_basis,
         "power_score": round(power, 4),
         "buy_intent": buy_intent,
     }

@@ -14,6 +14,54 @@ from datetime import datetime, timezone
 
 from heuristics import VERSION, compute_scores
 
+# Жизненный цикл тенанта для LTV: измеренная месячная отписка по когорте
+# подписок + сколько месяцев мы её вообще наблюдаем + средний чек (для
+# триалов). Доверяем замеру только от 3 уходов И 30 подписко-месяцев -
+# иначе честный прайор (base_churn_m=None).
+LIFECYCLE_QUERY = """
+SELECT
+    countIf(status IN ('canceled', 'incomplete_expired'))          AS churned,
+    sum(greatest(1, dateDiff('month', created,
+        if(status IN ('canceled', 'incomplete_expired')
+           AND canceled_at IS NOT NULL, canceled_at, now()))))     AS sub_months,
+    if(toUnixTimestamp(min(created)) = 0, 0,
+       dateDiff('day', min(created), now()) / 30.0)                AS obs_months
+FROM (
+    -- базовый лог, не _current: вьюха схлопывает клиента до одной строки и
+    -- прячет ушедшие подписки - когорту по ней не измерить
+    SELECT subscription_id,
+           argMax(status, updated_at)      AS status,
+           argMax(canceled_at, updated_at) AS canceled_at,
+           min(created_ts)                 AS created
+    FROM retention.stripe_subscriptions
+    WHERE tenant_id = %(t)s
+    GROUP BY subscription_id)
+"""
+
+MIN_CHURNED = 3
+MIN_SUB_MONTHS = 30
+
+
+def tenant_lifecycle(client, tenant: str) -> dict:
+    """ctx для compute_scores + сырьё замера (в knowledge для карточки)."""
+    rows = client.query(LIFECYCLE_QUERY, parameters={"t": tenant}).result_rows
+    churned, sub_months, obs = (rows[0] if rows else (0, 0, 0))
+    churned, sub_months = int(churned or 0), float(sub_months or 0)
+    obs = round(float(obs or 0), 2)      # дробные месяцы: подпискам может быть 8 дней
+
+    base = None
+    if churned >= MIN_CHURNED and sub_months >= MIN_SUB_MONTHS:
+        base = round(churned / sub_months, 4)
+
+    price_rows = client.query(
+        "SELECT coalesce(avg(nullIf(toFloat64(mrr), 0)), 0) "
+        "FROM retention.tenant_plans_current WHERE tenant_id = %(t)s",
+        parameters={"t": tenant}).result_rows
+    avg_price = float(price_rows[0][0] or 0) if price_rows else 0.0
+
+    return {"base_churn_m": base, "obs_months": obs, "avg_price": avg_price,
+            "churned": churned, "sub_months": round(sub_months, 1)}
+
 FEATURE_QUERY = """
 SELECT
     i.identity_id                                   AS identity_id,
@@ -67,6 +115,12 @@ def main() -> None:
         database=os.environ.get("CH_DB", "retention"),
     )
 
+    ctx = tenant_lifecycle(client, tenant)
+    # замер цикла - в знания: карточка объясняет им, откуда взялся LTV
+    from knowledge import save as kb_save
+    kb_save(client, tenant, "lifecycle_measured",
+            {**ctx, "version": VERSION}, "scoring")
+
     res = client.query(FEATURE_QUERY, parameters={"t": tenant})
     cols = res.column_names
     now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S.000")
@@ -74,9 +128,11 @@ def main() -> None:
     rows = []
     for r in res.result_rows:
         feat = dict(zip(cols, r))
-        scores = compute_scores(feat)
+        scores = compute_scores(feat, ctx)
         feat_json = {k: (str(v) if isinstance(v, datetime) else v)
                      for k, v in feat.items() if k != "identity_id"}
+        feat_json["ltv_months"] = scores["ltv_months"]
+        feat_json["ltv_basis"] = scores["ltv_basis"]
         rows.append([
             tenant, feat["identity_id"],
             scores["p_convert"], scores["p_churn"],

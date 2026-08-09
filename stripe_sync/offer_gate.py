@@ -27,13 +27,11 @@ import json
 
 try:                                # джобы плоско, борд пакетом
     from economics import gross_margin
-    from heuristics import expected_months
     from offer_value import (gift_budget, margin_at_stake, rank, tier_of,
                              uplift_or_prior)
     from saas_senders import load_tenant_channels
 except ImportError:                 # pragma: no cover
     from stripe_sync.economics import gross_margin  # type: ignore
-    from stripe_sync.heuristics import expected_months  # type: ignore
     from stripe_sync.offer_value import (gift_budget, margin_at_stake,  # type: ignore
                                          rank, tier_of, uplift_or_prior)
     from stripe_sync.saas_senders import load_tenant_channels  # type: ignore
@@ -116,7 +114,17 @@ def build_context(client, tenant: str, user: dict, campaign_id: str) -> dict:
         margin = gross_margin(answers)
         mrr = float(user.get("mrr") or 0.0)
         if margin is not None and mrr > 0:
-            months = expected_months(float(p_churn)) if p_churn else 12.0
+            # месяцы жизни - той же моделью, что LTV (heur-v4): измеренная
+            # база оттока + потолок доказуемости, а не 1/скор
+            try:
+                from heuristics import lifecycle_months
+            except ImportError:
+                from stripe_sync.heuristics import lifecycle_months  # type: ignore
+            try:
+                lc = kb_load(client, tenant, "lifecycle_measured")
+            except Exception:       # noqa: BLE001
+                lc = {}
+            months, _basis = lifecycle_months(float(p_churn or 0.0), lc)
             ctx["stake"] = margin_at_stake(round(mrr * margin, 2), months)
     except Exception:               # noqa: BLE001
         pass
