@@ -101,3 +101,52 @@ def test_email_column_aliases_are_wide():
     for header in ("User Email", "e_mail", "primary_email", "contact_email", "Адрес"):
         rows = parse_rows(f"id,{header}\nu_1,a@b.co\n")
         assert preview(rows)["with_email"] == 1, header
+
+
+def test_export_connector_maps_rows_and_drops_internal(monkeypatch):
+    """Экспорт продукта: is_internal - вон, stripe_customer_id и план - с собой."""
+    import connectors
+
+    page = {"data": {"rows": [
+        {"id": "u1", "email": "A@B.co", "stripe_customer_id": "cus_1",
+         "created_at": "2026-06-01T10:00:00Z", "plan": "pro", "status": "active",
+         "credits_balance": 500, "is_internal": False},
+        {"id": "svc", "email": "ops@team.co", "is_internal": True},
+    ], "cursor": ""}}
+    monkeypatch.setattr(connectors, "_get", lambda url, headers: page)
+
+    users = connectors.fetch_users({"kind": "export", "url": "https://x/api", "key": "k"})
+    assert len(users) == 1
+    assert users[0]["id"] == "u1" and users[0]["email"] == "a@b.co"
+    assert users[0]["stripe_customer_id"] == "cus_1"
+    assert users[0]["_meta"]["plan"] == "pro"
+    assert users[0]["_meta"]["credits_balance"] == 500
+
+
+def test_export_connector_stops_on_repeated_cursor(monkeypatch):
+    """Кривой курсор, который не двигается, не должен зациклить прогон."""
+    import connectors
+
+    calls = []
+    def fake_get(url, headers):
+        calls.append(url)
+        return {"data": {"rows": [{"id": f"u{len(calls)}", "email": "a@b.co"}] * 1000,
+                         "cursor": "same"}}
+    monkeypatch.setattr(connectors, "_get", fake_get)
+    connectors.export_users("https://x/api", "k")
+    assert len(calls) == 2          # первая страница + одна по курсору, дальше стоп
+
+
+def test_to_events_carries_connector_meta():
+    """План/статус/кредиты из экспорта доезжают до события - их ждёт скоринг."""
+    rows = [{"id": "u1", "email": "a@b.co", "created_at": "2026-06-01",
+             "stripe_customer_id": "cus_1", "_meta": {"plan": "pro"}}]
+    events, _report = to_events(rows, "t")
+    assert events[0][8] == "cus_1"
+    assert '"plan":"pro"' in events[0][9]
+
+
+def test_to_events_meta_empty_for_csv_rows():
+    rows = parse_rows("id,email\nu_1,a@b.co\n")
+    events, _ = to_events(rows, "t")
+    assert events[0][9] == ""

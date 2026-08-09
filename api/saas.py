@@ -1447,7 +1447,7 @@ def saas_users_source():
            'id_field': str(body.get('id_field') or 'id').strip(),
            'email_field': str(body.get('email_field') or 'email').strip(),
            'created_field': str(body.get('created_field') or 'created_at').strip()}
-    if kind in ('supabase', 'json') and not cfg['url']:
+    if kind in ('supabase', 'json', 'export') and not cfg['url']:
         return _bad('url_required')
     if not cfg['key'] and kind != 'json':
         return _bad('key_required')

@@ -120,9 +120,52 @@ def json_endpoint_users(url: str, token: str, list_path: str = "",
     return out
 
 
+def export_users(url: str, key: str, pages: int = MAX_PAGES) -> list:
+    """Read-only экспорт продукта: ?dataset=users&since=&limit=, ключ в X-API-Key.
+
+    Формат, который мы просим клиентов строить (первым построил hubcontent):
+    GET-only, страницы по курсору (cursor в ответе -> since следующего запроса).
+    Ценность против голого списка юзеров: отдаёт stripe_customer_id (прямая
+    склейка со Stripe), план/статус/кредиты (в meta -> скоринг и карточка)
+    и is_internal - служебные аккаунты отсекаем сразу, им не место в выручке.
+    """
+    base, out = url.rstrip("/"), []
+    since, seen_cursors = "", set()
+    for _ in range(pages):
+        page_url = f"{base}?dataset=users&limit=1000"
+        if since:
+            page_url += "&since=" + urllib.parse.quote(since)
+        doc = _get(page_url, {"X-API-Key": key})
+        data = (doc or {}).get("data") or {}
+        rows = data.get("rows") or []
+        if not rows:
+            break
+        for r in rows:
+            if not isinstance(r, dict) or r.get("is_internal"):
+                continue
+            out.append({
+                "id": str(r.get("id") or ""),
+                "email": str(r.get("email") or "").lower(),
+                "created_at": str(r.get("created_at") or ""),
+                "stripe_customer_id": str(r.get("stripe_customer_id") or ""),
+                "last_seen": "",
+                "_meta": {k: r[k] for k in ("plan", "status", "credits_balance",
+                                            "attribution_source", "usage_type")
+                          if r.get(k) not in (None, "")},
+            })
+        cursor = str(data.get("cursor") or "")
+        # страж от зацикливания: курсор пуст, повторился или страница неполная
+        if not cursor or cursor in seen_cursors or len(rows) < 1000:
+            break
+        seen_cursors.add(cursor)
+        since = cursor
+    return out
+
+
 SOURCES = {
     "supabase": lambda cfg: supabase_users(cfg.get("url", ""), cfg.get("key", "")),
     "clerk": lambda cfg: clerk_users(cfg.get("key", "")),
+    "export": lambda cfg: export_users(cfg.get("url", ""), cfg.get("key", "")),
     "json": lambda cfg: json_endpoint_users(
         cfg.get("url", ""), cfg.get("key", ""), cfg.get("list_path", ""),
         cfg.get("id_field", "id"), cfg.get("email_field", "email"),

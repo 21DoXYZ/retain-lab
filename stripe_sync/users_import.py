@@ -106,8 +106,14 @@ def to_events(rows: list[dict], tenant: str) -> tuple[list[list], dict]:
         ehash = hashlib.sha256(email.encode()).hexdigest() if email else ""
         # event_id детерминирован: повторная загрузка того же файла не задвоит
         event_id = "import:" + hashlib.sha256(f"{tenant}|{key}".encode()).hexdigest()[:24]
+        # коннекторы (export) кладут план/статус/кредиты в _meta - несём дальше,
+        # это питает карточку и скоринг; из CSV сюда ничего не попадает
+        meta = ""
+        if isinstance(row.get("_meta"), dict) and row["_meta"]:
+            meta = json.dumps(row["_meta"], separators=(",", ":"),
+                              ensure_ascii=False, default=str)
         out.append([tenant, event_id, "signup", ts, uid, ehash, email, "import",
-                    _pick(row, CUSTOMER_KEYS), ""])
+                    _pick(row, CUSTOMER_KEYS), meta])
     with_email = sum(1 for r in out if r[6])
     return out, {"parsed": len(rows), "imported": len(out), "skipped": skipped,
                  # БЕЗ ПОЧТЫ ЧЕЛОВЕКУ НЕЛЬЗЯ НАПИСАТЬ. Молчать об этом нечестно:
