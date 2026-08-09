@@ -84,3 +84,26 @@ def test_with_measured_merges_only_measured_keys():
     assert merged["gross_margin_pct"] == 80           # ответы не потёрты
     assert "measured_at" in merged                     # служебное тоже measured_*
     assert with_measured(answers, {}) == answers       # нет замера - без изменений
+
+
+def test_feedback_and_support_become_events():
+    from product_sync import feedback_event, support_event
+    fb = feedback_event({"id": "f1", "user_id": "u1", "category": "bug",
+                         "message": "x" * 500, "page": "/studio",
+                         "created_at": "2026-08-01T10:00:00+00:00"}, "t")
+    assert fb[2] == "feedback" and '"category":"bug"' in fb[9]
+    assert len(fb[9]) < 400                       # текст обрезан
+    sc = support_event({"conversation_id": "c1", "user_id": "u1",
+                        "created_at": "2026-07-31T18:38:40+00:00"}, "t")
+    assert sc[2] == "support_ticket" and sc[1] == "export:sc:c1"
+    assert support_event({"conversation_id": "c2"}, "t") is None
+
+
+def test_support_signals_raise_churn():
+    """Два тикета за месяц - человек уже недоволен вслух."""
+    from heuristics import compute_scores
+    base = {"sub_status": "active", "plan_mrr": 49,
+            "generations_7d": 2, "generations_prev_7d": 2}
+    calm = compute_scores(dict(base))
+    loud = compute_scores(dict(base, support_tickets_30d=2))
+    assert loud["p_churn"] == calm["p_churn"] + 0.10

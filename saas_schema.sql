@@ -444,6 +444,14 @@ SELECT
           AND ts < now() - INTERVAL 7 DAY)
       + countIf(event_type = 'heartbeat' AND ts >= now() - INTERVAL 14 DAY
                 AND ts < now() - INTERVAL 7 DAY) * 120                   AS active_sec_prev_7d,
+    -- ── поддержка и обратная связь (экспорт продукта) ──
+    -- обращение в поддержку и баг-репорт - фрустрация ДО падения активности
+    countIf(event_type = 'support_ticket'
+            AND ts >= now() - INTERVAL 30 DAY)                           AS support_tickets_30d,
+    countIf(event_type = 'feedback'
+            AND JSONExtractString(meta, 'category') IN ('bug', 'complaint')
+            AND ts >= now() - INTERVAL 30 DAY)                           AS bug_reports_30d,
+    maxIf(ts, event_type = 'support_ticket')                             AS last_support_at,
     -- ── намерение купить (buy-intent) ──
     -- заходы на прайсинг (кросс-сессия из RFM), пейвол, старт чекаута,
     -- скачивания (адаптация). Сильнейший - pricing_visits.

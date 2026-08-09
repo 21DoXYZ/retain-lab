@@ -132,6 +132,11 @@ def compute_scores(f: dict, ctx: dict | None = None) -> dict:
             p_churn += 0.10
         if int(f.get("rage_clicks_7d") or 0) >= 3:
             p_churn += 0.10
+        # поддержка/баг-репорты (экспорт продукта): человек уже недоволен
+        # вслух - это раньше, чем падение активности
+        if int(f.get("support_tickets_30d") or 0) >= 2 \
+                or int(f.get("bug_reports_30d") or 0) >= 2:
+            p_churn += 0.10
         act_prev = float(f.get("active_sec_prev_7d") or 0.0)
         act_now = float(f.get("active_sec_7d") or 0.0)
         if act_prev >= 600 and act_now <= act_prev * 0.4:

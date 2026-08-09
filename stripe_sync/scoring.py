@@ -80,6 +80,8 @@ SELECT
        999, dateDiff('day', f.last_seen, now()))    AS days_since_seen,
     if(f.first_seen IS NULL OR toUnixTimestamp(f.first_seen) = 0,
        0, dateDiff('day', f.first_seen, now()))     AS tenure_days,
+    coalesce(f.support_tickets_30d, 0)              AS support_tickets_30d,
+    coalesce(f.bug_reports_30d, 0)                  AS bug_reports_30d,
     coalesce(f.rage_clicks_7d, 0)                   AS rage_clicks_7d,
     coalesce(f.js_errors_7d, 0)                     AS js_errors_7d,
     coalesce(f.active_sec_7d, 0)                    AS active_sec_7d,

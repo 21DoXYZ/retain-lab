@@ -109,14 +109,41 @@ def subscription_event(r: dict, tenant: str) -> list | None:
                    "current_period_end": r.get("current_period_end")})]
 
 
+def feedback_event(r: dict, tenant: str) -> list | None:
+    """Обратная связь из продукта: категория (bug/complaint/idea) - сигнал
+    фрустрации в скоринг и фильтры; текст обрезаем - карточке хватит начала."""
+    uid = str(r.get("user_id") or "")
+    if not uid:
+        return None
+    return [tenant, f"export:fb:{r.get('id')}", "feedback",
+            _ts(r.get("created_at")), uid, "", "", "product", "",
+            _meta({"category": r.get("category"),
+                   "message": str(r.get("message") or "")[:300],
+                   "page": r.get("page")})]
+
+
+def support_event(r: dict, tenant: str) -> list | None:
+    """Тикет поддержки: сам факт обращения - ранний предиктор оттока."""
+    uid = str(r.get("user_id") or "")
+    if not uid:
+        return None
+    return [tenant, f"export:sc:{r.get('conversation_id')}", "support_ticket",
+            _ts(r.get("created_at")), uid, "", "", "product", "",
+            _meta({"updated_at": r.get("updated_at"),
+                   "last_operator_reply_at": r.get("last_operator_reply_at")})]
+
+
 DATASETS = {
     "jobs": job_event,
     "credit_transactions": credit_event,
     "plan_changes": plan_change_event,
     "subscriptions": subscription_event,
+    "feedback": feedback_event,
+    "support_conversations": support_event,
 }
 _PREFIX = {"jobs": "export:jobs:", "credit_transactions": "export:ct:",
-           "plan_changes": "export:pc:", "subscriptions": "export:sub:"}
+           "plan_changes": "export:pc:", "subscriptions": "export:sub:",
+           "feedback": "export:fb:", "support_conversations": "export:sc:"}
 
 
 def last_ts(client, tenant: str, dataset: str) -> str:

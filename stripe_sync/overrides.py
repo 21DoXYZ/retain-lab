@@ -98,8 +98,24 @@ def set_offer(tenant_id: str, offer_id: str, patch: dict | None,
 def merge_campaign_conf(conf: dict, ov: dict) -> dict:
     """Возвращает копию конфига кампаний с наложенными правками шагов.
     Правятся только тексты и delay_h; структура шагов неизменна. У правленого
-    шага появляется служебный флаг _edited (для бейджа в UI)."""
+    шага появляется служебный флаг _edited (для бейджа в UI).
+
+    Плюс РУЧНЫЕ кампании (custom_campaigns): владелец собрал в CRM кампанию
+    на отфильтрованный сегмент. Аудитория зачислена снапшотом при запуске
+    (manual_audience=true - тик их не дозачисляет и не выкидывает по смене
+    стадии, только исполняет шаги). Архивные не попадают движку вовсе."""
     out = copy.deepcopy(conf)
+    base_ids = {c.get("campaign_id") for c in out.get("campaigns", [])}
+    for camp in (ov or {}).get("custom_campaigns", []) or []:
+        cid = camp.get("campaign_id")
+        if not cid or cid in base_ids or camp.get("status") == "archived":
+            continue
+        c = copy.deepcopy(camp)
+        c["_custom"] = True
+        c["manual_audience"] = True
+        c.setdefault("entry_stage", "MANUAL")   # ни у кого нет такой стадии -
+        c.setdefault("steps", [])               # автозачисление не сработает
+        out.setdefault("campaigns", []).append(c)
     by_camp = (ov or {}).get("campaigns", {})
     for camp in out.get("campaigns", []):
         steps_ov = (by_camp.get(camp["campaign_id"]) or {}).get("steps", {})
@@ -161,6 +177,31 @@ def merge_catalog(catalog: dict, ov: dict) -> dict:
 def active_offers(catalog: dict) -> list:
     """Офферы, доступные выдаче (issue/campaign_tick): без отключённых."""
     return [o for o in catalog.get("offers", []) if not o.get("_disabled")]
+
+
+def add_custom_campaign(tenant_id: str, camp: dict, path: str = "") -> None:
+    """Ручная кампания владельца (уникальна по campaign_id, замена по id)."""
+    p = path or OVERRIDES_FILE
+    data = load_all(p)
+    t = data.setdefault(tenant_id, {})
+    lst = t.setdefault("custom_campaigns", [])
+    lst[:] = [c for c in lst if c.get("campaign_id") != camp.get("campaign_id")]
+    lst.append(camp)
+    _atomic_write(data, p)
+
+
+def set_custom_campaign_status(tenant_id: str, campaign_id: str, status: str,
+                               path: str = "") -> bool:
+    """active | paused | archived. False - кампании нет."""
+    p = path or OVERRIDES_FILE
+    data = load_all(p)
+    lst = (data.get(tenant_id) or {}).get("custom_campaigns") or []
+    for c in lst:
+        if c.get("campaign_id") == campaign_id:
+            c["status"] = status
+            _atomic_write(data, p)
+            return True
+    return False
 
 
 def add_custom_offer(tenant_id: str, offer: dict, path: str = "") -> None:

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Banner, Button, Card, PageHeader } from "@/components/ui";
+import { CampaignBuilder } from "./CampaignBuilder";
 import { NoTenant, isNoTenant } from "./NoTenant";
 import Link from "next/link";
 
@@ -29,6 +30,9 @@ interface Step {
 }
 
 interface Campaign {
+  custom?: boolean;
+  status?: string;
+  audience_note?: string;
   campaign_id: string;
   title: string;
   entry_stage: string;
@@ -248,7 +252,14 @@ export function CampaignsView() {
   const [state, setState] = useState<"loading" | "data" | "error" | "no_tenant">("loading");
   const [busy, setBusy] = useState(false);
   const [arm, setArm] = useState(false);
+  const [showBuilder, setShowBuilder] = useState(false);
   const armTimer = useRef<number | undefined>(undefined);
+
+  const setCustomStatus = (cid: string, status: string) => {
+    flaskFetch("/api/v1/saas/campaigns/custom/status", {
+      method: "POST", body: { campaign_id: cid, status },
+    }).then(load).catch(() => {});
+  };
 
   const load = useCallback(() => {
     setState("loading");
@@ -307,6 +318,14 @@ export function CampaignsView() {
 
       {state === "data" && data && (
         <>
+          <div>
+            <Button variant={showBuilder ? "ghost" : "brand"} size="sm"
+                    onClick={() => setShowBuilder(!showBuilder)}>
+              {showBuilder ? t("saas.builder.close") : "+ " + t("saas.builder.open")}
+            </Button>
+          </div>
+          {showBuilder ? <CampaignBuilder onLaunched={load} /> : null}
+
           {/* Откуда взялись тексты. Пока опросник не заполнен, на экране лежит
               нейтральный каркас платформы - и это должно быть сказано прямо. */}
           {!data.tailored ? (
@@ -400,15 +419,38 @@ export function CampaignsView() {
                   <div className="text-[15px] font-semibold text-ink">{c.title}</div>
                   <div className="font-mono text-[12px] text-steel">{c.campaign_id}</div>
                 </div>
-                <span
-                  className={
-                    "inline-block rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold " +
-                    (STAGE_TONE[c.entry_stage] ?? "bg-surface text-steel border-hair2")
-                  }
-                >
-                  {t(`saas.stage.${c.entry_stage}` as MessageKey)}
-                </span>
+                <div className="flex items-center gap-2">
+                  {c.custom ? (
+                    <>
+                      <span className="inline-block rounded-full border border-hair2 bg-surface px-2.5 py-0.5 text-[11.5px] font-semibold text-slate">
+                        {c.status === "paused" ? t("saas.builder.badge.paused") : t("saas.builder.badge.manual")}
+                      </span>
+                      <Button variant="ghost" size="sm"
+                              onClick={() => setCustomStatus(c.campaign_id, c.status === "paused" ? "active" : "paused")}>
+                        {c.status === "paused" ? t("saas.builder.resume") : t("saas.builder.pause")}
+                      </Button>
+                      <Button variant="ghost" size="sm"
+                              onClick={() => setCustomStatus(c.campaign_id, "archived")}>
+                        {t("saas.builder.archive")}
+                      </Button>
+                    </>
+                  ) : (
+                    <span
+                      className={
+                        "inline-block rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold " +
+                        (STAGE_TONE[c.entry_stage] ?? "bg-surface text-steel border-hair2")
+                      }
+                    >
+                      {t(`saas.stage.${c.entry_stage}` as MessageKey)}
+                    </span>
+                  )}
+                </div>
               </div>
+              {c.custom && c.audience_note ? (
+                <div className="text-[12.5px] text-steel">
+                  {t("saas.builder.audience")}: {c.audience_note}
+                </div>
+              ) : null}
 
               <ol className="flex flex-col">
                 {c.steps.map((s, i) => (

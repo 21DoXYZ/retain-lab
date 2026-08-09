@@ -424,6 +424,8 @@ def tick(client, tenant: str) -> dict[str, int]:
         parameters={"t": tenant}).result_rows}
 
     for camp in conf["campaigns"]:
+        if camp.get("_custom") and camp.get("status") == "paused":
+            continue                      # владелец поставил ручную на паузу
         cid, steps = camp["campaign_id"], camp["steps"]
         # Кулдаун повторного входа СВОЙ у кампании: дуннинг обязан отработать
         # каждый новый несписанный платёж (2д), винбэк - наоборот, редкий (90д).
@@ -645,8 +647,13 @@ def tick(client, tenant: str) -> dict[str, int]:
                     break   # шаг остаётся созревшим - повторим на след. тике
                 row["step_idx"] = i + 1
 
-            status = exit_status(stage_now, row["entry_stage"],
-                                 int(row["step_idx"]), len(steps))
+            if camp.get("manual_audience"):
+                # аудиторию собрал владелец руками - смена стадии не выход,
+                # человек покидает кампанию только пройдя все шаги
+                status = "done" if int(row["step_idx"]) >= len(steps) else None
+            else:
+                status = exit_status(stage_now, row["entry_stage"],
+                                     int(row["step_idx"]), len(steps))
             if status:
                 row["status"] = status
                 stats[status if status in ("done", "exited") else "done"] += 1

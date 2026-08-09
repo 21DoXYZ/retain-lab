@@ -1333,6 +1333,9 @@ def _campaigns_payload(tenant: str) -> dict:
                    } for s in c.get('steps', [])],
         'stats': {**enr.get(c['campaign_id'], empty),
                   'touches': touches.get(c['campaign_id'], 0)},
+        'custom': bool(c.get('_custom')),
+        'status': str(c.get('status') or 'active'),
+        'audience_note': str(c.get('audience_note') or ''),
     } for c in conf.get('campaigns', [])]
 
     import os as _os3
@@ -1353,6 +1356,153 @@ def _campaigns_payload(tenant: str) -> dict:
 @require_auth(roles=LEAK_ROLES)
 def saas_campaigns():
     return api_json(_campaigns_payload(_tenant_arg()))
+
+
+# ── Ручные кампании: сегмент по фильтрам + свои шаги, исполняет штатный тик ──
+
+
+def _segment_rows(tenant: str, audience: dict, limit: int = 0):
+    """(rows, unknown): кто попадает в сегмент прямо сейчас."""
+    from stripe_sync.segment import audience_sql, build
+    conds, sparams, unknown = build(audience or {})
+    rows = q(audience_sql(conds, limit), {'t': tenant, **sparams})[1]
+    return rows, unknown
+
+
+@bp.post('/saas/segments/preview')
+@require_auth(roles=LEAK_ROLES)
+def saas_segment_preview():
+    """Живое превью сегмента: сколько людей, скольким реально можно написать."""
+    tenant = _tenant_arg()
+    audience = (request.get_json(silent=True) or {}).get('audience') or {}
+    try:
+        rows, unknown = _segment_rows(tenant, audience)
+    except Exception as exc:  # noqa: BLE001
+        print(f'[segment] {tenant}: preview failed: {exc}', flush=True)
+        return _bad('segment_failed')
+    with_email = sum(1 for r in rows if r[2])
+    with_cuid = sum(1 for r in rows if r[3])
+    from stripe_sync.segment import describe
+    return api_json({
+        'tenant': tenant, 'count': len(rows),
+        'reachable_email': with_email, 'reachable_inapp': with_cuid,
+        'description': describe(audience), 'ignored_filters': unknown,
+        'sample': [{'identity_id': r[0], 'stage': r[1], 'email': r[2]}
+                   for r in rows[:8]],
+    })
+
+
+@bp.post('/saas/campaigns/custom')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_campaign_custom_create():
+    """Создать ручную кампанию на отфильтрованный сегмент и зачислить его
+    СНАПШОТОМ. Дальше работает штатный тик: dry-run до автопилота, подавления,
+    тихие часы, лог касаний - все предохранители общие с автокампаниями."""
+    import re as _re
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
+
+    from stripe_sync import overrides as ovr
+    from stripe_sync.campaign_tick import holdout_split, next_step_time
+    from stripe_sync.segment import describe
+
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+
+    from stripe_sync.segment import validate_steps
+    title = str(body.get('title') or '').strip()[:80]
+    if len(title) < 3:
+        return _bad('title_required')
+    steps, reason = validate_steps(body.get('steps') or [])
+    if reason:
+        return _bad(reason)
+    audience = body.get('audience') or {}
+    try:
+        control_pct = max(0, min(50, int(body.get('control_pct', 10))))
+    except (TypeError, ValueError):
+        control_pct = 10
+
+    try:
+        rows, unknown = _segment_rows(tenant, audience)
+    except Exception as exc:  # noqa: BLE001
+        print(f'[segment] {tenant}: audience failed: {exc}', flush=True)
+        return _bad('segment_failed')
+    if not rows:
+        return _bad('segment_empty')
+
+    slug = _re.sub(r'[^a-z0-9]+', '_', title.lower()).strip('_')[:24] or 'campaign'
+    now = _dt.now(tz=_tz.utc)
+    cid = f"M_{slug}_{now.strftime('%m%d%H%M')}"
+
+    # предупреждения методологии копирайта (§8) - не блокируют, но видны
+    warnings = []
+    try:
+        from stripe_sync.copy_review import review_step
+        profile = (ca.load_tenants().get(tenant, {}) or {}).get('onboarding_answers') or {}
+        for i, st in enumerate(steps):
+            flags = review_step(st.get('subject', ''), st.get('body', ''),
+                                cid, st['action'], profile) or []
+            warnings += [f"step_{i}:{f.get('code', f)}" if isinstance(f, dict)
+                         else f'step_{i}:{f}' for f in flags]
+    except Exception:  # noqa: BLE001
+        pass
+
+    ovr.add_custom_campaign(tenant, {
+        'campaign_id': cid, 'title': title, 'status': 'active',
+        'goal_event': str(body.get('goal_event') or ''),
+        'audience': audience, 'audience_note': describe(audience),
+        'created_at': now.strftime('%Y-%m-%d %H:%M:%S'),
+        'steps': steps,
+    })
+
+    ch = _ch_direct()
+    cols = ['tenant_id', 'campaign_id', 'identity_id', 'control', 'entry_stage',
+            'step_idx', 'next_step_at', 'status', 'enrolled_at', 'updated_at']
+    first_at = next_step_time(steps, now, 0)
+    enroll_rows, control_n = [], 0
+    for r in rows:
+        control = holdout_split(tenant, cid, r[0], control_pct)
+        control_n += 1 if control else 0
+        enroll_rows.append([tenant, cid, r[0], 1 if control else 0,
+                            str(r[1] or 'MANUAL'), 0, first_at, 'active', now, now])
+    ch.insert('retention.campaign_enrollments', enroll_rows, column_names=cols)
+
+    print(f'[custom_camp] {tenant}: {cid} "{title}" enrolled={len(enroll_rows)} '
+          f'control={control_n} audience={describe(audience)}', flush=True)
+    return api_json({'campaign_id': cid, 'enrolled': len(enroll_rows),
+                     'control': control_n, 'ignored_filters': unknown,
+                     'copy_warnings': warnings,
+                     'autopilot': _autopilot_resolved(_campaigns_conf(tenant), tenant)})
+
+
+@bp.post('/saas/campaigns/custom/status')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_campaign_custom_status():
+    """Пауза/архив ручной кампании. Архив дополнительно закрывает активные
+    зачисления - иначе тик продолжил бы слать шаги."""
+    from stripe_sync import overrides as ovr
+
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    cid = str(body.get('campaign_id') or '')
+    status = str(body.get('status') or '')
+    if not cid.startswith('M_') or status not in ('active', 'paused', 'archived'):
+        return _bad('invalid_request')
+    if not ovr.set_custom_campaign_status(tenant, cid, status):
+        return _bad('unknown_campaign', 404)
+    if status == 'archived':
+        ch = _ch_direct()
+        ch.command(
+            "ALTER TABLE retention.campaign_enrollments UPDATE status = 'exited', "
+            "updated_at = now() WHERE tenant_id = %(t)s AND campaign_id = %(c)s "
+            "AND status = 'active' SETTINGS mutations_sync = 1",
+            parameters={'t': tenant, 'c': cid})
+    print(f'[custom_camp] {tenant}: {cid} -> {status}', flush=True)
+    return api_json({'campaign_id': cid, 'status': status})
 
 
 @bp.post('/saas/campaigns/step')
