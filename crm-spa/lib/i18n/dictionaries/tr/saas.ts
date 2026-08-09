@@ -730,6 +730,8 @@ export const saas: Partial<Messages> = {
   "saas.ucard.beh.source": "",
   "saas.ucard.beh.device": "",
   "saas.ucard.beh.topPages": "",
+  "saas.ucard.beh.emptyUnlinked": "",
+  "saas.ucard.beh.emptyLinked": "",
   "saas.ucard.stat.buyIntent": "",
   "saas.ucard.beh.visits": "",
   "saas.ucard.beh.pricingVisits": "",

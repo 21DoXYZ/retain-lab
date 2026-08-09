@@ -744,6 +744,8 @@ export const saas: Partial<Messages> = {
   "saas.ucard.beh.source": "Source",
   "saas.ucard.beh.device": "Device",
   "saas.ucard.beh.topPages": "Pages",
+  "saas.ucard.beh.emptyUnlinked": "No behavior data yet: this user came from billing and is not linked to website activity. Data appears once the site snippet passes the logged-in user (data-user-id / ra.identify) and this person visits.",
+  "saas.ucard.beh.emptyLinked": "No behavior data yet: user is linked to the site but has not visited since the snippet went live. Appears after the first visit.",
   "saas.ucard.stat.buyIntent": "Buy intent",
   "saas.ucard.beh.visits": "Visits",
   "saas.ucard.beh.pricingVisits": "Pricing visits",

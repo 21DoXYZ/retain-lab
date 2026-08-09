@@ -331,9 +331,15 @@ export function UserCardView({ identity }: { identity: string }) {
           </section>
           ) : null}
 
-          {data.behavior ? (
           <section className="rounded-ctl border border-hair bg-surface p-4">
             <h2 className="text-[13.5px] font-semibold text-ink">{t("saas.ucard.beh.title")}</h2>
+            {!data.behavior ? (
+              <p className="mt-2 text-[12.5px] leading-relaxed text-steel">
+                {u.client_user_id
+                  ? t("saas.ucard.beh.emptyLinked")
+                  : t("saas.ucard.beh.emptyUnlinked")}
+              </p>
+            ) : (<>
             <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 { k: "saas.ucard.beh.time", v: data.behavior.active_min_14d + " " + t("saas.ucard.beh.min"), warn: false },
@@ -407,8 +413,8 @@ export function UserCardView({ identity }: { identity: string }) {
                 </div>
               ) : null}
             </dl>
+            </>)}
           </section>
-          ) : null}
 
           <section className="rounded-ctl border border-hair bg-surface p-4">
             <h2 className="text-[13.5px] font-semibold text-ink">{t("saas.ucard.touches.title")}</h2>

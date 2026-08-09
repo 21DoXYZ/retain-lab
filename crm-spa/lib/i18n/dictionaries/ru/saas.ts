@@ -743,6 +743,8 @@ export const saas = {
   "saas.ucard.beh.source": "Источник",
   "saas.ucard.beh.device": "Устройство",
   "saas.ucard.beh.topPages": "Страницы",
+  "saas.ucard.beh.emptyUnlinked": "Пока нет данных о поведении: этот юзер пришёл из биллинга и не связан с веб-активностью. Данные появятся, когда счётчик на сайте начнёт передавать залогиненного юзера (data-user-id / ra.identify) и этот человек зайдёт.",
+  "saas.ucard.beh.emptyLinked": "Пока нет данных о поведении: юзер связан с сайтом, но ещё не заходил после установки счётчика. Появится после первого визита.",
   "saas.ucard.stat.buyIntent": "Намерение купить",
   "saas.ucard.beh.visits": "Визитов",
   "saas.ucard.beh.pricingVisits": "Заходы на цены",
