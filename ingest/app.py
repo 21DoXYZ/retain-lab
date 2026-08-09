@@ -113,6 +113,7 @@ SAAS_TOPIC = os.environ.get("SAAS_KAFKA_TOPIC", "saas.events")
 REQUIRED_SAAS = {"event_id", "tenant_id", "event_type", "ts"}
 
 from event_time import sane_ts  # noqa: E402
+from geo import resolve as geo_resolve  # noqa: E402
 # Сниппет ra.js постит с сайта тенанта (кросс-домен) — браузеру нужен CORS.
 # Токен «публичного класса» (как ключи аналитик), поэтому echo-origin допустим;
 # сузить до доменов тенантов: SAAS_CORS_ORIGINS="https://app.x.com,https://y.io".
@@ -323,6 +324,18 @@ def ingest_saas():
             return jsonify(error=f"meta too large (max {MAX_META_BYTES})",
                            index=i), 413
 
+    # Гео на весь батч считаем ОДИН раз: у всех событий запроса общий IP и
+    # одна таймзона (лежит в meta session_start / контекста). Страна из IP
+    # точнее; без базы - из таймзоны. Кладём в meta каждого события.
+    _tz = ""
+    for e in events:
+        try:
+            _m = json.loads(e.get("meta") or "{}")
+            _tz = _m.get("tz") or (_m.get("first") or {}).get("tz") or _tz
+        except (ValueError, TypeError):
+            pass
+    geo = geo_resolve(request.headers, request.remote_addr or "", _tz)
+
     now_utc = datetime.now(tz=timezone.utc)
     for e in events:
         # жёсткое присваивание, не setdefault: source из браузера - не факт
@@ -332,6 +345,14 @@ def ingest_saas():
         # Браузер шлёт только email_hash; настоящий адрес приходит из Stripe.
         e.pop("email", None)
         e["ts"] = sane_ts(e.get("ts"), now_utc)
+        if geo:
+            try:
+                m = json.loads(e.get("meta") or "{}")
+                if isinstance(m, dict):
+                    m.setdefault("geo", geo)
+                    e["meta"] = json.dumps(m, separators=(",", ":"))
+            except (ValueError, TypeError):
+                pass
         key = e.get("client_user_id") or e.get("stripe_customer_id") or e["tenant_id"]
         producer.produce(SAAS_TOPIC, key=str(key), value=json.dumps(e), on_delivery=_cb)
     producer.flush(10)

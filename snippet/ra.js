@@ -1,5 +1,5 @@
 /**
- * Revenue Autopilot site snippet (~7KB gzip): события продукта → /ingest/saas/events.
+ * Revenue Autopilot site snippet (~10KB gzip): события продукта → /ingest/saas/events.
  *
  * Подключение (одна строка на сайте тенанта):
  *   <script src="https://cdn.../ra.js" data-endpoint="https://ingest.../ingest/saas/events"
@@ -23,8 +23,17 @@
  * js_error (первые 5 за сессию - баги продукта предсказывают отток),
  * rage_click (3+ клика в одну точку за 0.7с - фрустрация). Разметка
  * data-ra-event="имя" на любом элементе шлёт событие клика без кода.
- * Приватность: НИКОГДА не собираем тексты, значения полей, заголовки страниц
- * и сырой email - в сеть уходит только sha256(email) и техконтекст.
+ * Устройство/среда (session_start.meta + heartbeat): язык(и), таймзона, экран,
+ * DPR, глубина цвета, платформа, модель/версия ОС/архитектура (Client Hints,
+ * Chromium), память, ядра, тач/pointer, dark/reduced-motion/contrast,
+ * ориентация, установленная PWA, HDR, сеть (тип/скорость/rtt/save-data).
+ * Гео: страна/регион/город - на шлюзе из IP (+ таймзона как кросс-проверка VPN).
+ * Web Vitals (page_leave/heartbeat): LCP, CLS, INP, load_ms.
+ * Вовлечённость: download_click, outbound_click, copy_event(len), field_focus
+ * (имя поля, НЕ значение), form_submit, media_play/complete, tab_switches.
+ * Атрибуция: gclid/gbraid/wbraid/fbclid/msclkid/ttclid/li_fat_id + entry/exit.
+ * Приватность: НИКОГДА не собираем тексты, значения полей (в т.ч. пароли),
+ * заголовки страниц и сырой email - только sha256(email), техконтекст и гео.
  */
 (function () {
   "use strict";
@@ -76,7 +85,8 @@
   function utmOf(search) {
     var out = {};
     var keys = ["utm_source", "utm_medium", "utm_campaign", "utm_term",
-                "utm_content", "gclid", "fbclid", "ref"];
+                "utm_content", "gclid", "gbraid", "wbraid", "fbclid",
+                "msclkid", "ttclid", "li_fat_id", "ref"];
     try {
       var q = new URLSearchParams(search || location.search);
       for (var i = 0; i < keys.length; i++) {
@@ -87,19 +97,71 @@
     return out;
   }
 
+  function mq(q) { try { return matchMedia(q).matches ? 1 : 0; } catch (_) { return 0; } }
+
+  // Модель/бренд/версия ОС - высокоэнтропийные Client Hints (async, Chromium).
+  // Резолвим один раз при старте, кладём в модульную переменную - следующие
+  // события несут её в meta. Первое session_start может уйти без модели -
+  // heartbeat/page_leave её уже добавят.
+  var hicues = {};
+  (function () {
+    try {
+      var ua = navigator.userAgentData;
+      if (ua && ua.getHighEntropyValues) {
+        ua.getHighEntropyValues(["model", "platformVersion", "architecture",
+                                 "bitness", "fullVersionList"]).then(function (h) {
+          hicues = {
+            model: h.model || "", os_ver: h.platformVersion || "",
+            arch: h.architecture || "", bits: h.bitness || "",
+            brands: (h.fullVersionList || []).map(function (b) {
+              return b.brand + " " + b.version; }).join(", ").slice(0, 200),
+          };
+        }).catch(function () {});
+      }
+    } catch (_) {}
+  })();
+
   function deviceCtx() {
     var d = {};
     try {
       d.lang = navigator.language || "";
+      d.langs = (navigator.languages || []).slice(0, 4).join(",");
       d.tz = (Intl.DateTimeFormat().resolvedOptions() || {}).timeZone || "";
       d.sw = screen.width; d.sh = screen.height;
       d.vw = innerWidth; d.vh = innerHeight;
       d.dpr = Math.round((window.devicePixelRatio || 1) * 100) / 100;
+      d.depth = screen.colorDepth || 0;
       d.mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 1 : 0;
       d.platform = (navigator.userAgentData && navigator.userAgentData.platform)
         || navigator.platform || "";
+      // железо (в ЮВА собираем): память, ядра, тач
+      if (navigator.deviceMemory) d.ram = navigator.deviceMemory;
+      if (navigator.hardwareConcurrency) d.cores = navigator.hardwareConcurrency;
+      d.touch = navigator.maxTouchPoints || 0;
+      d.pointer = mq("(pointer: coarse)") ? "coarse"
+        : (mq("(pointer: fine)") ? "fine" : "");
+      // модель/версия ОС/архитектура - если high-entropy уже отрезолвился
+      for (var hk in hicues) {
+        if (Object.prototype.hasOwnProperty.call(hicues, hk) && hicues[hk])
+          d[hk] = hicues[hk];
+      }
+      // среда/предпочтения: сегменты и UX-соответствие
+      d.dark = mq("(prefers-color-scheme: dark)");
+      d.reduce_motion = mq("(prefers-reduced-motion: reduce)");
+      d.contrast = mq("(prefers-contrast: more)");
+      d.orient = mq("(orientation: portrait)") ? "portrait" : "landscape";
+      d.standalone = mq("(display-mode: standalone)");   // установленная PWA
+      d.hdr = mq("(dynamic-range: high)");
+      // сеть: тип, скорость, режим экономии
       var c = navigator.connection;
-      if (c && c.effectiveType) d.net = c.effectiveType;
+      if (c) {
+        if (c.effectiveType) d.net = c.effectiveType;
+        if (c.downlink) d.downlink = c.downlink;
+        if (c.rtt) d.rtt = c.rtt;
+        if (c.saveData) d.save_data = 1;
+      }
+      // бот-фильтр для чистоты данных (не фича юзера)
+      if (navigator.webdriver) d.bot = 1;
     } catch (_) {}
     return d;
   }
@@ -517,7 +579,9 @@
     var secs = Math.round((Date.now() - pageEnter) / 1000);
     if (secs < 2) return;                  // мгновенный отскок не считаем уходом
     leaveSent = true;
-    var props = metaProps({ seconds: secs, scroll_pct: maxScroll });
+    var props = metaProps(Object.assign(
+      { seconds: secs, scroll_pct: maxScroll, entry: firstTouch().page,
+        exit: location.pathname }, vitalsSnapshot()));
     // На уходе со страницы fetch часто обрывается браузером - beacon доживает.
     // Авторизацию beacon нести не умеет, поэтому токен уходит в query
     // (токен публичного класса, он и так в HTML страницы).
@@ -557,7 +621,8 @@
     try {
       if (document.visibilityState !== "visible") return;
       if (Date.now() - lastActivity > 120000) return;
-      send("heartbeat", metaProps({ scroll_pct: maxScroll }));
+      send("heartbeat", metaProps(Object.assign(
+        { scroll_pct: maxScroll }, vitalsSnapshot())));
     } catch (_) {}
   }, 120000);
 
@@ -606,6 +671,114 @@
       if (el && el.dataset.raEvent) send(String(el.dataset.raEvent).slice(0, 60));
     } catch (_) {}
   }, { capture: true, passive: true });
+
+  // ── Вовлечённость: клики-действия, копирование, формы, медиа ──────────────
+  // Всё СОБЫТИЯ ПОВЕДЕНИЯ на своих страницах, без содержимого. Главная
+  // ценность для оттока живёт здесь, а не в железе.
+
+  // Переключения вкладки: частый уход = раздвоенное внимание, слабое
+  // вовлечение. Считаем за сессию, шлём в page_leave/heartbeat через счётчик.
+  var tabSwitches = 0;
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") tabSwitches++;
+  });
+
+  // Клики по ссылкам: скачивания (адаптация фич), исходящие (куда уходят -
+  // в доки или к конкуренту). Только href, без текста и содержимого.
+  var FILE_RE = /\.(pdf|csv|xlsx?|docx?|zip|png|jpe?g|mp4|mp3|pptx?)($|\?)/i;
+  addEventListener("click", function (ev) {
+    try {
+      var a = ev.target && ev.target.closest && ev.target.closest("a[href]");
+      if (!a) return;
+      var href = a.getAttribute("href") || "";
+      if (a.hasAttribute("download") || FILE_RE.test(href)) {
+        send("download_click", metaProps({ href: href.slice(0, 200) }));
+        return;
+      }
+      var host = "";
+      try { host = new URL(a.href, location.href).host; } catch (_) {}
+      if (host && host !== location.host)
+        send("outbound_click", metaProps({ host: host }));
+    } catch (_) {}
+  }, { capture: true, passive: true });
+
+  // Копирование - извлечение ценности (цены, API-ключи, тексты). Только ФАКТ
+  // и длина, НИКОГДА содержимое.
+  var copyCount = 0;
+  addEventListener("copy", function () {
+    try {
+      copyCount++;
+      var len = 0;
+      try { len = String((getSelection() || "")).length; } catch (_) {}
+      if (copyCount <= 10) send("copy_event", metaProps({ len: len }));
+    } catch (_) {}
+  });
+
+  // Формы: заброшенность. Имя/id поля, порядок и время фокуса - НИКОГДА
+  // значения. Юзер тронул поле и ушёл, не отправив - премиальный сигнал
+  // воронки (регистрация, чекаут, онбординг).
+  var formTouched = {};
+  addEventListener("focusin", function (ev) {
+    try {
+      var el = ev.target;
+      if (!el || !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (el.type === "password") return;       // к паролям не подходим вовсе
+      var form = el.form && (el.form.getAttribute("name") || el.form.id) || "";
+      var key = form + ":" + (el.getAttribute("name") || el.id || el.type);
+      if (!formTouched[key]) {
+        formTouched[key] = 1;
+        send("field_focus", metaProps({ field: key.slice(0, 80) }));
+      }
+    } catch (_) {}
+  }, { capture: true });
+  addEventListener("submit", function (ev) {
+    try {
+      var f = ev.target;
+      send("form_submit", metaProps({
+        form: (f && (f.getAttribute("name") || f.id) || "").slice(0, 80) }));
+    } catch (_) {}
+  }, { capture: true });
+
+  // Медиа: досмотр онбординг-видео сильно предсказывает активацию.
+  addEventListener("play", function (ev) {
+    try {
+      if (/^(VIDEO|AUDIO)$/.test(ev.target.tagName))
+        send("media_play", metaProps({ src: (ev.target.currentSrc || "").slice(-80) }));
+    } catch (_) {}
+  }, { capture: true });
+  addEventListener("ended", function (ev) {
+    try {
+      if (/^(VIDEO|AUDIO)$/.test(ev.target.tagName)) send("media_complete");
+    } catch (_) {}
+  }, { capture: true });
+
+  // ── Web Vitals: медленно/дёргано/тормозит = тихий драйвер оттока ──────────
+  // Это ИСХОД (что человек реально пережил), а не косвенный железный прокси -
+  // объясняет «почему» лучше, чем deviceMemory. INP заменил FID в 2024+.
+  function observeVital(type, cb, opts) {
+    try {
+      var po = new PerformanceObserver(function (list) {
+        list.getEntries().forEach(cb);
+      });
+      po.observe(Object.assign({ type: type, buffered: true }, opts || {}));
+      return po;
+    } catch (_) { return null; }
+  }
+  var vitals = { lcp: 0, cls: 0, inp: 0 };
+  observeVital("largest-contentful-paint", function (e) {
+    vitals.lcp = Math.round(e.startTime);
+  });
+  observeVital("layout-shift", function (e) {
+    if (!e.hadRecentInput) vitals.cls += e.value;
+  });
+  observeVital("event", function (e) {
+    if (e.duration > vitals.inp) vitals.inp = Math.round(e.duration);
+  }, { durationThreshold: 40 });
+  // Web Vitals финализируются к уходу - их несёт page_leave (см. sendLeave).
+  function vitalsSnapshot() {
+    return { lcp: vitals.lcp, cls: Math.round(vitals.cls * 1000) / 1000,
+             inp: vitals.inp, load_ms: loadMs(), tab_switches: tabSwitches };
+  }
 
   // Одностраничные приложения меняют адрес без перезагрузки: без этого хука
   // переход на страницу тарифов внутри SPA не давал события, и «смотрел цены»

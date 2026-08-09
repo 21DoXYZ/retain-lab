@@ -24,9 +24,13 @@ ra.187-77-157-6.sslip.io {
 		reverse_proxy 127.0.0.1:8050
 	}
 
-	# Ingest: сниппеты тенантов постят события сюда.
+	# Ingest: сниппеты тенантов постят события сюда. Реальный IP клиента -
+	# в X-Real-Client-IP: из него шлюз достаёт страну/регион (гео) и держит
+	# IP-allowlist. Caddy в host-network видит настоящий remote_host.
 	handle /ingest/* {
-		reverse_proxy 127.0.0.1:8081
+		reverse_proxy 127.0.0.1:8081 {
+			header_up X-Real-Client-IP {remote_host}
+		}
 	}
 
 	# Stripe-вебхуки тенантов. Без STRIPE_WEBHOOK_SECRET приём fail-closed (400),
