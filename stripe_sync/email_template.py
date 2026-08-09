@@ -31,20 +31,27 @@ def _safe_color(raw: str) -> str:
 
 
 def split_cta(body: str) -> tuple[str, str]:
-    """(текст без хвостовой ссылки, ссылка). Ссылку показываем кнопкой.
+    """(текст без ссылки-кнопки, ссылка). Ссылку показываем кнопкой.
 
-    Ссылку в конце строки люди читают как мусор, а кнопку нажимают. Если
-    ссылка стоит в середине предложения - не трогаем: она там по смыслу.
+    Кнопкой становится ссылка в конце ЛЮБОГО абзаца (не только всего письма):
+    после контентного прохода ссылки часто стоят в конце первого абзаца, а
+    дальше идёт «ответь - читает человек». Ссылка в середине предложения
+    остаётся текстом - она там по смыслу. Из нескольких кандидатов берём
+    последний: он ближе к действию.
     """
     text = (body or "").strip()
-    match = None
-    for m in LINK_RE.finditer(text):
-        if text[m.end():].strip(" .!)»\"'") == "":
-            match = m
-    if not match:
+    lines = text.split("\n")
+    pick = None                       # (номер строки, match)
+    for li, line in enumerate(lines):
+        for m in LINK_RE.finditer(line):
+            if line[m.end():].strip(" .!)»\"'") == "":
+                pick = (li, m)
+    if not pick:
         return text, ""
-    head = text[:match.start()].rstrip(" :-–—\n")
-    return head, match.group(0)
+    li, m = pick
+    lines[li] = lines[li][:m.start()].rstrip(" :-–—")
+    cleaned = "\n".join(lines).strip()
+    return cleaned, m.group(0)
 
 
 def preheader(text: str, limit: int = MAX_PREHEADER) -> str:

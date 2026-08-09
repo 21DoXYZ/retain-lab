@@ -21,13 +21,15 @@
             "delay_h": 0,
             "action": "email",
             "subject": "You signed up - here is the fastest first win",
-            "body": "Hi! The quickest way to see if this is for you: open the product and finish one small thing. {{app_url}}\n\nStuck on anything? Reply to this email - a person reads it."
+            "body": "Hi! The quickest way to see if this is for you: open the product and finish one small thing. {{app_url}}\n\nStuck on anything? Reply to this email - a person reads it.",
+            "cta_label": "Open the product"
           },
           {
             "delay_h": 24,
             "action": "email",
             "subject": "The one thing that usually blocks people",
-            "body": "Most people who stall stop at the same spot: they open the product, look around, and close it without trying anything. The fix is to start smaller than feels useful - one tiny result changes how the whole product reads. {{app_url}}\n\nIf something specific is in your way, reply with one line and we will sort it."
+            "body": "Most people who stall stop at the same spot: they open the product, look around, and close it without trying anything. The fix is to start smaller than feels useful - one tiny result changes how the whole product reads. {{app_url}}\n\nIf something specific is in your way, reply with one line and we will sort it.",
+            "cta_label": "Open the product"
           },
           {
             "delay_h": 72,
@@ -38,7 +40,8 @@
             "delay_h": 192,
             "action": "email",
             "subject": "Did we get something wrong?",
-            "body": "You signed up but never got to a first result - that is usually on us, not you. What stopped you? Reply with one line, even two words help.\n\nYour account is ready whenever you are: {{app_url}}"
+            "body": "You signed up but never got to a first result - that is usually on us, not you. What stopped you? Reply with one line, even two words help.\n\nYour account is ready whenever you are: {{app_url}}",
+            "cta_label": "Open the product"
           }
         ],
         "goal": {
@@ -64,7 +67,8 @@
             "delay_h": 0,
             "action": "email",
             "subject": "Your trial ends in a few days - here is what you keep",
-            "body": "When you upgrade, everything you made and every setting carries over - nothing to redo. Plans start small and you can change or cancel anytime: {{app_url}}\n\nNot sure which plan fits? Reply and a person will tell you honestly, including if the smallest one is enough."
+            "body": "When you upgrade, everything you made and every setting carries over - nothing to redo. Plans start small and you can change or cancel anytime: {{app_url}}\n\nNot sure which plan fits? Reply and a person will tell you honestly, including if the smallest one is enough.",
+            "cta_label": "Pick a plan"
           },
           {
             "delay_h": 24,
@@ -75,13 +79,15 @@
             "delay_h": 48,
             "action": "email",
             "subject": "Still deciding? Tell us what is holding you back",
-            "body": "Your work and settings stay with you on any paid plan. If something held you back from upgrading - price, a missing feature, not enough time to test - reply with one line. A human reads this and answers honestly. {{app_url}}"
+            "body": "Your work and settings stay with you on any paid plan. If something held you back from upgrading - price, a missing feature, not enough time to test - reply with one line. A human reads this and answers honestly. {{app_url}}",
+            "cta_label": "Pick a plan"
           },
           {
             "delay_h": 120,
             "action": "email",
             "subject": "Your trial ended - nothing was deleted",
-            "body": "The trial is over, but your work and settings are all still here. Pick a plan and everything is exactly where you left it: {{app_url}}\n\nIf you tried it and it was not a fit, no hard feelings - a one-line reply about why helps us more than you would think."
+            "body": "The trial is over, but your work and settings are all still here. Pick a plan and everything is exactly where you left it: {{app_url}}\n\nIf you tried it and it was not a fit, no hard feelings - a one-line reply about why helps us more than you would think.",
+            "cta_label": "Pick a plan"
           }
         ],
         "goal": {
@@ -108,18 +114,20 @@
             "delay_h": 0,
             "action": "email",
             "subject": "Payment issue - your account is safe",
-            "body": "Your last payment did not go through - usually the card expired, hit a limit, or the bank asked for extra confirmation. Nothing is wrong on your side of the product and your work is safe.\n\nUpdating the card takes about 30 seconds: {{card_update_url}}"
+            "body": "Your last payment did not go through - usually the card expired, hit a limit, or the bank asked for extra confirmation. Nothing is wrong on your side of the product and your work is safe.\n\nUpdating the card takes about 30 seconds: {{card_update_url}}",
+            "cta_label": "Update card"
           },
           {
             "delay_h": 72,
             "action": "email",
             "subject": "Reminder: your card is still declining",
-            "body": "Quick reminder - your payment method still needs an update: {{card_update_url}}. The charge retries automatically once it is fixed, nothing else to do.",
+            "body": "Quick reminder - your payment method still needs an update: {{card_update_url}}\n\nThe charge retries automatically once it is fixed, nothing else to do.",
             "channels": [
               "email",
               "whatsapp",
               "sms"
-            ]
+            ],
+            "cta_label": "Update card"
           },
           {
             "delay_h": 168,
@@ -130,7 +138,8 @@
               "email",
               "whatsapp",
               "sms"
-            ]
+            ],
+            "cta_label": "Update card"
           },
           {
             "delay_h": 336,
@@ -141,7 +150,8 @@
               "email",
               "whatsapp",
               "sms"
-            ]
+            ],
+            "cta_label": "Update card"
           },
           {
             "delay_h": 672,
@@ -152,7 +162,8 @@
               "email",
               "whatsapp",
               "sms"
-            ]
+            ],
+            "cta_label": "Update card"
           }
         ],
         "goal": {
@@ -180,7 +191,8 @@
             "delay_h": 0,
             "action": "email",
             "subject": "Take a month off instead of canceling",
-            "body": "If now is just a busy or tight moment, pause the subscription: you pay nothing while it is paused, your history and settings stay, and it picks up when you are ready. {{app_url}}\n\nIf it is something else - price, a missing feature, something broken - reply with one line. A person reads this."
+            "body": "If now is just a busy or tight moment, pause the subscription: you pay nothing while it is paused, your history and settings stay, and it picks up when you are ready. {{app_url}}\n\nIf it is something else - price, a missing feature, something broken - reply with one line. A person reads this.",
+            "cta_label": "Pause my plan"
           },
           {
             "delay_h": 48,
@@ -191,7 +203,8 @@
             "delay_h": 120,
             "action": "email",
             "subject": "One question before you go",
-            "body": "If you are stepping away, what is the main reason? One line is enough - it decides what we fix next.\n\nIf it is price or timing, there may be an option we have not shown you - just ask. {{app_url}}"
+            "body": "If you are stepping away, what is the main reason? One line is enough - it decides what we fix next.\n\nIf it is price or timing, there may be an option we have not shown you - just ask. {{app_url}}",
+            "cta_label": "Pause my plan"
           }
         ],
         "goal": {
@@ -218,7 +231,8 @@
             "delay_h": 0,
             "action": "email",
             "subject": "You are hitting your plan limit this month",
-            "body": "You have used most of your plan - which usually means the product is earning its keep. The next tier removes the ceiling for months like this one, and often works out cheaper per unit - the pricing page has the exact math: {{app_url}}\n\nWant a sanity check on which tier actually fits your usage? Reply - a person will look at your numbers."
+            "body": "You have used most of your plan - which usually means the product is earning its keep. The next tier removes the ceiling for months like this one, and often works out cheaper per unit - the pricing page has the exact math: {{app_url}}\n\nWant a sanity check on which tier actually fits your usage? Reply - a person will look at your numbers.",
+            "cta_label": "Compare plans"
           },
           {
             "delay_h": 48,
@@ -229,7 +243,8 @@
             "delay_h": 96,
             "action": "email",
             "subject": "Worth checking: annual pricing for months like this",
-            "body": "If months like this one are the new normal, annual billing usually works out cheaper for the same thing - the exact math is on the pricing page: {{app_url}}"
+            "body": "If months like this one are the new normal, annual billing usually works out cheaper for the same thing - the exact math is on the pricing page: {{app_url}}",
+            "cta_label": "Compare plans"
           }
         ],
         "goal": {
@@ -246,13 +261,15 @@
             "delay_h": 336,
             "action": "email",
             "subject": "Your account is still here (untouched)",
-            "body": "It has been a few weeks since you canceled. Your account and history are exactly as you left them, so a fresh look costs nothing: {{app_url}}"
+            "body": "It has been a few weeks since you canceled. Your account and history are exactly as you left them, so a fresh look costs nothing: {{app_url}}",
+            "cta_label": "Come back in"
           },
           {
             "delay_h": 720,
             "action": "email",
             "subject": "What made you leave?",
-            "body": "Honest question, one line is enough: what was the main reason you canceled? It goes straight into what we build next.\n\nAnd if that reason is already fixed - your account is still here: {{app_url}}"
+            "body": "Honest question, one line is enough: what was the main reason you canceled? It goes straight into what we build next.\n\nAnd if that reason is already fixed - your account is still here: {{app_url}}",
+            "cta_label": "Come back in"
           },
           {
             "delay_h": 1440,
@@ -263,7 +280,8 @@
             "delay_h": 2160,
             "action": "email",
             "subject": "Last note from us",
-            "body": "This is the last email - we do not believe in nagging people who made a decision. Your account and history stay saved, and if you ever want to pick up where you left off, the door is open: {{app_url}}"
+            "body": "This is the last email - we do not believe in nagging people who made a decision. Your account and history stay saved, and if you ever want to pick up where you left off, the door is open: {{app_url}}",
+            "cta_label": "Come back in"
           }
         ],
         "goal": {

@@ -103,9 +103,17 @@ Produce 4-7 offers covering DIFFERENT roles (at least activation, conversion,
 save, upgrade, winback when the answers allow them)."""
 
 
-def build_user_prompt(answers: dict, avg_price: float) -> str:
+def build_user_prompt(answers: dict, avg_price: float,
+                      context: dict | None = None) -> str:
+    """context - полный бизнес-контекст (business_context): без него промпт
+    остаётся на анкете, и это допустимо только там, где базы нет (тесты)."""
+    try:
+        from business_context import context_block
+    except ImportError:
+        from stripe_sync.business_context import context_block  # type: ignore
+    ctx = context if context is not None else {"claimed": answers, "measured": {}}
     return (
-        "Product answers (questionnaire):\n" + json.dumps(answers, ensure_ascii=False)
+        context_block(ctx)
         + f"\nAverage plan price from Stripe: ${avg_price:.2f}"
         + "\nCompose the offer set now."
     )
@@ -189,9 +197,10 @@ def parse_ai_offers(text: str, max_discount_pct: float) -> tuple[list[dict], lis
 
 # Мастер-промпт копирайта v2. База: knowledge/lifecycle_playbook.md (§3
 # психология по типам, §5 каркас). Структура цепочек фиксирована кодом.
-COPY_SYSTEM = """You are a lifecycle copywriter. Write retention email and
-in-app banner copy for ONE SaaS product, in ITS voice, to ITS users. Output
-ONLY valid JSON:
+COPY_SYSTEM = """You are a top-tier lifecycle copywriter (the person who
+writes save-flows and dunning for the best subscription companies). Write
+retention email and in-app banner copy for ONE SaaS product, in ITS voice, to
+ITS users. Output ONLY valid JSON:
 {"K1_activation": {"0": {"subject": "...", "body": "..."}, "1": {...}, "2": {...}},
  "K2_trial_conversion": {"0": {...}, "1": {...}, "3": {...}},
  "K3_payment_recovery": {"0": {...}, "1": {...}, "2": {...}, "3": {...}},
@@ -199,69 +208,59 @@ ONLY valid JSON:
  "K5_upgrade": {"0": {...}, "1": {...}, "3": {...}},
  "K6_winback": {"0": {...}, "3": {...}}}
 
-The skeleton is fixed - write copy ONLY for these steps, with this intent.
-In-app steps are BANNERS inside the product: subject is the headline, body is
-ONE short line, no links (the platform attaches the button itself). They are
-often the only channel that reaches users with no email on file.
+THE FORMULA - every email body follows four beats, 40-120 words total:
+1. HOOK: the reader's concrete outcome or pain, first sentence. Never open
+   with what THEY did ("you signed up") - open with what they GET ("that
+   brief on your desk is already a video").
+2. SPECIFICITY: at least one real fact from the product profile - the value
+   unit, the aha moment, a plan's included volume, a time contrast ("the work
+   that normally eats an afternoon"). An email with zero product facts is
+   generic filler and will be discarded.
+3. ONE ACTION: exactly one link placeholder. The platform renders it as a
+   button.
+4. DE-RISK: close with safety - "reply, a person reads this" / "nothing was
+   deleted" / "cancel anytime". Replies are how the platform learns WHY
+   people leave; invite them wherever it is natural.
 
-K1 activation (signed up, no first result in 48h):
-  step 0 in-app banner: name the ONE next action and that it takes minutes.
-  step 1 email (same day): remove friction - the one next action, how few
-    minutes it takes; mention the starter bonus they received.
-  step 2 email (day 1): social proof path - what most users do first; invite
-    a reply if stuck.
-K2 trial ending (<=3 days, unpaid):
-  step 0 in-app banner: trial ends soon, their work stays on any paid plan.
-  step 1 email (same day): loss aversion - what they LOSE (their work,
-    settings, history), explicit deadline, upgrade as the way to keep it.
-  step 3 email (day 2): "we added extra days" - frame the extension as care,
-    suggest trying one advanced feature meanwhile.
-K3 payment failed (dunning):
-  step 0 in-app banner: one calm line + card update action, 30 seconds.
-  step 1 email (same hour): reassure - card issue not their fault, work is
-    safe, we retry automatically. MUST contain {{card_update_url}}.
-  step 2 email (day 3): short reminder, zero drama. MUST contain
-    {{card_update_url}}.
-  step 3 email (day 7): honest last call - access pauses soon, still 30
-    seconds to fix. Firm but never threatening. MUST contain
-    {{card_update_url}}.
-K4 save (STILL SUBSCRIBED, opened cancel flow or went quiet):
-  step 0 in-app banner: pause instead of canceling - keep everything, pay
-    nothing for a month.
-  step 1 email (same day): acknowledge the right to leave; pause for a month
-    as the no-cost alternative (keep history and data, pay nothing).
-  step 3 email (day 5): their investment - what they already built here -
-    plus one recent improvement they have not tried yet. They have NOT left:
-    never write as if the subscription is already over.
-K5 upgrade (80%+ of plan limit):
-  step 0 in-app banner: close to the limit; the next tier costs less per unit.
-  step 1 email (same day): compliment the power use, then the math - the
-    higher tier is cheaper per unit at their volume.
-  step 3 email (day 4): the annual option in plain numbers for heavy months.
-K6 winback (canceled 30+ days ago):
-  step 0 email (day 14): no guilt - what is NEW in the product since they
-    left, one concrete improvement.
-  step 3 email (day 90): their account and history are safe, the door is
-    open. This is the last message they will get.
+WHAT EACH CAMPAIGN SELLS (the message, not the feature):
+K1 activation: the CONTRAST - hours of manual work vs minutes in the product.
+  Motivate trying it on their ugliest real task. Step 2: how most users
+  start. Final step subject is a question ("Did we get something wrong?") -
+  blame-absorbing, asking for a one-line reply.
+K2 trial ending: the MATH - what a paid month costs vs what one delivered
+  piece of client work earns. Everything they made carries over. Never
+  threaten deletion; state honestly that work stays saved.
+K3 dunning: SAFETY and EASE - card issue is not their fault, work is safe,
+  fix takes 30 seconds. Calm escalation: reminder -> access will pause if it
+  keeps declining -> two weeks, nothing deleted -> final note that says the
+  reminders stop. MUST contain {{card_update_url}} in every email step.
+K4 save (STILL SUBSCRIBED): FIX THE REASON - something specific broke for
+  them (quality, price, missing feature). Ask for a one-line reply about
+  what is off; promise a straight human answer. Only mention pausing if the
+  profile says can_pause is true - promising a pause the product cannot do
+  is a lie on autopilot.
+K5 upgrade: the GOOD PROBLEM - they burned through their plan because the
+  product carries real volume. Sell headroom with the actual tier ratio from
+  the profile plans (e.g. "2.5x the credits"). Step 3: annual math, hedged
+  ("usually works out cheaper") unless plans prove it.
+K6 winback: NOTHING IS LOST - their workspace is untouched, coming back is
+  cheaper than starting over. One email asks the honest question "what made
+  you leave?". The final email promises to stop - and means it.
 
-Hard rules:
-- Past-departure voice ("since you left", "welcome back", "come back to us",
-  "now that you are gone") belongs ONLY to K6 winback. In K1-K5 the person is
-  still a user or still paying - addressing them as a leaver is a factual
-  error and the step gets thrown away.
-- Subjects under 60 chars, bodies 1-3 sentences, ONE call to action per email.
-- In-app banner bodies are ONE sentence, no links, no placeholders.
-- Use the product name and its value unit naturally - never a generic
-  "your product" voice.
-- Keep placeholders {{card_update_url}} and {{app_url}} EXACTLY where a link
-  belongs (double curly braces, verbatim). Every K3 email step (1,2,3) MUST
-  include {{card_update_url}} - an email asking to update a card without the
-  link is a broken email. No other placeholders.
-- Never invent numbers, discounts or bonus amounts - offers are attached by
-  the platform separately. Refer to them generically ("your starter bonus").
-- No emoji, no em-dash, no ALL CAPS, no fake urgency, no guilt-tripping.
-- If "site_profile" is present in the input, ground the copy in it: speak
-  to its audience, and in K1 point at the aha_moment as the first action.
+HARD RULES (a validator rejects violations):
+- Exactly one link placeholder per email: {{app_url}} or {{card_update_url}},
+  double curly braces verbatim. No other placeholders. In-app banner bodies:
+  ONE sentence, no links.
+- No exclamation marks anywhere. No ALL CAPS. No hurry/act now/last
+  chance/limited time. Fake urgency reads as spam and dies in the filter.
+- Never promise capabilities absent from the profile: no pause when
+  can_pause is false, no trial extensions, no invented discounts or numbers.
+  Offers are attached by the platform separately.
+- Past-departure voice ("since you left", "welcome back") ONLY in K6.
+- Subjects under 60 chars, concrete, no colon-litter. Questions welcome
+  where the email asks one.
+- No emoji, no em-dash. Write like a founder who respects the reader, not
+  a marketing department.
 """
 
 
@@ -287,9 +286,11 @@ def _talks_to_leaver(text: str) -> bool:
     return any(p in low for p in LEAVER_PHRASES)
 
 
-def parse_ai_copy(text: str) -> dict:
+def parse_ai_copy(text: str, profile: dict | None = None) -> dict:
     """JSON модели -> {campaign_id: {int_idx: {subject, body}}} с обрезкой длин.
-    Кривой JSON -> {} (вызывающий остаётся на детерминированных шаблонах)."""
+    Кривой JSON -> {} (вызывающий остаётся на детерминированных шаблонах).
+    Каждый шаг дополнительно проходит методологию текстов (copy_review):
+    fatal-флаг = шаг выброшен, останется нейтральный шаблон."""
     try:
         start, end = text.index("{"), text.rindex("}") + 1
         doc = json.loads(text[start:end])
@@ -325,31 +326,44 @@ def parse_ai_copy(text: str) -> dict:
             # выбрасываем, остаётся нейтральный шаблон.
             if str(cid) != "K6_winback" and _talks_to_leaver(subject + " " + body):
                 continue
+            if profile is not None:
+                try:
+                    from copy_review import fatal, review_step
+                except ImportError:
+                    from stripe_sync.copy_review import fatal, review_step  # type: ignore
+                role = "inapp" if i == 0 and str(cid) != "K6_winback" else "email"
+                if fatal(review_step(subject, body, str(cid), role, profile)):
+                    continue
             clean[i] = {"subject": subject, "body": body}
         if clean:
             out[str(cid)] = clean
     return out
 
 
-def ai_compose_copy(answers: dict) -> tuple[dict, str]:
+def ai_compose_copy(answers: dict, context: dict | None = None) -> tuple[dict, str]:
     """Тексты кампаний под продукт. ({}, note) при сбое - остаёмся на шаблонах."""
     provider, api_key = resolve_provider()
     if not provider:
         return {}, "ai_not_configured"
     call = _call_anthropic if provider == "anthropic" else _call_openai
-    user = ("Product profile:\n" + json.dumps(answers, ensure_ascii=False)
-            + "\nWrite the copy now.")
+    try:
+        from business_context import context_block
+    except ImportError:
+        from stripe_sync.business_context import context_block  # type: ignore
+    ctx = context if context is not None else {"claimed": answers, "measured": {}}
+    user = context_block(ctx) + "\nWrite the copy now."
     try:
         text = call(api_key, COPY_SYSTEM, user)
     except urllib.error.HTTPError as exc:
         return {}, f"ai_http_{exc.code}"
     except Exception as exc:
         return {}, f"ai_{type(exc).__name__}"
-    out = parse_ai_copy(text)
+    out = parse_ai_copy(text, profile=answers)
     return out, "" if out else "ai_empty"
 
 
-def ai_compose(answers: dict, avg_price: float) -> tuple[list[dict], str]:
+def ai_compose(answers: dict, avg_price: float,
+               context: dict | None = None) -> tuple[list[dict], str]:
     """(офферы, note). Пустой список + note при любом сбое - вызывающий
     остаётся на детерминированной сборке."""
     provider, api_key = resolve_provider()
@@ -357,7 +371,7 @@ def ai_compose(answers: dict, avg_price: float) -> tuple[list[dict], str]:
         return [], "ai_not_configured"
     call = _call_anthropic if provider == "anthropic" else _call_openai
     try:
-        text = call(api_key, SYSTEM, build_user_prompt(answers, avg_price))
+        text = call(api_key, SYSTEM, build_user_prompt(answers, avg_price, context))
     except urllib.error.HTTPError as exc:
         return [], f"ai_http_{exc.code}"
     except Exception as exc:

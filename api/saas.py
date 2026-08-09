@@ -539,7 +539,9 @@ def saas_questionnaire_submit():
     ai_offers = []
     if _ai_enabled():
         from stripe_sync.ai_compose import ai_compose
-        ai_offers, ai_note = ai_compose(answers, avg_price)
+        from stripe_sync.business_context import business_context
+        _bctx = business_context(_ch_direct(), tenant, answers)
+        ai_offers, ai_note = ai_compose(answers, avg_price, context=_bctx)
 
     # AI-набор (если есть) вытесняет детерминированный: он богаче, но прошёл
     # те же схемы; без AI - живёт база. Ручные C_ офферы не трогаются.
@@ -576,7 +578,9 @@ def saas_questionnaire_submit():
     copy_note = 'deterministic'
     if _ai_enabled():
         from stripe_sync.ai_compose import ai_compose_copy
-        ai_map, note = ai_compose_copy(answers)
+        from stripe_sync.business_context import business_context
+        ai_map, note = ai_compose_copy(
+            answers, context=business_context(_ch_direct(), tenant, answers))
         copy_note = 'ai' if ai_map else note
 
     conf = _campaigns_conf(tenant)

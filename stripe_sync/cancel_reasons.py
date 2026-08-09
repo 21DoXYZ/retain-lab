@@ -117,7 +117,7 @@ def pending(client, tenant: str, limit: int = 50) -> list:
     return out
 
 
-def classify(items: list) -> tuple[dict, str]:
+def classify(items: list, context: dict | None = None) -> tuple[dict, str]:
     if not items:
         return {}, "nothing_to_do"
     provider, api_key = resolve_provider()
@@ -125,9 +125,16 @@ def classify(items: list) -> tuple[dict, str]:
         return {}, "ai_not_configured"
     call = _call_anthropic if provider == "anthropic" else _call_openai
     payload = [{"id": i["event_id"], "text": i["text"]} for i in items]
+    # Продуктовый контекст обязателен: «не хватает функции» и «плохое
+    # качество» различимы только на языке КОНКРЕТНОГО продукта.
+    try:
+        from business_context import context_block
+    except ImportError:
+        from stripe_sync.business_context import context_block  # type: ignore
+    ctx_text = context_block(context) + "\n" if context else ""
     try:
         text = call(api_key, SYSTEM,
-                    "Classify these cancellation reasons:\n"
+                    ctx_text + "Classify these cancellation reasons:\n"
                     + json.dumps(payload, ensure_ascii=False))
     except urllib.error.HTTPError as exc:
         return {}, f"ai_http_{exc.code}"
@@ -167,7 +174,8 @@ def main() -> None:
         database=os.environ.get("CH_DB", "retention"),
     )
     items = pending(client, tenant)
-    classified, note = classify(items)
+    from business_context import business_context
+    classified, note = classify(items, context=business_context(client, tenant))
     n = save(client, tenant, items, classified) if classified else 0
     print(f"[cancel_reasons] tenant={tenant} pending={len(items)} classified={n}"
           + (f" ({note})" if note else ""))

@@ -222,7 +222,16 @@ def analyze(client, tenant: str, campaigns: dict, days: int = 7) -> tuple[list, 
     if not provider:
         return [], "ai_not_configured"
     call = _call_anthropic if provider == "anthropic" else _call_openai
-    user = ("FACTS (last %d days, tenant %s):\n" % (days, tenant)
+    # Бизнес-контекст обязателен: rewrite_copy без него советует голосом
+    # генерик-SaaS, а не ЭТОГО продукта (методология §8).
+    try:
+        from business_context import business_context, context_block
+    except ImportError:
+        from stripe_sync.business_context import (business_context,  # type: ignore
+                                                  context_block)
+    ctx = business_context(client, tenant)
+    user = (context_block(ctx)
+            + "\nFACTS (last %d days, tenant %s):\n" % (days, tenant)
             + json.dumps(facts, ensure_ascii=False, default=str)
             + "\nCampaign step counts: " + json.dumps(campaigns)
             + "\nProduce the insights now.")
