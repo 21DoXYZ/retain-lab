@@ -26,6 +26,7 @@ interface CardUser {
   ltv: number;
   last_seen: string;
   stage_note: string;
+  buy_intent: number;
 }
 
 interface Contact { channel: string; address: string; consent: number; consent_ts: string }
@@ -46,6 +47,16 @@ interface Behavior {
   lang: string;
   tz: string;
   top_pages: { page: string; views: number }[];
+  country: string;
+  os: string;
+  device_type: string;
+  gpu: string;
+  device_model: string;
+  pricing_visits: number;
+  visits: number;
+  inp_ms: number;
+  lcp_ms: number;
+  datacenter: number;
 }
 
 interface CardData {
@@ -244,12 +255,13 @@ export function UserCardView({ identity }: { identity: string }) {
         {u.action ? <span className="font-mono text-[12px] text-slate">{u.action}</span> : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         {[
           { k: "saas.ucard.stat.plan", v: u.plan_id || "-" },
           { k: "saas.ucard.stat.mrr", v: usd(u.mrr) },
           { k: "saas.ucard.stat.atStake", v: u.value_at_stake > 0 ? usd(u.value_at_stake) : "-", neg: u.value_at_stake > 0 },
-          { k: "saas.ucard.stat.churn", v: u.p_churn > 0 ? (u.p_churn * 100).toFixed(0) + "%" : "-" },
+          { k: "saas.ucard.stat.churn", v: u.p_churn > 0 ? (u.p_churn * 100).toFixed(0) + "%" : "-", neg: u.p_churn >= 0.4 },
+          { k: "saas.ucard.stat.buyIntent", v: u.buy_intent > 0 ? (u.buy_intent * 100).toFixed(0) + "%" : "-", pos: u.buy_intent >= 0.5 },
           { k: "saas.ucard.stat.ltv", v: usd(u.ltv) },
           { k: "saas.ucard.stat.lastSeen", v: u.last_seen ? u.last_seen.slice(0, 10) : "-" },
         ].map((s) => (
@@ -257,7 +269,7 @@ export function UserCardView({ identity }: { identity: string }) {
             <div className="text-[11px] font-medium uppercase tracking-wide text-steel">
               {t(s.k as MessageKey)}
             </div>
-            <div className={"mt-1 font-mono text-[15px] font-semibold " + (s.neg ? "text-neg" : "text-ink")}>
+            <div className={"mt-1 font-mono text-[15px] font-semibold " + (s.neg ? "text-neg" : (s.pos ? "text-pos" : "text-ink"))}>
               {s.v}
             </div>
           </div>
@@ -319,7 +331,35 @@ export function UserCardView({ identity }: { identity: string }) {
                 </div>
               ))}
             </div>
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { k: "saas.ucard.beh.visits", v: data.behavior.visits > 0 ? String(data.behavior.visits) : "-", warn: false },
+                { k: "saas.ucard.beh.pricingVisits", v: data.behavior.pricing_visits > 0 ? String(data.behavior.pricing_visits) : "-", pos: data.behavior.pricing_visits >= 2 },
+                { k: "saas.ucard.beh.inp", v: data.behavior.inp_ms > 0 ? data.behavior.inp_ms + " ms" : "-", warn: data.behavior.inp_ms > 500 },
+                { k: "saas.ucard.beh.lcp", v: data.behavior.lcp_ms > 0 ? (data.behavior.lcp_ms / 1000).toFixed(1) + " s" : "-", warn: data.behavior.lcp_ms > 2500 },
+              ].map((b) => (
+                <div key={b.k} className="rounded-ctl border border-hair2 bg-canvas p-2.5">
+                  <div className="text-[10.5px] font-medium uppercase tracking-wide text-steel">{t(b.k as MessageKey)}</div>
+                  <div className={"mt-0.5 font-mono text-[14px] font-semibold " +
+                    ((b as {warn?: boolean}).warn ? "text-neg" : ((b as {pos?: boolean}).pos ? "text-pos" : "text-ink"))}>{b.v}</div>
+                </div>
+              ))}
+            </div>
             <dl className="mt-3 flex flex-col gap-1 text-[12.5px]">
+              {data.behavior.country ? (
+                <div className="flex gap-2">
+                  <dt className="w-[90px] shrink-0 text-steel">{t("saas.ucard.beh.geo")}</dt>
+                  <dd className="text-slate">
+                    {data.behavior.country}
+                    {data.behavior.tz ? " · " + data.behavior.tz : ""}
+                    {data.behavior.datacenter ? (
+                      <span className="ml-2 rounded-md border border-[#fedf89] bg-[#fffaeb] px-1.5 py-0.5 text-[10.5px] font-semibold text-[#b54708]">
+                        {t("saas.ucard.beh.datacenter")}
+                      </span>
+                    ) : null}
+                  </dd>
+                </div>
+              ) : null}
               {data.behavior.utm_source || data.behavior.ref ? (
                 <div className="flex gap-2">
                   <dt className="w-[90px] shrink-0 text-steel">{t("saas.ucard.beh.source")}</dt>
@@ -328,13 +368,13 @@ export function UserCardView({ identity }: { identity: string }) {
                   </dd>
                 </div>
               ) : null}
-              {data.behavior.platform ? (
+              {(data.behavior.device_model || data.behavior.os || data.behavior.platform) ? (
                 <div className="flex gap-2">
                   <dt className="w-[90px] shrink-0 text-steel">{t("saas.ucard.beh.device")}</dt>
-                  <dd className="text-slate">
-                    {data.behavior.platform}{data.behavior.mobile ? " · mobile" : ""}
-                    {data.behavior.lang ? " · " + data.behavior.lang : ""}
-                    {data.behavior.tz ? " · " + data.behavior.tz : ""}
+                  <dd className="min-w-0 text-slate">
+                    {[data.behavior.device_model, data.behavior.os || data.behavior.platform,
+                      data.behavior.gpu, data.behavior.device_type,
+                      data.behavior.lang].filter(Boolean).join(" · ")}
                   </dd>
                 </div>
               ) : null}

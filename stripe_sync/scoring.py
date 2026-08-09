@@ -36,6 +36,10 @@ SELECT
     coalesce(f.js_errors_7d, 0)                     AS js_errors_7d,
     coalesce(f.active_sec_7d, 0)                    AS active_sec_7d,
     coalesce(f.active_sec_prev_7d, 0)               AS active_sec_prev_7d,
+    coalesce(f.pricing_visits, 0)                   AS pricing_visits,
+    coalesce(f.downloads_14d, 0)                    AS downloads_14d,
+    coalesce(f.inp_ms, 0)                           AS inp_ms,
+    coalesce(f.apple_pay, 0)                        AS apple_pay,
     coalesce(f.last_payment_failed > f.last_invoice_paid, 0)    AS failed_recent,
     coalesce(f.last_cancel_scheduled > f.last_invoice_paid, 0)  AS cancel_scheduled
 FROM retention.identities_current i
@@ -77,6 +81,7 @@ def main() -> None:
             tenant, feat["identity_id"],
             scores["p_convert"], scores["p_churn"],
             scores["ltv_estimate"], scores["power_score"],
+            scores["buy_intent"],
             json.dumps(feat_json, separators=(",", ":")),
             VERSION, now,
         ])
@@ -85,7 +90,8 @@ def main() -> None:
         client.insert(
             "retention.user_scores", rows,
             column_names=["tenant_id", "identity_id", "p_convert", "p_churn",
-                          "ltv_estimate", "power_score", "features", "version", "scored_at"],
+                          "ltv_estimate", "power_score", "buy_intent",
+                          "features", "version", "scored_at"],
         )
     print(f"[scoring] tenant={tenant} version={VERSION} scored={len(rows)}")
 

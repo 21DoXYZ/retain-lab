@@ -15,6 +15,8 @@ def _f(**kw):
             "cancel_flow_14d": 0, "tokens_spent_month": 0, "days_since_seen": 0,
             "tenure_days": 30, "rage_clicks_7d": 0, "js_errors_7d": 0,
             "active_sec_7d": 0, "active_sec_prev_7d": 0,
+            "pricing_visits": 0, "downloads_14d": 0, "inp_ms": 0,
+            "apple_pay": 0,
             "failed_recent": 0, "cancel_scheduled": 0}
     base.update(kw)
     return base
@@ -127,3 +129,29 @@ def test_power_zero_for_non_paying():
     s = compute_scores(_f(sub_status="trialing", monthly_tokens=1500,
                           tokens_spent_month=1400))
     assert s["power_score"] == 0.0
+
+
+def test_buy_intent_from_pricing_visits():
+    """Кросс-сессионные заходы на прайсинг - сильнейший сигнал намерения."""
+    base = compute_scores(_f(sub_status="active", plan_mrr=49))
+    assert base["buy_intent"] == 0.0
+    one = compute_scores(_f(sub_status="active", plan_mrr=49, pricing_visits=1))
+    three = compute_scores(_f(sub_status="active", plan_mrr=49, pricing_visits=3))
+    assert three["buy_intent"] > one["buy_intent"] > 0
+    # чекаут + прайсинг складываются
+    hot = compute_scores(_f(sub_status="active", plan_mrr=49,
+                            pricing_visits=3, checkout_starts=1, paywall_views=1))
+    assert hot["buy_intent"] >= 0.9
+
+
+def test_slow_inp_raises_churn():
+    """Тормозящий отклик (INP) - тихая фрустрация, поднимает риск."""
+    calm = compute_scores(_f(sub_status="active", plan_mrr=49,
+                             generations_7d=3, generations_prev_7d=3))
+    slow = compute_scores(_f(sub_status="active", plan_mrr=49,
+                             generations_7d=3, generations_prev_7d=3, inp_ms=1200))
+    assert abs(slow["p_churn"] - (calm["p_churn"] + 0.10)) < 1e-9
+
+
+def test_buy_intent_zero_for_no_signals():
+    assert compute_scores(_f(sub_status="trialing"))["buy_intent"] == 0.0

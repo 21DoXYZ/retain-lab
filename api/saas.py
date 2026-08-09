@@ -2229,7 +2229,7 @@ def _user_row(tenant: str, ident: str):
                value_at_stake, coalesce(p_convert, 0), coalesce(p_churn, 0),
                coalesce(ltv_estimate, 0),
                if(toUnixTimestamp(last_seen) = 0, '', toString(last_seen)),
-               stage_note
+               stage_note, coalesce(buy_intent, 0)
         FROM user_actions
         WHERE tenant_id = {t:String}
           AND (identity_id = {i:String}
@@ -2292,6 +2292,7 @@ def saas_user_card():
         'value_at_stake': round(_flt(r[9]), 2),
         'p_convert': round(_flt(r[10]), 2), 'p_churn': round(_flt(r[11]), 2),
         'ltv': round(_flt(r[12]), 2), 'last_seen': r[13], 'stage_note': r[14],
+        'buy_intent': round(_flt(r[15]), 2) if len(r) > 15 else 0.0,
     }
 
     # контакты каналов: лежат под client_user_id, у Stripe-only - под identity.
@@ -2411,6 +2412,17 @@ def saas_user_card():
             GROUP BY page ORDER BY count() DESC LIMIT 5
             """, {'t': tenant, 'c': cuid})[1]]
         s0 = src[0] if src else ('', '', '', 0, '', '', '', '')
+        # Устройство/гео/RFM/vitals - из готовой витрины фич (та же, что кормит
+        # скоринг: одни данные - одни цифры на всех экранах).
+        feat = q(
+            """
+            SELECT geo_country, os_family, device_type, gpu, device_model,
+                   toInt32(pricing_visits), toInt32(visit_count),
+                   toInt32(inp_ms), toInt32(lcp_ms), toInt32(datacenter)
+            FROM user_event_features
+            WHERE tenant_id = {t:String} AND identity_id = {i:String}
+            """, {'t': tenant, 'i': identity})[1]
+        fx = feat[0] if feat else ('', '', '', '', '', 0, 0, 0, 0, 0)
         behavior = {
             'active_min_14d': active_min,
             'pages_14d': int(agg[2] or 0),
@@ -2421,8 +2433,14 @@ def saas_user_card():
             'platform': str(s0[2] or ''), 'mobile': int(s0[3] or 0),
             'lang': str(s0[4] or ''), 'tz': str(s0[5] or ''),
             'top_pages': top_pages,
+            'country': str(fx[0] or ''), 'os': str(fx[1] or ''),
+            'device_type': str(fx[2] or ''),
+            'gpu': str(fx[3] or ''), 'device_model': str(fx[4] or ''),
+            'pricing_visits': int(fx[5] or 0), 'visits': int(fx[6] or 0),
+            'inp_ms': int(fx[7] or 0), 'lcp_ms': int(fx[8] or 0),
+            'datacenter': int(fx[9] or 0),
         }
-        if not (active_min or behavior['pages_14d'] or src):
+        if not (active_min or behavior['pages_14d'] or src or behavior['country']):
             behavior = None      # сниппет-данных нет - блок не показываем
 
     # личный WhatsApp: если адрес контакта совпадает с тредом инбокса,

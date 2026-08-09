@@ -274,12 +274,15 @@ CREATE TABLE IF NOT EXISTS retention.user_scores
     `p_churn`      Float64,
     `ltv_estimate` Float64,
     `power_score`  Float64,
+    `buy_intent`   Float64 DEFAULT 0,       -- намерение купить/расшириться (heur-v3)
     `features`     String,                  -- JSON фич, из которых собраны скоры
     `version`      LowCardinality(String),  -- напр. heur-v1
     `scored_at`    DateTime64(3)
 )
 ENGINE = MergeTree
 ORDER BY (tenant_id, identity_id, scored_at);
+ALTER TABLE retention.user_scores
+    ADD COLUMN IF NOT EXISTS `buy_intent` Float64 DEFAULT 0 AFTER `power_score`;
 
 CREATE OR REPLACE VIEW retention.user_scores_current AS
 SELECT tenant_id, identity_id,
@@ -287,6 +290,7 @@ SELECT tenant_id, identity_id,
        argMax(p_churn, scored_at)      AS p_churn,
        argMax(ltv_estimate, scored_at) AS ltv_estimate,
        argMax(power_score, scored_at)  AS power_score,
+       argMax(buy_intent, scored_at)   AS buy_intent,
        argMax(version, scored_at)      AS version,
        max(scored_at)                  AS last_scored_at
 FROM retention.user_scores
@@ -418,7 +422,31 @@ SELECT
           event_type = 'page_leave' AND ts >= now() - INTERVAL 14 DAY
           AND ts < now() - INTERVAL 7 DAY)
       + countIf(event_type = 'heartbeat' AND ts >= now() - INTERVAL 14 DAY
-                AND ts < now() - INTERVAL 7 DAY) * 120                   AS active_sec_prev_7d
+                AND ts < now() - INTERVAL 7 DAY) * 120                   AS active_sec_prev_7d,
+    -- buy-intent: заходы на прайсинг (кросс-сессия из RFM), просмотры пейвола,
+    -- старты чекаута, скачивания (адаптация). Сильнейший - pricing_visits.
+    max(JSONExtractInt(meta, 'pricing_visits'))                          AS pricing_visits,
+    max(JSONExtractInt(meta, 'visits'))                                  AS visit_count,
+    countIf(event_type = 'download_click' AND ts >= now() - INTERVAL 14 DAY) AS downloads_14d,
+    -- перформанс как исход (тормоза = тихий отток): INP и LCP, худшее за 7д
+    maxIf(JSONExtractInt(meta, 'inp'), event_type IN ('page_leave', 'heartbeat')
+          AND ts >= now() - INTERVAL 7 DAY)                             AS inp_ms,
+    maxIf(JSONExtractInt(meta, 'lcp'), event_type IN ('page_leave', 'heartbeat')
+          AND ts >= now() - INTERVAL 7 DAY)                             AS lcp_ms,
+    -- контекст последней сессии: страна, ОС/браузер, тип устройства, GPU-тир
+    argMaxIf(JSONExtractString(meta, 'geo', 'country'), ts,
+             JSONExtractString(meta, 'geo', 'country') != '')            AS geo_country,
+    argMaxIf(JSONExtractString(meta, 'ua', 'os'), ts,
+             JSONExtractString(meta, 'ua', 'os') != '')                  AS os_family,
+    argMaxIf(JSONExtractString(meta, 'ua', 'device_type'), ts,
+             JSONExtractString(meta, 'ua', 'device_type') != '')         AS device_type,
+    argMaxIf(JSONExtractString(meta, 'gpu'), ts,
+             JSONExtractString(meta, 'gpu') != '')                       AS gpu,
+    argMaxIf(JSONExtractString(meta, 'model'), ts,
+             JSONExtractString(meta, 'model') != '')                     AS device_model,
+    maxIf(JSONExtractInt(meta, 'apple_pay'), event_type = 'session_start') AS apple_pay,
+    argMaxIf(JSONExtractInt(meta, 'datacenter'), ts,
+             JSONExtractString(meta, 'geo', 'ip') != '')                 AS datacenter
 FROM (
     -- ДЕДУПЛИКАЦИЯ. Сниппет повторяет отправку при сбое сети, Stripe
     -- перепосылает вебхук на любой не-2xx - одно и то же событие приходит
@@ -575,7 +603,7 @@ SELECT
         stage_calc IN ('CONVERT', 'ACTIVATE', 'WINBACK'), toFloat64(coalesce(p.mrr, 0)),
         0.0)            AS value_at_stake,
     if(is_canceled AND days_since_cancel < 30, 'post_cancel_cooldown', '') AS stage_note,
-    sc.p_convert, sc.p_churn, sc.ltv_estimate, sc.power_score,
+    sc.p_convert, sc.p_churn, sc.ltv_estimate, sc.power_score, sc.buy_intent,
     sc.last_scored_at AS scored_at
 FROM retention.identities_current i
 LEFT JOIN retention.stripe_subscriptions_current s

@@ -720,4 +720,11 @@ export const saas = {
   "saas.ucard.beh.source": "Источник",
   "saas.ucard.beh.device": "Устройство",
   "saas.ucard.beh.topPages": "Страницы",
+  "saas.ucard.stat.buyIntent": "Намерение купить",
+  "saas.ucard.beh.visits": "Визитов",
+  "saas.ucard.beh.pricingVisits": "Заходы на цены",
+  "saas.ucard.beh.inp": "Отклик (INP)",
+  "saas.ucard.beh.lcp": "Загрузка (LCP)",
+  "saas.ucard.beh.geo": "Гео",
+  "saas.ucard.beh.datacenter": "дата-центр/VPN",
 };

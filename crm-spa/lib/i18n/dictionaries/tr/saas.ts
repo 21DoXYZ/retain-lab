@@ -707,4 +707,11 @@ export const saas: Partial<Messages> = {
   "saas.ucard.beh.source": "",
   "saas.ucard.beh.device": "",
   "saas.ucard.beh.topPages": "",
+  "saas.ucard.stat.buyIntent": "",
+  "saas.ucard.beh.visits": "",
+  "saas.ucard.beh.pricingVisits": "",
+  "saas.ucard.beh.inp": "",
+  "saas.ucard.beh.lcp": "",
+  "saas.ucard.beh.geo": "",
+  "saas.ucard.beh.datacenter": "",
 };
