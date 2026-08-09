@@ -184,6 +184,41 @@
     post(e, 1);
   }
 
+  // ── Очередь недоставленного ───────────────────────────────────────────
+  // Мобильная сеть рвётся, вкладки закрываются: событие, не ушедшее после
+  // ретраев, ложится в localStorage (кап 50) и уезжает при следующей
+  // загрузке страницы одним батчем. Лучше поздно, чем никогда: дедуп по
+  // event_id на приёме делает повторы безопасными.
+  var KQ = "ra_q";
+
+  function qload() {
+    try { return JSON.parse(get(KQ) || "[]") || []; } catch (_) { return []; }
+  }
+
+  function qsave(items) {
+    try { set(KQ, JSON.stringify(items.slice(-50))); } catch (_) {}
+  }
+
+  function enqueue(e) {
+    var q = qload();
+    q.push(e);
+    qsave(q);
+  }
+
+  function flushQueue() {
+    var q = qload();
+    if (!q.length || !cfg.endpoint || !cfg.token) return;
+    fetch(cfg.endpoint, {
+      method: "POST", keepalive: true,
+      headers: { "Content-Type": "application/json",
+                 Authorization: "Bearer " + cfg.token },
+      body: JSON.stringify(q),
+    }).then(function (r) {
+      if (r.ok) qsave([]);           // доехало - очередь чиста
+      else if (r.status < 500 && r.status !== 429) qsave([]);  // яд не копим
+    }).catch(function () {});         // сеть всё ещё лежит - попробуем позже
+  }
+
   // Один ретрай через 2с при сетевой ошибке или 5xx (шлюз пережидает Kafka).
   function post(e, retries) {
     try {
@@ -193,11 +228,15 @@
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.token },
         body: JSON.stringify(e),
       }).then(function (r) {
-        if ((r.status >= 500 || r.status === 429) && retries > 0)
-          setTimeout(function () { post(e, retries - 1); }, 2000 + Math.random() * 1000);
+        if (r.status >= 500 || r.status === 429) {
+          if (retries > 0)
+            setTimeout(function () { post(e, retries - 1); }, 2000 + Math.random() * 1000);
+          else enqueue(e);
+        }
       }).catch(function () {
         if (retries > 0)
           setTimeout(function () { post(e, retries - 1); }, 2000 + Math.random() * 1000);
+        else enqueue(e);
       });
     } catch (_) {}
   }
@@ -594,6 +633,7 @@
   }
 
   try {
+    flushQueue();                     // недоставленное с прошлого визита
     sessionId();
     // Просмотр страницы шлём ВСЕГДА: иначе на сайте с трафиком мы видим одно
     // событие на сессию, и клиенту честно кажется, что ничего не работает.
