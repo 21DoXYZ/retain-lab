@@ -232,7 +232,7 @@ def compose_offers(answers: dict, avg_price: float = 0.0) -> list[dict]:
     margin = gross_margin(answers)
     # ...в том числе когда себестоимость ПРЕДПОЛОЖЕНА по типу бизнеса: иначе
     # ограничения на размер подарка и глубину скидки молча не применяются
-    if margin is None and cost_basis in ("stated", "assumed") \
+    if margin is None and cost_basis in ("measured", "stated", "assumed") \
             and u_price and u_cost is not None:
         margin = max(0.0, 1.0 - u_cost / u_price)
     monthly_margin = (price * margin) if (price and margin) else None

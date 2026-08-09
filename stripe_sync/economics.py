@@ -61,7 +61,10 @@ def unit_price(plan_price: float, units: float) -> float | None:
 def unit_cost(answers: dict, price_per_unit: float | None) -> tuple[float | None, str]:
     """Себестоимость одного юнита и то, ОТКУДА мы её взяли.
 
-    Четыре источника по убыванию точности:
+    Источники по убыванию точности:
+      'measured'- посчитана по факту из экспорта продукта: живые деньги
+                  провайдерам / потраченные юниты (product_sync). Бьёт всё:
+                  владелец ОЦЕНИВАЕТ, а это - ИЗМЕРЕНО (§9 методологии);
       'stated'  - владелец назвал прямые расходы на юнит;
       'margin'  - вывели из валовой маржи: цена юнита x (1 - маржа);
       'assumed' - взяли коридор маржи по типу бизнеса с сайта (предположение,
@@ -73,6 +76,14 @@ def unit_cost(answers: dict, price_per_unit: float | None) -> tuple[float | None
     оно завышает стоимость подарка в разы, и система начинает отказываться от
     нормальных офферов, не сказав почему.
     """
+    measured = answers.get("measured_unit_cost_usd")
+    if measured not in (None, ""):
+        try:
+            value = float(measured)
+        except (TypeError, ValueError):
+            value = -1.0
+        if value >= 0:
+            return round(value, 6), "measured"
     stated = answers.get("unit_cost_usd")
     if stated not in (None, ""):
         try:
@@ -96,7 +107,20 @@ def unit_cost(answers: dict, price_per_unit: float | None) -> tuple[float | None
 
 
 def gross_margin(answers: dict) -> float | None:
-    """Валовая маржа долей единицы. Нет ответа - None, не подставляем 100%."""
+    """Валовая маржа долей единицы. Нет ответа - None, не подставляем 100%.
+
+    Измеренная маржа (выручка Stripe минус расходы провайдерам за окно,
+    считает product_sync) важнее названной владельцем: та - оценка. И
+    измеренный НОЛЬ - это знание «маржи нет», а не отсутствие ответа:
+    подарки живыми деньгами при нём обязаны стоить как весь клиент."""
+    measured = answers.get("measured_margin_pct")
+    if measured not in (None, ""):
+        try:
+            pct = float(measured)
+        except (TypeError, ValueError):
+            pct = None
+        if pct is not None and 0 <= pct <= 100:
+            return round(pct / 100.0, 4)
     raw = answers.get("gross_margin_pct")
     if raw in (None, ""):
         return None
@@ -253,7 +277,7 @@ def build(plans: list, answers: dict) -> dict:
     margin = gross_margin(answers)
     # Себестоимость назвали (или предположили по типу бизнеса), а маржу нет -
     # выводим маржу из неё самой
-    if margin is None and cost_basis in ("stated", "assumed") \
+    if margin is None and cost_basis in ("measured", "stated", "assumed") \
             and u_price and u_cost is not None:
         margin = round(max(0.0, 1.0 - u_cost / u_price), 4)
 
@@ -326,6 +350,15 @@ def build(plans: list, answers: dict) -> dict:
         # без этого числа стоимость подарка остаётся догадкой
         missing.append("валовая маржа или себестоимость юнита")
 
+    measured_note = None
+    if cost_basis == "measured" or answers.get("measured_margin_pct") not in (None, ""):
+        measured_note = {
+            "jobs": answers.get("measured_jobs"),
+            "window_days": answers.get("measured_window_days"),
+            "revenue_usd": answers.get("measured_revenue_usd"),
+            "provider_cost_usd": answers.get("measured_provider_cost_usd"),
+        }
+
     return {
         "typical_plan": typical.get("name") or "",
         "monthly_price": round(price, 2) if price else None,
@@ -343,7 +376,20 @@ def build(plans: list, answers: dict) -> dict:
         "ladder": ladder,
         "levers": levers,
         "missing": missing,
+        "measured": measured_note,
     }
+
+
+def with_measured(answers: dict, measured: dict) -> dict:
+    """Ответы владельца + измеренная экономика (knowledge kind='measured_costs').
+
+    Единая точка слияния для всех, кто считает деньги (скан, гейт офферов,
+    тексты): measured-ключи ложатся ПОВЕРХ ответов, потому что unit_cost и
+    gross_margin отдают им приоритет. Замера нет - система честно живёт
+    на оценках владельца, ничего не ломается."""
+    picked = {k: v for k, v in (measured or {}).items()
+              if k.startswith("measured_")}
+    return {**(answers or {}), **picked} if picked else dict(answers or {})
 
 
 def _num(raw) -> float | None:

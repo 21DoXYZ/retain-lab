@@ -61,6 +61,13 @@ STAGES: dict[str, dict] = {
         "when": lambda t: t.minute == 35,
         "deps": [], "fresh_h": 26,
     },
+    "product_sync": {
+        # продуктовые события экспорта (генерации, кредиты, планы) + измеренная
+        # экономика; после users_sync, чтобы новые юзеры уже были в базе
+        "argv": ["python", "product_sync.py"],
+        "when": lambda t: t.minute == 45,
+        "deps": ["users_sync"], "fresh_h": 26,
+    },
     "cancel_reasons": {
         "argv": ["python", "cancel_reasons.py"],
         "when": lambda t: t.minute == 20,
@@ -218,8 +225,9 @@ def name_argv(name: str) -> list[str]:
 
 # Порядок исполнения в один тик: топологический (зависимость раньше зависящей),
 # чтобы свежесть, поднятая stitch в этот же тик, сразу увидел scoring/campaign.
-_ORDER = ["stitch", "plans", "contacts", "users_sync", "cancel_reasons",
-          "scoring", "campaign_tick", "uplift_report", "ai_analyst"]
+_ORDER = ["stitch", "plans", "contacts", "users_sync", "product_sync",
+          "cancel_reasons", "scoring", "campaign_tick", "uplift_report",
+          "ai_analyst"]
 
 
 def main() -> None:

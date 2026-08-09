@@ -38,6 +38,7 @@ export const saas: Partial<Messages> = {
   "saas.pipeline.stage.plans": "Plans",
   "saas.pipeline.stage.contacts": "Contacts",
   "saas.pipeline.stage.users": "User base",
+  "saas.pipeline.stage.product": "Product usage",
   "saas.pipeline.stage.reasons": "Cancel reasons",
   "saas.pipeline.stage.scoring": "Scoring",
   "saas.pipeline.stage.campaigns": "Campaigns",

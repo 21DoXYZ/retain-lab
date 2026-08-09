@@ -37,6 +37,7 @@ export const saas = {
   "saas.pipeline.stage.plans": "Тарифы",
   "saas.pipeline.stage.contacts": "Контакты",
   "saas.pipeline.stage.users": "База юзеров",
+  "saas.pipeline.stage.product": "Использование продукта",
   "saas.pipeline.stage.reasons": "Причины отмен",
   "saas.pipeline.stage.scoring": "Скоринг",
   "saas.pipeline.stage.campaigns": "Кампании",

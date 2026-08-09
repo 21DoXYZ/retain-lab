@@ -99,7 +99,20 @@ def build_context(client, tenant: str, user: dict, campaign_id: str) -> dict:
 
     # ставка: месячная маржа человека x ожидаемая жизнь
     try:
-        answers = (load_tenant_channels(tenant).get("onboarding_answers") or {})
+        try:
+            from economics import with_measured
+            from knowledge import load as kb_load
+        except ImportError:
+            from stripe_sync.economics import with_measured  # type: ignore
+            from stripe_sync.knowledge import load as kb_load  # type: ignore
+        # измеренная маржа (product_sync -> knowledge) важнее названной
+        # владельцем; замера нет или знания недоступны - живём на ответах
+        try:
+            measured = kb_load(client, tenant, "measured_costs")
+        except Exception:           # noqa: BLE001
+            measured = {}
+        answers = with_measured(
+            load_tenant_channels(tenant).get("onboarding_answers") or {}, measured)
         margin = gross_margin(answers)
         mrr = float(user.get("mrr") or 0.0)
         if margin is not None and mrr > 0:

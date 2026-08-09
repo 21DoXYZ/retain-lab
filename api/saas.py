@@ -434,6 +434,15 @@ def _avg_plan_price(tenant: str) -> float:
         return 0.0
 
 
+def _measured_costs(tenant: str) -> dict:
+    """Измеренная экономика (product_sync -> knowledge). {} - замера ещё нет."""
+    try:
+        from stripe_sync.knowledge import load as kb_load
+        return kb_load(_ch_direct(), tenant, 'measured_costs')
+    except Exception:
+        return {}
+
+
 @bp.post('/saas/scan')
 @require_auth(roles=CHANNEL_WRITE_ROLES)
 def saas_scan_site():
@@ -465,6 +474,7 @@ def saas_scan_site():
 
     from stripe_sync import knowledge as kb
     from stripe_sync.economics import build as build_economics
+    from stripe_sync.economics import with_measured
 
     ch = _ch_direct()
     prev = kb.load(ch, tenant, 'brief')
@@ -475,7 +485,9 @@ def saas_scan_site():
 
     answers = tc.get('onboarding_answers') or {}
     prefill = answers_from_brief(brief, facts)
-    econ = build_economics(facts.get('plans') or [], {**prefill, **answers})
+    econ = build_economics(facts.get('plans') or [],
+                           with_measured({**prefill, **answers},
+                                         kb.load(ch, tenant, 'measured_costs')))
 
     if facts or brief:
         # ЗНАНИЕ - в своё хранилище с версиями (секреты туда не попадают),
@@ -531,8 +543,9 @@ def saas_questionnaire_submit():
     if reason:
         return _bad(reason)
 
+    from stripe_sync.economics import with_measured
     avg_price = _avg_plan_price(tenant) or float(answers.get('avg_plan_price') or 0)
-    base = compose_offers(answers, avg_price)
+    base = compose_offers(with_measured(answers, _measured_costs(tenant)), avg_price)
 
     # контекст с сайта клиента (аудитория, момент ценности, тарифы) - в промпты
     site = (ca.load_tenants().get(tenant, {}) or {}).get('site_profile') or {}
@@ -1578,7 +1591,9 @@ def saas_offer_suggestions():
     avg_price = _flt(q(
         "SELECT coalesce(avg(nullIf(toFloat64(mrr), 0)), 0) FROM tenant_plans_current "
         "WHERE tenant_id = {t:String}", {'t': tenant})[1][0][0])
-    composed = compose_offers(answers, avg_price) if answers else []
+    from stripe_sync.economics import with_measured
+    composed = compose_offers(with_measured(answers, _measured_costs(tenant)),
+                              avg_price) if answers else []
 
     return api_json({
         'tenant': tenant,
@@ -2714,7 +2729,8 @@ def saas_user_enroll():
 # Ожидаемый порядок стадий + человеко-понятные имена (i18n на фронте по ключу).
 _PIPELINE_STAGES = [
     ('stitch', 'identity'), ('plans', 'plans'), ('contacts', 'contacts'),
-    ('users_sync', 'users'), ('cancel_reasons', 'reasons'),
+    ('users_sync', 'users'), ('product_sync', 'product'),
+    ('cancel_reasons', 'reasons'),
     ('scoring', 'scoring'), ('campaign_tick', 'campaigns'),
     ('uplift_report', 'uplift'), ('ai_analyst', 'analyst'),
 ]
@@ -2722,7 +2738,7 @@ _PIPELINE_STAGES = [
 # Окно свежести выхода стадии (часы) - зеркало ops_loop.STAGES.fresh_h.
 _STAGE_FRESH_H = {
     'stitch': 2, 'plans': 26, 'contacts': 26, 'users_sync': 26,
-    'cancel_reasons': 26, 'scoring': 26, 'campaign_tick': 26,
+    'product_sync': 26, 'cancel_reasons': 26, 'scoring': 26, 'campaign_tick': 26,
     'uplift_report': 24, 'ai_analyst': 24,
 }
 

@@ -120,19 +120,18 @@ def json_endpoint_users(url: str, token: str, list_path: str = "",
     return out
 
 
-def export_users(url: str, key: str, pages: int = MAX_PAGES) -> list:
-    """Read-only экспорт продукта: ?dataset=users&since=&limit=, ключ в X-API-Key.
+def export_rows(url: str, key: str, dataset: str, since: str = "",
+                pages: int = MAX_PAGES) -> list:
+    """Read-only экспорт продукта: ?dataset=&since=&limit=, ключ в X-API-Key.
 
     Формат, который мы просим клиентов строить (первым построил hubcontent):
     GET-only, страницы по курсору (cursor в ответе -> since следующего запроса).
-    Ценность против голого списка юзеров: отдаёт stripe_customer_id (прямая
-    склейка со Stripe), план/статус/кредиты (в meta -> скоринг и карточка)
-    и is_internal - служебные аккаунты отсекаем сразу, им не место в выручке.
+    Возвращает сырые строки датасета - разбор у каждого потребителя свой.
     """
     base, out = url.rstrip("/"), []
-    since, seen_cursors = "", set()
+    seen_cursors: set = set()
     for _ in range(pages):
-        page_url = f"{base}?dataset=users&limit=1000"
+        page_url = f"{base}?dataset={urllib.parse.quote(dataset)}&limit=1000"
         if since:
             page_url += "&since=" + urllib.parse.quote(since)
         doc = _get(page_url, {"X-API-Key": key})
@@ -140,25 +139,37 @@ def export_users(url: str, key: str, pages: int = MAX_PAGES) -> list:
         rows = data.get("rows") or []
         if not rows:
             break
-        for r in rows:
-            if not isinstance(r, dict) or r.get("is_internal"):
-                continue
-            out.append({
-                "id": str(r.get("id") or ""),
-                "email": str(r.get("email") or "").lower(),
-                "created_at": str(r.get("created_at") or ""),
-                "stripe_customer_id": str(r.get("stripe_customer_id") or ""),
-                "last_seen": "",
-                "_meta": {k: r[k] for k in ("plan", "status", "credits_balance",
-                                            "attribution_source", "usage_type")
-                          if r.get(k) not in (None, "")},
-            })
+        out.extend(r for r in rows if isinstance(r, dict))
         cursor = str(data.get("cursor") or "")
         # страж от зацикливания: курсор пуст, повторился или страница неполная
         if not cursor or cursor in seen_cursors or len(rows) < 1000:
             break
         seen_cursors.add(cursor)
         since = cursor
+    return out
+
+
+def export_users(url: str, key: str, pages: int = MAX_PAGES) -> list:
+    """Датасет users экспорта -> формат users_import.
+
+    Ценность против голого списка юзеров: отдаёт stripe_customer_id (прямая
+    склейка со Stripe), план/статус/кредиты (в meta -> скоринг и карточка)
+    и is_internal - служебные аккаунты отсекаем сразу, им не место в выручке.
+    """
+    out = []
+    for r in export_rows(url, key, "users", pages=pages):
+        if r.get("is_internal"):
+            continue
+        out.append({
+            "id": str(r.get("id") or ""),
+            "email": str(r.get("email") or "").lower(),
+            "created_at": str(r.get("created_at") or ""),
+            "stripe_customer_id": str(r.get("stripe_customer_id") or ""),
+            "last_seen": "",
+            "_meta": {k: r[k] for k in ("plan", "status", "credits_balance",
+                                        "attribution_source", "usage_type")
+                      if r.get(k) not in (None, "")},
+        })
     return out
 
 
