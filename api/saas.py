@@ -482,6 +482,15 @@ def saas_scan_site():
         kb.save(ch, tenant, 'economics', econ, url)
         ca.update_tenant(tenant, {'site_profile': facts,
                                   'site_scanned_pages': visited})
+        # Цвет бренда - из того же разбора сайта: им красятся письма кампаний.
+        # Руками выставленный цвет (source != scan) скан не перетирает.
+        if not tc.get('brand_color') or tc.get('brand_color_source') == 'scan':
+            from stripe_sync.site_scan import brand_color_from_url
+            bc = brand_color_from_url(url)
+            if bc:
+                ca.update_tenant(tenant, {'brand_color': bc,
+                                          'brand_color_source': 'scan'})
+                print(f'[scan] {tenant}: brand_color {bc}', flush=True)
     print(f'[scan] {tenant}: {url} -> {"ok" if facts else note} '
           f'({len(visited)} страниц, изменений: {len(changes)})', flush=True)
     return api_json({'profile': facts, 'brief': brief, 'pages': visited,

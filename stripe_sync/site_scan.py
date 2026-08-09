@@ -425,3 +425,111 @@ def scan(url_raw: str) -> tuple[dict, list, str]:
         return {}, visited, f"ai_{type(exc).__name__}"
     profile = parse_profile(out)
     return profile, visited, ("" if profile else "ai_empty")
+
+
+# ── Брендинг с сайта: цвет CTA, не самый частый хекс ─────────────────────────
+# Урок hubcontent.ai: по чистой частоте побеждает мусор (зелёные галочки где-то
+# в глубине разметки), а бренд у них - чёрная кнопка на кремовом. Поэтому вес
+# у КОНТЕКСТА: переменные --primary/--brand и кнопочные селекторы бьют голую
+# частоту, почти-белое отбрасывается (это фон, не бренд), а чёрный - легальный
+# бренд, никакой «ищем яркое» эвристики.
+
+import re as _re
+
+_HEX = _re.compile(r"#[0-9a-fA-F]{6}\b")
+_VAR_CTX = _re.compile(
+    r"--(?:primary|brand|accent|cta|button)[\w-]*\s*:\s*(#[0-9a-fA-F]{6})", _re.I)
+_BTN_CTX = _re.compile(
+    r"(?:btn|button|cta|primary|accent|brand|sign[_-]?up)[^{};]{0,120}?"
+    r"(#[0-9a-fA-F]{6})", _re.I)
+_THEME = _re.compile(
+    r'name=["\']theme-color["\'][^>]*content=["\'](#[0-9a-fA-F]{6})', _re.I)
+
+
+def _luma(hex6: str) -> float:
+    r, g, b = (int(hex6[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def brand_color_from_html(raw_html: str, css_texts: list | None = None) -> str:
+    """Цвет бренда из разметки/стилей сайта; '' - не определился уверенно."""
+    blobs = [raw_html or ""] + list(css_texts or [])
+    ctx_w: dict[str, float] = {}
+    freq_w: dict[str, float] = {}
+
+    def usable(color: str) -> bool:
+        # цвет пойдёт на кнопку с белым текстом: светлое не годится ни как
+        # бренд-акцент, ни по контрасту (светло-серые - вторичные кнопки)
+        return _luma(color) <= 0.75
+
+    def add_ctx(color: str, w: float) -> None:
+        c = color.lower()
+        if usable(c):
+            ctx_w[c] = ctx_w.get(c, 0.0) + w
+
+    def add_freq(color: str) -> None:
+        c = color.lower()
+        if usable(c):
+            freq_w[c] = freq_w.get(c, 0.0) + 1.0
+
+    for blob in blobs:
+        m = _THEME.search(blob)
+        if m:
+            add_ctx(m.group(1), 18.0)
+        for m in _VAR_CTX.finditer(blob):
+            add_ctx(m.group(1), 24.0)
+        for m in _BTN_CTX.finditer(blob):
+            add_ctx(m.group(1), 12.0)
+        for m in _HEX.finditer(blob):
+            add_freq(m.group(0))
+
+    # Частота капится: гора зелёных галочек в разметке не должна перекричать
+    # один честный --primary. Контекст - главный голос.
+    weights = {c: min(w, 15.0) for c, w in freq_w.items()}
+    for c, w in ctx_w.items():
+        weights[c] = weights.get(c, 0.0) + w
+
+    if not weights:
+        return ""
+
+    # КЛАСТЕРИЗАЦИЯ. Бренд почти никогда не один хекс: у hubcontent.ai чёрный
+    # размазан по #0a0a0a/#141414/#1f1f1f/... - поодиночке ни один не набирал
+    # уверенного отрыва, и скан молчал. Похожие цвета голосуют вместе,
+    # представитель кластера - самый весомый его член.
+    def _rgb(c):
+        return tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
+
+    def _close(a, b, limit=90):
+        return sum(abs(x - y) for x, y in zip(_rgb(a), _rgb(b))) <= limit
+
+    clusters: list[dict] = []
+    for color, w in sorted(weights.items(), key=lambda kv: -kv[1]):
+        for cl in clusters:
+            if _close(color, cl["rep"]):
+                cl["weight"] += w
+                break
+        else:
+            clusters.append({"rep": color, "weight": w})
+
+    clusters.sort(key=lambda cl: -cl["weight"])
+    best = clusters[0]
+    # уверенность: кластер-лидер должен заметно отрываться, иначе честнее
+    # промолчать (владелец увидит дефолт и поставит цвет сам)
+    if len(clusters) > 1 and best["weight"] < clusters[1]["weight"] * 1.3:
+        return ""
+    return best["rep"]
+
+
+def brand_color_from_url(url: str) -> str:
+    """Цвет бренда прямо с сайта: страница + до трёх её стилевых файлов."""
+    from urllib.parse import urljoin
+    base = normalize_url(url)
+    raw = fetch(base)
+    if not raw:
+        return ""
+    css = []
+    for href in _re.findall(
+            r'<link[^>]+rel=["\']stylesheet["\'][^>]+href=["\']([^"\']+)',
+            raw, _re.I)[:3]:
+        css.append(fetch(urljoin(base, href)))
+    return brand_color_from_html(raw, [c for c in css if c])
