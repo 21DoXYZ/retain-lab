@@ -298,6 +298,97 @@
           "window_days": 30
         },
         "reentry_days": 90
+      },
+      {
+        "campaign_id": "T1_checkout_rescue",
+        "title": "Trigger: checkout started, not finished",
+        "entry_stage": "TRIGGER",
+        "manual_audience": true,
+        "reentry_days": 7,
+        "goal": {
+          "event_type": "billing.invoice_paid",
+          "window_days": 7
+        },
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "inapp",
+            "ttl_days": 2,
+            "subject": "Your upgrade is one click from done",
+            "body": "You started checking out and stopped - whatever got in the way, your plan is still waiting.",
+            "cta_label": "Finish checkout",
+            "cta_url": "{{app_url}}"
+          },
+          {
+            "delay_h": 3,
+            "action": "email",
+            "subject": "You were one step from your plan",
+            "body": "Hi! You started upgrading a few hours ago and something interrupted you.\n\nYour checkout is still open - it takes under a minute to finish: {{app_url}}\n\nIf a question stopped you, just reply to this email and a human will answer.",
+            "cta_label": "Finish checkout",
+            "cta_url": "{{app_url}}"
+          }
+        ]
+      },
+      {
+        "campaign_id": "T2_credits_out",
+        "title": "Trigger: credits exhausted",
+        "entry_stage": "TRIGGER",
+        "manual_audience": true,
+        "reentry_days": 14,
+        "goal": {
+          "event_type": "billing.invoice_paid",
+          "window_days": 14
+        },
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "inapp",
+            "ttl_days": 3,
+            "subject": "You have used your credits - do not lose momentum",
+            "body": "You clearly found your rhythm: the balance is at {{credits_left}}. Top up or upgrade to keep going.",
+            "cta_label": "Get more credits",
+            "cta_url": "{{app_url}}"
+          },
+          {
+            "delay_h": 24,
+            "action": "email",
+            "subject": "Out of credits mid-flow?",
+            "body": "Hi! Yesterday you ran your balance down to {{credits_left}} credits - that usually means the product is working for you.\n\nPick up where you left off: {{app_url}}\n\nQuestions about plans? Reply to this email.",
+            "cta_label": "Continue",
+            "cta_url": "{{app_url}}"
+          }
+        ]
+      },
+      {
+        "campaign_id": "T3_card_expiring",
+        "title": "Trigger: card expires within 14 days",
+        "entry_stage": "TRIGGER",
+        "manual_audience": true,
+        "reentry_days": 30,
+        "goal": {
+          "event_type": "billing.payment_failed",
+          "window_days": 45,
+          "invert": true
+        },
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "Your card expires soon - 30 seconds to keep everything running",
+            "body": "Hi! The card on your subscription expires at the end of the month. Updating it takes about 30 seconds and nothing gets interrupted: {{card_update_url}}\n\nAfter it expires the renewal fails silently - this is exactly the kind of loss nobody notices until access stops.",
+            "cta_label": "Update card",
+            "cta_url": "{{card_update_url}}"
+          },
+          {
+            "delay_h": 168,
+            "action": "inapp",
+            "ttl_days": 7,
+            "subject": "Card update pending",
+            "body": "Your payment card expires this month. Update it to keep your subscription running.",
+            "cta_label": "Update card",
+            "cta_url": "{{card_update_url}}"
+          }
+        ]
       }
     ]
   }

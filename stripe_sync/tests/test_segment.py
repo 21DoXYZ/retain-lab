@@ -103,3 +103,34 @@ def test_segment_support_filters():
     assert unknown == []
     assert any("support_tickets_30d, 0) >= 2" in c for c in conds)
     assert any("bug_reports_30d, 0) >= 1" in c for c in conds)
+
+
+def test_trigger_campaigns_config_is_sound():
+    """T*-кампании: entry TRIGGER (стадийный enroll молчит), manual_audience
+    (смена стадии не выкидывает), у каждого триггера есть кампания в конфиге."""
+    import json
+    from pathlib import Path
+    from campaign_tick import enroll_entry
+    from trigger_tick import TRIGGERS
+
+    conf = json.loads((Path(__file__).parent.parent / "saas_campaigns.json")
+                      .read_text())["_default"]
+    camps = {c["campaign_id"]: c for c in conf["campaigns"]}
+    for cid in TRIGGERS:
+        assert cid in camps, cid
+        c = camps[cid]
+        assert c["entry_stage"] == "TRIGGER" and c["manual_audience"] is True
+        assert c["steps"] and float(c["steps"][0]["delay_h"]) == 0  # шаг 0 сразу
+        assert int(c.get("reentry_days", 0)) >= 7                   # кулдаун есть
+        for stage in ("ACTIVATE", "CONVERT", "MONITOR", "DUNNING"):
+            assert enroll_entry(c, stage, 1.0, 1.0) == ""
+        for s in c["steps"]:
+            text = (s.get("subject", "") + s.get("body", ""))
+            assert "—" not in text and "–" not in text               # тире-правило
+
+
+def test_trigger_conditions_are_tenant_scoped():
+    """Каждое условие обязано фильтровать по тенанту - чужие юзеры не входят."""
+    from trigger_tick import TRIGGERS
+    for cid, sql in TRIGGERS.items():
+        assert sql.count("%(t)s") >= 1, cid

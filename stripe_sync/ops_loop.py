@@ -83,6 +83,13 @@ STAGES: dict[str, dict] = {
         "when": lambda t: t.minute % 15 == 0,
         "deps": ["stitch"], "fresh_h": 26,
     },
+    "triggers": {
+        # событийные триггеры: момент интента (чекаут, кредиты, карта) не
+        # живёт 15-минутными циклами - проверяем каждую минуту, это дёшево
+        "argv": ["python", "trigger_tick.py"],
+        "when": lambda t: True,
+        "deps": [], "fresh_h": 1,
+    },
     "uplift_report": {
         "argv": ["python", "uplift_report.py"],
         "when": lambda t: t.weekday() == 0 and t.hour == 8 and t.minute == 0,
@@ -226,8 +233,8 @@ def name_argv(name: str) -> list[str]:
 # Порядок исполнения в один тик: топологический (зависимость раньше зависящей),
 # чтобы свежесть, поднятая stitch в этот же тик, сразу увидел scoring/campaign.
 _ORDER = ["stitch", "plans", "contacts", "users_sync", "product_sync",
-          "cancel_reasons", "scoring", "campaign_tick", "uplift_report",
-          "ai_analyst"]
+          "cancel_reasons", "scoring", "campaign_tick", "triggers",
+          "uplift_report", "ai_analyst"]
 
 
 def main() -> None:

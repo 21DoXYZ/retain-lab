@@ -56,6 +56,7 @@ export const saas = {
   "saas.pipeline.stage.reasons": "Причины отмен",
   "saas.pipeline.stage.scoring": "Скоринг",
   "saas.pipeline.stage.campaigns": "Кампании",
+  "saas.pipeline.stage.triggers": "Событийные триггеры",
   "saas.pipeline.stage.uplift": "Замер uplift",
   "saas.pipeline.stage.analyst": "ИИ-аналитик",
 

@@ -347,10 +347,35 @@ def tick(client, tenant: str) -> dict[str, int]:
     tg_bot = str(_tch.get("telegram_bot_username") or "")
     wa_phone = str(_tch.get("wa_phone_display") or "")
 
-    def _user_ctx(cuid: str) -> dict:
+    # Факты юзера для персональных плейсхолдеров ({{credits_left}}): остаток
+    # кредитов из последнего списания, фолбэк - баланс из импорта юзеров.
+    # Письмо «вы сожгли всё» с конкретным числом бьёт generic-текст всегда.
+    user_facts: dict[str, dict] = {}
+    try:
+        for r in client.query(
+            """
+            SELECT identity_id, argMax(val, ts) FROM (
+                SELECT identity_id, ts,
+                       JSONExtractFloat(meta, 'balance_after') AS val
+                FROM retention.saas_events_resolved
+                WHERE tenant_id = %(t)s AND event_type = 'credit_spend'
+                UNION ALL
+                SELECT identity_id, ts,
+                       JSONExtractFloat(meta, 'credits_balance') AS val
+                FROM retention.saas_events_resolved
+                WHERE tenant_id = %(t)s AND event_type = 'signup'
+                  AND JSONHas(meta, 'credits_balance')
+            ) GROUP BY identity_id
+            """, parameters={"t": tenant}).result_rows:
+            user_facts[r[0]] = {"credits_left": int(float(r[1] or 0))}
+    except Exception as exc:  # noqa: BLE001 - факты опциональны, тик важнее
+        print(f"[tick] {tenant}: user facts unavailable: {type(exc).__name__}",
+              flush=True)
+
+    def _user_ctx(cuid: str, identity: str = "") -> dict:
         """Плейсхолдеры, зависящие от КОНКРЕТНОГО человека. Ссылки подписки
         подписаны: голый id в ссылке позволял бы увести чужие уведомления."""
-        out: dict = {}
+        out: dict = dict(user_facts.get(identity) or {})
         if not cuid:
             return out
         if tg_bot:
@@ -558,7 +583,7 @@ def tick(client, tenant: str) -> dict[str, int]:
                                     ok, detail = route_message(
                                         channel, address, step.get("subject", ""),
                                         step["body"], email_cfg, msg_cfg,
-                                        {**_user_ctx(cuid),
+                                        {**_user_ctx(cuid, identity),
                                          # whatsapp шлёт ШАБЛОН по (кампания, шаг),
                                          # а не текст - ему нужен адрес шага
                                          "campaign_id": cid, "step_idx": i,
@@ -617,7 +642,7 @@ def tick(client, tenant: str) -> dict[str, int]:
                             else:
                                 ctx = {"app_url": email_cfg.app_url,
                                        "card_update_url": email_cfg.card_update_url,
-                                       **_user_ctx(cuid)}
+                                       **_user_ctx(cuid, identity)}
                                 client.insert(
                                     "retention.inapp_inbox",
                                     [inapp_row(tenant, camp, step, i, identity,
