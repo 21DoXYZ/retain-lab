@@ -27,6 +27,14 @@ interface CardUser {
   last_seen: string;
   stage_note: string;
   buy_intent: number;
+  online: boolean;
+  ltv_explain: {
+    months: number | null;
+    basis: string | null;
+    observed_months: number | null;
+    churned: number | null;
+    sub_months: number | null;
+  } | null;
 }
 
 interface Contact { channel: string; address: string; consent: number; consent_ts: string }
@@ -325,6 +333,12 @@ export function UserCardView({ identity }: { identity: string }) {
             ? t("saas.users.stage.justCanceled")
             : t(`saas.stage.${u.stage}` as MessageKey)}
         </span>
+        {u.online ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-pos/30 bg-pos/10 px-2.5 py-0.5 text-[11.5px] font-semibold text-pos">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-pos" />
+            {t("saas.ucard.online")}
+          </span>
+        ) : null}
         {u.action ? <span className="font-mono text-[12px] text-slate">{u.action}</span> : null}
       </div>
 
@@ -335,9 +349,15 @@ export function UserCardView({ identity }: { identity: string }) {
           { k: "saas.ucard.stat.atStake", v: u.value_at_stake > 0 ? usd(u.value_at_stake) : "-", neg: u.value_at_stake > 0 },
           { k: "saas.ucard.stat.churn", v: u.p_churn > 0 ? (u.p_churn * 100).toFixed(0) + "%" : "-", neg: u.p_churn >= 0.4 },
           { k: "saas.ucard.stat.buyIntent", v: u.buy_intent > 0 ? (u.buy_intent * 100).toFixed(0) + "%" : "-", pos: u.buy_intent >= 0.5 },
-          { k: "saas.ucard.stat.ltv", v: usd(u.ltv) },
+          { k: "saas.ucard.stat.ltv", v: usd(u.ltv),
+            sub: u.ltv > 0 && u.ltv_explain?.months
+              ? t(u.ltv_explain.basis === "measured"
+                    ? "saas.ucard.ltv.measured" : "saas.ucard.ltv.prior")
+                  .replace("{m}", String(u.ltv_explain.months))
+                  .replace("{obs}", String(u.ltv_explain.observed_months ?? 0))
+              : undefined },
           { k: "saas.ucard.stat.lastSeen", v: u.last_seen ? u.last_seen.slice(0, 10) : "-" },
-        ].map((s) => (
+        ].map((s: { k: string; v: string; neg?: boolean; pos?: boolean; sub?: string }) => (
           <div key={s.k} className="rounded-ctl border border-hair bg-surface p-3">
             <div className="text-[11px] font-medium uppercase tracking-wide text-steel">
               {t(s.k as MessageKey)}
@@ -345,6 +365,9 @@ export function UserCardView({ identity }: { identity: string }) {
             <div className={"mt-1 font-mono text-[15px] font-semibold " + (s.neg ? "text-neg" : (s.pos ? "text-pos" : "text-ink"))}>
               {s.v}
             </div>
+            {s.sub ? (
+              <div className="mt-0.5 text-[10.5px] leading-snug text-steel">{s.sub}</div>
+            ) : null}
           </div>
         ))}
       </div>

@@ -25,6 +25,7 @@ interface SaasUser {
   ltv: number;
   last_seen: string;
   stage_note: string;
+  online: boolean;
 }
 
 interface UsersData {
@@ -76,7 +77,12 @@ export function UsersView() {
       key: "email", header: t("saas.users.col.user"),
       render: (r) => (
         <div className="min-w-0">
-          <div className="font-medium text-ink truncate">{r.email || r.client_user_id || r.identity_id.slice(0, 8)}</div>
+          <div className="flex items-center gap-1.5 font-medium text-ink">
+            {r.online ? (
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-pos" title={t("saas.ucard.online")} />
+            ) : null}
+            <span className="truncate">{r.email || r.client_user_id || r.identity_id.slice(0, 8)}</span>
+          </div>
           {r.client_user_id ? <div className="text-[11px] text-steel">{r.client_user_id}</div> : null}
         </div>
       ),

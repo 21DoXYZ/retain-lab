@@ -686,7 +686,9 @@ def saas_users():
                value_at_stake, coalesce(p_convert, 0), coalesce(p_churn, 0),
                coalesce(ltv_estimate, 0),
                if(toUnixTimestamp(last_seen) = 0, '', toString(last_seen)),
-               stage_note
+               stage_note,
+               if(toUnixTimestamp(last_seen) = 0, 1000000,
+                  dateDiff('second', last_seen, now()))
         FROM user_actions WHERE {where}
         ORDER BY value_at_stake DESC, mrr DESC
         LIMIT 500
@@ -700,6 +702,7 @@ def saas_users():
         'p_convert': round(_flt(r[10]), 2), 'p_churn': round(_flt(r[11]), 2),
         'ltv': round(_flt(r[12]), 2), 'last_seen': r[13],
         'stage_note': r[14],
+        'online': len(r) > 15 and _flt(r[15]) < ONLINE_THRESHOLD_S,
     } for r in rows]
 
     stages = {r[0]: int(r[1]) for r in q(
@@ -2248,7 +2251,9 @@ def _user_row(tenant: str, ident: str):
                value_at_stake, coalesce(p_convert, 0), coalesce(p_churn, 0),
                coalesce(ltv_estimate, 0),
                if(toUnixTimestamp(last_seen) = 0, '', toString(last_seen)),
-               stage_note, coalesce(buy_intent, 0)
+               stage_note, coalesce(buy_intent, 0),
+               if(toUnixTimestamp(last_seen) = 0, 1000000,
+                  dateDiff('second', last_seen, now()))
         FROM user_actions
         WHERE tenant_id = {t:String}
           AND (identity_id = {i:String}
@@ -2256,6 +2261,11 @@ def _user_row(tenant: str, ident: str):
         LIMIT 1
         """, {'t': tenant, 'i': ident})[1]
     return rows[0] if rows else None
+
+
+# «Онлайн» = событие младше 3 минут: heartbeat идёт раз в 2, живой юзер не
+# успевает протухнуть; порог длиннее - и «онлайн» видел бы уже ушедших.
+ONLINE_THRESHOLD_S = 180
 
 
 def _campaign_titles(tenant: str) -> list:
@@ -2312,7 +2322,30 @@ def saas_user_card():
         'p_convert': round(_flt(r[10]), 2), 'p_churn': round(_flt(r[11]), 2),
         'ltv': round(_flt(r[12]), 2), 'last_seen': r[13], 'stage_note': r[14],
         'buy_intent': round(_flt(r[15]), 2) if len(r) > 15 else 0.0,
+        'online': len(r) > 16 and _flt(r[16]) < ONLINE_THRESHOLD_S,
     }
+
+    # Откуда взялся LTV: месяцы и basis лежат в фичах скоринга, замер когорты
+    # (наблюдаемые месяцы, уходы) - в knowledge. Карточка обязана уметь
+    # ответить на «с чего это вдруг», а не показывать голое число.
+    try:
+        import json as _json2
+        # base-таблица: вьюха _current не выносит features
+        fs = q("SELECT argMax(features, scored_at) FROM user_scores "
+               "WHERE tenant_id = {t:String} AND identity_id = {i:String}",
+               {'t': tenant, 'i': identity})[1]
+        feats = _json2.loads(fs[0][0]) if fs and fs[0][0] else {}
+        from stripe_sync.knowledge import load as _kb_load
+        lc = _kb_load(_ch_direct(), tenant, 'lifecycle_measured')
+        user['ltv_explain'] = {
+            'months': feats.get('ltv_months'),
+            'basis': feats.get('ltv_basis'),
+            'observed_months': lc.get('obs_months'),
+            'churned': lc.get('churned'),
+            'sub_months': lc.get('sub_months'),
+        }
+    except Exception:
+        user['ltv_explain'] = None
 
     # контакты каналов: лежат под client_user_id, у Stripe-only - под identity.
     # Ключа два, поэтому канал может встретиться дважды - берём запись под
