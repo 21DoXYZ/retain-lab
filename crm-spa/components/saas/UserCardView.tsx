@@ -112,6 +112,61 @@ function usd(n: number): string {
   return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
+type Reading = { label: string; value: string; note: string; tone: string };
+
+// Превращает сырые сигналы поведения в человеческие строки с трактовкой:
+// владельцу нужен смысл («раздражение», «интерес к покупке»), а не INP/rage.
+function readBehavior(b: Behavior, t: (k: MessageKey, v?: Record<string, string | number>) => string): Reading[] {
+  const out: Reading[] = [];
+
+  // Активность: сколько реально жил в продукте
+  out.push({
+    label: t("saas.ucard.beh.r.activity"),
+    value: t("saas.ucard.beh.r.activityVal",
+      { min: b.active_min_14d, visits: b.visits || b.pages_14d, pages: b.pages_14d }),
+    note: b.active_min_14d >= 20 ? t("saas.ucard.beh.r.engaged")
+      : b.active_min_14d <= 2 ? t("saas.ucard.beh.r.barely") : "",
+    tone: b.active_min_14d >= 20 ? "pos" : b.active_min_14d <= 2 ? "warn" : "muted",
+  });
+
+  // Интерес к покупке: заходы на страницу цен - сильнейший сигнал
+  if (b.pricing_visits > 0) {
+    out.push({
+      label: t("saas.ucard.beh.r.intent"),
+      value: t("saas.ucard.beh.r.pricingTimes", { n: b.pricing_visits }),
+      note: b.pricing_visits >= 2 ? t("saas.ucard.beh.r.strongIntent")
+        : t("saas.ucard.beh.r.someIntent"),
+      tone: b.pricing_visits >= 2 ? "pos" : "muted",
+    });
+  }
+
+  // Раздражение: злые клики + ошибки продукта у этого человека
+  if (b.rage_14d > 0 || b.errors_14d > 0) {
+    out.push({
+      label: t("saas.ucard.beh.r.frustration"),
+      value: t("saas.ucard.beh.r.frustrationVal",
+        { rage: b.rage_14d, errors: b.errors_14d }),
+      note: t("saas.ucard.beh.r.annoying"),
+      tone: "neg",
+    });
+  }
+
+  // Скорость для юзера: INP/LCP переведены в «отклик кнопок» / «загрузка»
+  if (b.inp_ms > 0 || b.lcp_ms > 0) {
+    const inpWord = b.inp_ms > 500 ? t("saas.ucard.beh.r.slow")
+      : b.inp_ms > 0 ? t("saas.ucard.beh.r.fast") : "";
+    out.push({
+      label: t("saas.ucard.beh.r.speed"),
+      value: t("saas.ucard.beh.r.speedVal",
+        { inp: (b.inp_ms / 1000).toFixed(1), lcp: (b.lcp_ms / 1000).toFixed(1) }),
+      note: inpWord,
+      tone: b.inp_ms > 500 || b.lcp_ms > 2500 ? "warn" : "pos",
+    });
+  }
+
+  return out;
+}
+
 const ADD_CHANNELS = ["whatsapp", "sms", "viber", "telegram"];
 
 const inputCls =
@@ -340,30 +395,21 @@ export function UserCardView({ identity }: { identity: string }) {
                   : t("saas.ucard.beh.emptyUnlinked")}
               </p>
             ) : (<>
-            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { k: "saas.ucard.beh.time", v: data.behavior.active_min_14d + " " + t("saas.ucard.beh.min"), warn: false },
-                { k: "saas.ucard.beh.pages", v: String(data.behavior.pages_14d), warn: false },
-                { k: "saas.ucard.beh.rage", v: String(data.behavior.rage_14d), warn: data.behavior.rage_14d > 0 },
-                { k: "saas.ucard.beh.errors", v: String(data.behavior.errors_14d), warn: data.behavior.errors_14d > 0 },
-              ].map((b) => (
-                <div key={b.k} className="rounded-ctl border border-hair2 bg-canvas p-2.5">
-                  <div className="text-[10.5px] font-medium uppercase tracking-wide text-steel">{t(b.k as MessageKey)}</div>
-                  <div className={"mt-0.5 font-mono text-[14px] font-semibold " + (b.warn ? "text-neg" : "text-ink")}>{b.v}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { k: "saas.ucard.beh.visits", v: data.behavior.visits > 0 ? String(data.behavior.visits) : "-", warn: false },
-                { k: "saas.ucard.beh.pricingVisits", v: data.behavior.pricing_visits > 0 ? String(data.behavior.pricing_visits) : "-", pos: data.behavior.pricing_visits >= 2 },
-                { k: "saas.ucard.beh.inp", v: data.behavior.inp_ms > 0 ? data.behavior.inp_ms + " ms" : "-", warn: data.behavior.inp_ms > 500 },
-                { k: "saas.ucard.beh.lcp", v: data.behavior.lcp_ms > 0 ? (data.behavior.lcp_ms / 1000).toFixed(1) + " s" : "-", warn: data.behavior.lcp_ms > 2500 },
-              ].map((b) => (
-                <div key={b.k} className="rounded-ctl border border-hair2 bg-canvas p-2.5">
-                  <div className="text-[10.5px] font-medium uppercase tracking-wide text-steel">{t(b.k as MessageKey)}</div>
-                  <div className={"mt-0.5 font-mono text-[14px] font-semibold " +
-                    ((b as {warn?: boolean}).warn ? "text-neg" : ((b as {pos?: boolean}).pos ? "text-pos" : "text-ink"))}>{b.v}</div>
+            <p className="mt-1 mb-2 text-[12px] leading-snug text-steel">{t("saas.ucard.beh.lead")}</p>
+            <div className="flex flex-col divide-y divide-hair">
+              {readBehavior(data.behavior, t).map((r) => (
+                <div key={r.label} className="flex items-baseline gap-3 py-2">
+                  <div className="w-[130px] shrink-0 text-[12.5px] font-medium text-slate">{r.label}</div>
+                  <div className="min-w-0 flex-1">
+                    <span className="font-mono text-[13px] text-ink">{r.value}</span>
+                    {r.note ? (
+                      <span className={"ml-2 text-[12px] " +
+                        (r.tone === "pos" ? "text-pos" : r.tone === "neg" ? "text-neg"
+                          : r.tone === "warn" ? "text-[#b54708]" : "text-steel")}>
+                        {r.note}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>
