@@ -948,3 +948,46 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMM(ts)
 ORDER BY (tenant_id, stage, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY;
+
+-- ============================================================================
+-- Карты клиентов: срок действия для перехвата НЕВОЛЬНОГО оттока. Карта
+-- истекает -> следующий платёж не пройдёт -> человек уходит, не желая того.
+-- Пишет mapper из событий payment_method.* (attached/updated/автообновление).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS retention.stripe_cards
+(
+    `tenant_id`   LowCardinality(String),
+    `customer_id` String,
+    `brand`       LowCardinality(String),
+    `last4`       String,
+    `exp_month`   UInt8,
+    `exp_year`    UInt16,
+    `updated_at`  DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, customer_id);
+
+CREATE OR REPLACE VIEW retention.stripe_cards_current AS
+SELECT tenant_id, customer_id,
+       argMax(brand, updated_at)     AS brand,
+       argMax(last4, updated_at)     AS last4,
+       argMax(exp_month, updated_at) AS exp_month,
+       argMax(exp_year, updated_at)  AS exp_year
+FROM retention.stripe_cards
+GROUP BY tenant_id, customer_id;
+
+-- Карта истекает СКОРО у активной подписки = будущий невольный отток.
+-- Дней до конца месяца истечения; порог перехвата (<=45 дней) применяет код.
+CREATE OR REPLACE VIEW retention.card_expiry_current AS
+SELECT c.tenant_id                                             AS tenant_id,
+       c.customer_id                                           AS customer_id,
+       c.brand                                                 AS brand,
+       c.last4                                                 AS last4,
+       c.exp_month                                             AS exp_month,
+       c.exp_year                                              AS exp_year,
+       -- последний день месяца истечения (карта живёт до конца месяца)
+       toLastDayOfMonth(makeDate(c.exp_year, c.exp_month, 1))     AS expires_on,
+       dateDiff('day', today(),
+                toLastDayOfMonth(makeDate(c.exp_year, c.exp_month, 1))) AS days_to_expiry
+FROM retention.stripe_cards_current c
+WHERE c.exp_year > 0 AND c.exp_month BETWEEN 1 AND 12;

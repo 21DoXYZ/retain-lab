@@ -301,4 +301,22 @@ def snapshot(evt: dict[str, Any], tenant_id: str) -> tuple[str, dict[str, Any]] 
             "updated_at": now,
         }
 
+    # Срок действия карты - ловим НЕВОЛЬНЫЙ отток: карта истекает -> платёж не
+    # пройдёт -> человек уйдёт, не желая уходить. Предупредим ДО списания.
+    # Источник - события payment_method (attached/updated/автообновление сети).
+    if stripe_type.startswith("payment_method."):
+        card = obj.get("card") or {}
+        cust = obj.get("customer") or ""
+        if not cust or not card:
+            return None
+        return "stripe_cards", {
+            "tenant_id": tenant_id,
+            "customer_id": str(cust),
+            "brand": str(card.get("brand") or ""),
+            "last4": str(card.get("last4") or ""),
+            "exp_month": int(card.get("exp_month") or 0),
+            "exp_year": int(card.get("exp_year") or 0),
+            "updated_at": now,
+        }
+
     return None

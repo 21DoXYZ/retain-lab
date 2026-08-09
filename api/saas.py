@@ -2354,6 +2354,21 @@ def saas_user_card():
         """, {'t': tenant, 'i': identity})[1]]
 
     scid = str(r[3] or '')
+    # Карта: срок действия для перехвата невольного оттока (истекает -> платёж
+    # не пройдёт). Показываем всегда, предупреждение - если <=45 дней.
+    card = None
+    if scid:
+        cr = q("""
+            SELECT brand, last4, exp_month, exp_year, toInt32(days_to_expiry)
+            FROM card_expiry_current
+            WHERE tenant_id = {t:String} AND customer_id = {c:String}
+            """, {'t': tenant, 'c': scid})[1]
+        if cr:
+            card = {'brand': str(cr[0][0]), 'last4': str(cr[0][1]),
+                    'exp_month': int(cr[0][2]), 'exp_year': int(cr[0][3]),
+                    'days_to_expiry': int(cr[0][4]),
+                    'expiring_soon': 0 <= int(cr[0][4]) <= 45}
+
     events = [{'event_type': e[0], 'ts': str(e[1]), 'amount': round(_flt(e[2]), 2),
                'plan_id': e[3], 'page': e[4]} for e in q(
         """
@@ -2468,7 +2483,7 @@ def saas_user_card():
         'email_suppressed': email_suppressed, 'enrollments': enrollments,
         'touches': touches, 'offers': offers, 'events': events,
         'campaigns': _campaign_titles(tenant), 'wa_chat': wa_chat,
-        'behavior': behavior,
+        'behavior': behavior, 'card': card,
         'autopilot': _autopilot_on(tenant),
         # что может ЭТА роль: support пишет людям, но кампании не трогает
         'can_touch': role in CLIENT_WRITE_ROLES,

@@ -70,6 +70,8 @@ interface CardData {
   campaigns: { id: string; title: string }[];
   wa_chat: string;
   behavior: Behavior | null;
+  card: { brand: string; last4: string; exp_month: number; exp_year: number;
+          days_to_expiry: number; expiring_soon: boolean } | null;
   autopilot: boolean;
   can_touch: boolean;
   can_enroll: boolean;
@@ -582,6 +584,27 @@ export function UserCardView({ identity }: { identity: string }) {
               </div>
             ) : null}
           </section>
+
+          {data.card ? (
+            <section className={"rounded-ctl border bg-surface p-4 " +
+              (data.card.expiring_soon ? "border-[#fecdca]" : "border-hair")}>
+              <h2 className="text-[13.5px] font-semibold text-ink">{t("saas.ucard.card.title")}</h2>
+              <div className="mt-1.5 font-mono text-[13px] text-slate">
+                {data.card.brand} ····{data.card.last4} · {String(data.card.exp_month).padStart(2,"0")}/{data.card.exp_year}
+              </div>
+              {data.card.expiring_soon ? (
+                <p className="mt-1.5 text-[12px] leading-snug text-neg">
+                  {data.card.days_to_expiry < 0
+                    ? t("saas.ucard.card.expired")
+                    : t("saas.ucard.card.expiringSoon", { days: data.card.days_to_expiry })}
+                </p>
+              ) : (
+                <p className="mt-1.5 text-[12px] text-steel">
+                  {t("saas.ucard.card.ok", { days: data.card.days_to_expiry })}
+                </p>
+              )}
+            </section>
+          ) : null}
 
           <section className="rounded-ctl border border-hair bg-surface p-4">
             <h2 className="text-[13.5px] font-semibold text-ink">{t("saas.ucard.camp.title")}</h2>

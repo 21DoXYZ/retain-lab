@@ -211,3 +211,22 @@ def test_customer_updated_snapshots_the_new_email():
     evt["data"]["object"]["email"] = None
     _t, row2 = snapshot(evt, "t1")
     assert row2["email_hash"] == "" and row2["email_norm"] == ""
+
+
+def test_payment_method_snapshots_card_expiry():
+    """Срок карты - для перехвата невольного оттока (карта истечёт -> платёж
+    не пройдёт). Источник - события payment_method.*"""
+    from stripe_sync.mapper import snapshot
+    evt = {"type": "payment_method.attached", "created": 1786000000,
+           "data": {"object": {"id": "pm_1", "customer": "cus_7",
+                               "card": {"brand": "visa", "last4": "4242",
+                                        "exp_month": 3, "exp_year": 2027}}}}
+    out = snapshot(evt, "t1")
+    assert out is not None
+    table, row = out
+    assert table == "stripe_cards"
+    assert row["customer_id"] == "cus_7" and row["last4"] == "4242"
+    assert row["exp_month"] == 3 and row["exp_year"] == 2027
+    # без карты/клиента - не снапшотим
+    evt["data"]["object"]["card"] = None
+    assert snapshot(evt, "t1") is None
