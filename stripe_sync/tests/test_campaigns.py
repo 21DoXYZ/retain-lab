@@ -183,6 +183,12 @@ class FakeCH:
             return _Res([])
         if "contacts_current" in sql:
             return _Res([])
+        if "saas_events_resolved" in sql:
+            # meta последних payment_failed (ретраи Stripe): [[identity, meta]]
+            return _Res(getattr(self, "retry_meta", []))
+        if "email_events" in sql:
+            # открытия/клики: [[campaign, step, address, event_type]]
+            return _Res(getattr(self, "engaged_rows", []))
         if "campaign_enrollments_current" in sql:
             return _Res([])
         if "campaign_send_log" in sql and "GROUP BY identity_id" in sql:
@@ -591,3 +597,65 @@ def test_manual_exit_is_not_resurrected_by_a_running_tick():
     fake3.exited = {"id1"}
     ct._save(fake3, "t", "K1_activation", {**row, "status": "exited"})
     assert len(fake3.inserts) == 1
+
+
+# ── Точность дуннинга, ветвление, лестница каналов (аудит качества) ──────────
+
+def _tick_one(fake, campaign_id="K3_payment_recovery", stage="DUNNING",
+              email="u@x.test", enrolled_hours_ago=80):
+    """Мини-прогон: один юзер, один тик, конфиг из файла."""
+    import json as _json
+    from datetime import datetime, timedelta, timezone
+    import campaign_tick as ct
+
+    conf = _json.loads(ct.CAMPAIGNS_PATH.read_text())["_default"]
+    camp = next(c for c in conf["campaigns"] if c["campaign_id"] == campaign_id)
+    now = datetime(2026, 8, 5, 12, 0, 0)
+    fake.enroll_row = ["id1", 0, stage, 2,
+                       now - timedelta(hours=1), "active",
+                       now - timedelta(hours=enrolled_hours_ago)]
+    return camp, now, ct
+
+
+def test_branch_skip_resend_only_to_non_openers():
+    from campaign_tick import branch_skip
+    engaged = {("K1_activation", 1, "u@x.test", "opened")}
+    step = {"skip_if_opened_step": 1}
+    assert branch_skip(step, "K1_activation", "U@X.test", engaged) == "opened_step_1"
+    assert branch_skip(step, "K1_activation", "other@x.test", engaged) == ""
+    # клик считается открытием; без условия шаг всегда идёт
+    engaged2 = {("K1_activation", 1, "u@x.test", "clicked")}
+    assert branch_skip(step, "K1_activation", "u@x.test", engaged2) == "opened_step_1"
+    assert branch_skip({}, "K1_activation", "u@x.test", engaged) == ""
+    # без email условие не применяется (некому было открывать)
+    assert branch_skip(step, "K1_activation", "", engaged) == ""
+
+
+def test_quiet_hours_jitter_spreads_the_morning():
+    """После 07:00 люди выходят из тихих часов не залпом, а вразнобой
+    (детерминированный джиттер до 90 минут по identity)."""
+    from datetime import datetime
+    from campaign_tick import quiet_hours_block
+    at_7_45 = datetime(2026, 8, 5, 7, 45, 0)
+    at_8_31 = datetime(2026, 8, 5, 8, 31, 0)
+    blocked = [quiet_hours_block("K4_save", at_7_45, "UTC", f"id{i}")
+               for i in range(40)]
+    # в середине джиттер-окна часть ещё ждёт, часть уже свободна
+    assert "quiet_hours" in blocked and "" in blocked
+    # к 08:31 свободны все
+    assert all(quiet_hours_block("K4_save", at_8_31, "UTC", f"id{i}") == ""
+               for i in range(40))
+    # дуннинг сервисный - джиттер и тихие часы не про него
+    assert quiet_hours_block("K3_payment_recovery", at_7_45, "UTC", "id1") == ""
+
+
+def test_channel_ladder_declared_in_default_dunning():
+    """K3: догонялки объявляют лестницу email -> whatsapp -> sms и
+    align_retries - конфиг, который исполняет новая ветка раннера."""
+    import json as _json
+    import campaign_tick as ct
+    conf = _json.loads(ct.CAMPAIGNS_PATH.read_text())["_default"]
+    k3 = next(c for c in conf["campaigns"] if c["campaign_id"] == "K3_payment_recovery")
+    assert k3.get("align_retries") is True
+    laddered = [s for s in k3["steps"] if s.get("channels")]
+    assert laddered and all(s["channels"][0] == "email" for s in laddered)

@@ -124,17 +124,29 @@ FREQ_EXEMPT = ("K3_payment_recovery",)
 QUIET_START, QUIET_END = 21, 7          # [21:00, 07:00) - молчим
 
 
-def quiet_hours_block(campaign_id: str, now_utc: datetime, tz_name: str) -> str:
-    """Можно ли слать промо СЕЙЧАС по местному времени тенанта. '' - можно."""
+def quiet_hours_block(campaign_id: str, now_utc: datetime, tz_name: str,
+                      identity: str = "") -> str:
+    """Можно ли слать промо СЕЙЧАС по местному времени тенанта. '' - можно.
+
+    После тихих часов - персональный джиттер до 90 минут (детерминированный
+    по identity): иначе всё, что созрело ночью, уходит залпом ровно в 07:00 -
+    спайк для доставляемости и для саппорта клиента.
+    """
     if campaign_id in FREQ_EXEMPT:
         return ""
     try:
         from zoneinfo import ZoneInfo
-        local_hour = now_utc.astimezone(ZoneInfo(tz_name or "UTC")).hour
+        local = now_utc if now_utc.tzinfo else now_utc.replace(tzinfo=timezone.utc)
+        local = local.astimezone(ZoneInfo(tz_name or "UTC"))
     except Exception:                    # кривая зона в конфиге - не роняем тик
-        local_hour = now_utc.hour
-    if local_hour >= QUIET_START or local_hour < QUIET_END:
+        local = now_utc
+    if local.hour >= QUIET_START or local.hour < QUIET_END:
         return "quiet_hours"
+    if identity and local.hour == QUIET_END:
+        import hashlib
+        jitter_min = int(hashlib.md5(identity.encode()).hexdigest()[:6], 16) % 90
+        if local.minute < jitter_min:
+            return "quiet_hours"
     return ""
 
 
@@ -150,6 +162,28 @@ def frequency_block(campaign_id: str, sent_24h: int, sent_7d: int) -> str:
         return "freq_cap_day"
     if sent_7d >= MAX_TOUCHES_PER_WEEK:
         return "freq_cap_week"
+    return ""
+
+
+def branch_skip(step: dict, campaign_id: str, email: str,
+                engaged: set) -> str:
+    """Пропустить ли шаг по поведению получателя. '' - слать.
+
+    skip_if_opened_step / skip_if_clicked_step: N - шаг-«догонялка» нужен
+    только тем, кто НЕ открыл/кликнул шаг N. Открывшему слать то же самое
+    второй раз - это спам, который поднимает отписки.
+    """
+    mail = str(email or "").lower()
+    if not mail:
+        return ""
+    n = step.get("skip_if_opened_step")
+    if n is not None and (
+            (campaign_id, int(n), mail, "opened") in engaged
+            or (campaign_id, int(n), mail, "clicked") in engaged):
+        return f"opened_step_{int(n)}"
+    n = step.get("skip_if_clicked_step")
+    if n is not None and (campaign_id, int(n), mail, "clicked") in engaged:
+        return f"clicked_step_{int(n)}"
     return ""
 
 
@@ -335,6 +369,30 @@ def tick(client, tenant: str) -> dict[str, int]:
         "FROM retention.contacts_current WHERE tenant_id = %(t)s",
         parameters={"t": tenant}).result_rows}
 
+    # Следующая РЕАЛЬНАЯ попытка списания Stripe (из meta последнего
+    # payment_failed). Дуннинг-догонялки шлём не раньше, чем за сутки до неё:
+    # письмо «обновите карту» за 4 дня до ретрая - в никуда, за день - в точку.
+    retry_at = {}
+    for r in client.query(
+        "SELECT identity_id, argMax(meta, ts) FROM retention.saas_events_resolved "
+        "WHERE tenant_id = %(t)s AND event_type = 'billing.payment_failed' "
+        "AND source = 'stripe' GROUP BY identity_id",
+            parameters={"t": tenant}).result_rows:
+        try:
+            npa = json.loads(r[1] or "{}").get("next_payment_attempt")
+            if npa:
+                retry_at[r[0]] = datetime.fromtimestamp(int(npa), tz=timezone.utc)
+        except (ValueError, TypeError, OSError):
+            pass
+
+    # Открытия/клики писем: (campaign, step, email) - для ветвления шагов
+    # (ресенд только неоткрывшим и т.п.). Вебхуки Resend уже пишут campaign+step.
+    engaged = {(r[0], int(r[1]), str(r[2]).lower(), r[3]) for r in client.query(
+        "SELECT campaign_id, step_idx, address, event_type "
+        "FROM retention.email_events WHERE tenant_id = %(t)s "
+        "AND event_type IN ('opened', 'clicked')",
+        parameters={"t": tenant}).result_rows}
+
     for camp in conf["campaigns"]:
         cid, steps = camp["campaign_id"], camp["steps"]
         # Кулдаун повторного входа СВОЙ у кампании: дуннинг обязан отработать
@@ -381,28 +439,33 @@ def tick(client, tenant: str) -> dict[str, int]:
                 try:
                     if not row["control"]:
                         if step["action"] in ("email", "message"):
-                            channel = step.get("channel", "email")
-                            if channel == "email":
-                                address, consent = email, 1
-                            else:
-                                # у Stripe-only юзера нет client_user_id -
-                                # ручной контакт из карточки лежит под identity
-                                address, consent = (contacts.get((cuid, channel))
-                                                    or contacts.get((identity, channel))
-                                                    or ("", 0))
-                            if not address:
-                                _log_send(client, tenant, cid, identity, i, channel,
-                                          step.get("subject", ""), "rejected", "no_contact")
-                            elif channel == "email" and address.lower() in suppressed:
-                                _log_send(client, tenant, cid, identity, i, channel,
-                                          step.get("subject", ""), "rejected", "suppressed")
-                            elif not consent:
-                                _log_send(client, tenant, cid, identity, i, channel,
-                                          step.get("subject", ""), "rejected", "no_consent")
-                            elif quiet_hours_block(cid, now, tenant_tz):
+                            # Ветвление по поведению: догонялка только тем, кто
+                            # не открыл/не кликнул указанный шаг. Открывшему то
+                            # же письмо второй раз - спам.
+                            skip = branch_skip(step, cid, email, engaged)
+                            if skip:
+                                _log_send(client, tenant, cid, identity, i,
+                                          step.get("channel", "email"),
+                                          step.get("subject", ""), "skipped", skip)
+                            elif (camp.get("align_retries")
+                                    and float(step.get("delay_h", 0)) > 0
+                                    and identity in retry_at
+                                    and retry_at[identity].replace(tzinfo=None)
+                                        - now > timedelta(hours=24)):
+                                # Дуннинг-догонялка раньше, чем за сутки до
+                                # РЕАЛЬНОГО ретрая Stripe, уходит в никуда:
+                                # человеку не к чему действовать. Шаг дозреет
+                                # в окне суток перед попыткой списания.
+                                _log_send(client, tenant, cid, identity, i,
+                                          step.get("channel", "email"),
+                                          step.get("subject", ""), "rejected",
+                                          "awaiting_retry")
+                                retry_step = True
+                            elif quiet_hours_block(cid, now, tenant_tz, identity):
                                 # ночь у аудитории: шаг НЕ отработан, созреет
                                 # утром. В ОАЭ ночное промо ещё и незаконно.
-                                _log_send(client, tenant, cid, identity, i, channel,
+                                _log_send(client, tenant, cid, identity, i,
+                                          step.get("channel", "email"),
                                           step.get("subject", ""), "rejected",
                                           "quiet_hours")
                                 retry_step = True
@@ -410,55 +473,101 @@ def tick(client, tenant: str) -> dict[str, int]:
                                 # Шаг НЕ отработан: он созреет снова, когда
                                 # частота позволит. Иначе касание пропадало бы
                                 # навсегда из-за соседней кампании.
-                                _log_send(client, tenant, cid, identity, i, channel,
+                                _log_send(client, tenant, cid, identity, i,
+                                          step.get("channel", "email"),
                                           step.get("subject", ""), "rejected",
                                           frequency_block(cid, *touches.get(identity, (0, 0))))
                                 retry_step = True
                             else:
-                                # счётчик растёт СРАЗУ: за один тик могут созреть
-                                # два шага, и второй обязан увидеть первый
-                                day, week = touches.get(identity, (0, 0))
-                                touches[identity] = (day + 1, week + 1)
-                                ok, detail = route_message(
-                                    channel, address, step.get("subject", ""),
-                                    step["body"], email_cfg, msg_cfg,
-                                    {**_user_ctx(cuid),
-                                     # whatsapp шлёт ШАБЛОН по (кампания, шаг),
-                                     # а не текст - ему нужен адрес шага
-                                     "campaign_id": cid, "step_idx": i,
-                                     "app_url": email_cfg.app_url,
-                                     "card_update_url": email_cfg.card_update_url})
-                                if not ok and channel == "whatsapp":
-                                    from whatsapp_cloud import should_suppress
-                                    if should_suppress(detail):
-                                        # человек запретил бизнесу писать себе:
-                                        # fail-closed, как email-супрессии
-                                        client.insert(
-                                            "retention.contacts",
-                                            [[tenant, cuid, "whatsapp", address,
-                                              0, now, now]],
-                                            column_names=[
-                                                "tenant_id", "client_user_id",
-                                                "channel", "address", "consent",
-                                                "consent_ts", "updated_at"])
-                                # Провайдер лёг или придушил лимитом - касание НЕ
-                                # отработано: шаг остаётся созревшим, следующий тик
-                                # повторит. Иначе письмо о несписании терялось бы
-                                # навсегда из-за минутного 503.
-                                if (not ok and transient_failure(detail)
-                                        and _retry_count(client, tenant, cid,
-                                                         identity, i) < MAX_SEND_RETRIES):
+                                # ЛЕСТНИЦА КАНАЛОВ. Шаг может объявить
+                                # channels: ["email", "whatsapp", ...] - идём по
+                                # порядку, пока канал не доставит. Недоступный
+                                # канал (нет адреса/согласия/шаблона) - к
+                                # следующему; временный сбой - тот же канал на
+                                # следующем тике. Раньше письмо в супрессии
+                                # значило «никто не узнал о несписании».
+                                channels = [str(c) for c in
+                                            (step.get("channels")
+                                             or [step.get("channel", "email")])]
+                                counted = False
+                                delivered = False
+                                for channel in channels:
+                                    if channel == "email":
+                                        address, consent = email, 1
+                                    else:
+                                        # у Stripe-only юзера нет client_user_id -
+                                        # ручной контакт лежит под identity
+                                        address, consent = (
+                                            contacts.get((cuid, channel))
+                                            or contacts.get((identity, channel))
+                                            or ("", 0))
+                                    if not address:
+                                        _log_send(client, tenant, cid, identity, i, channel,
+                                                  step.get("subject", ""), "rejected", "no_contact")
+                                        continue
+                                    if channel == "email" and address.lower() in suppressed:
+                                        _log_send(client, tenant, cid, identity, i, channel,
+                                                  step.get("subject", ""), "rejected", "suppressed")
+                                        continue
+                                    if not consent:
+                                        _log_send(client, tenant, cid, identity, i, channel,
+                                                  step.get("subject", ""), "rejected", "no_consent")
+                                        continue
+                                    # счётчик частоты растёт при ПЕРВОЙ попытке
+                                    # отправки: за один тик могут созреть два
+                                    # шага, второй обязан увидеть первый
+                                    if not counted:
+                                        day, week = touches.get(identity, (0, 0))
+                                        touches[identity] = (day + 1, week + 1)
+                                        counted = True
+                                    ok, detail = route_message(
+                                        channel, address, step.get("subject", ""),
+                                        step["body"], email_cfg, msg_cfg,
+                                        {**_user_ctx(cuid),
+                                         # whatsapp шлёт ШАБЛОН по (кампания, шаг),
+                                         # а не текст - ему нужен адрес шага
+                                         "campaign_id": cid, "step_idx": i,
+                                         "app_url": email_cfg.app_url,
+                                         "card_update_url": email_cfg.card_update_url})
+                                    if not ok and channel == "whatsapp":
+                                        from whatsapp_cloud import should_suppress
+                                        if should_suppress(detail):
+                                            # человек запретил бизнесу писать себе:
+                                            # fail-closed, как email-супрессии
+                                            client.insert(
+                                                "retention.contacts",
+                                                [[tenant, cuid, "whatsapp", address,
+                                                  0, now, now]],
+                                                column_names=[
+                                                    "tenant_id", "client_user_id",
+                                                    "channel", "address", "consent",
+                                                    "consent_ts", "updated_at"])
+                                    if ok:
+                                        # detail успешной отправки = id письма у
+                                        # провайдера: по нему вебхуки доставки
+                                        # находят это касание
+                                        pid = detail if detail != "dry_run" else ""
+                                        _log_send(client, tenant, cid, identity, i, channel,
+                                                  step.get("subject", ""),
+                                                  "dry_run" if detail == "dry_run" else "sent",
+                                                  "", pid)
+                                        delivered = True
+                                        break
+                                    # Провайдер лёг или придушил лимитом - касание
+                                    # НЕ отработано: тот же канал повторит следующий
+                                    # тик. Иначе письмо о несписании терялось бы
+                                    # навсегда из-за минутного 503.
+                                    if (transient_failure(detail)
+                                            and _retry_count(client, tenant, cid,
+                                                             identity, i) < MAX_SEND_RETRIES):
+                                        _log_send(client, tenant, cid, identity, i, channel,
+                                                  step.get("subject", ""), "retry", detail)
+                                        retry_step = True
+                                        break
+                                    # постоянный отказ канала - пробуем следующий
                                     _log_send(client, tenant, cid, identity, i, channel,
-                                              step.get("subject", ""), "retry", detail)
-                                    retry_step = True
-                                else:
-                                    # detail успешной отправки = id письма у провайдера:
-                                    # по нему вебхуки доставки находят это касание
-                                    pid = detail if (ok and detail != "dry_run") else ""
-                                    _log_send(client, tenant, cid, identity, i, channel,
-                                              step.get("subject", ""),
-                                              "dry_run" if detail == "dry_run" else ("sent" if ok else "rejected"),
-                                              "" if ok else detail, pid)
+                                              step.get("subject", ""), "rejected", detail)
+                                del delivered   # исход целиком в send_log
                         elif step["action"] == "inapp":
                             # Баннер в продукте тенанта - касание, поэтому уважает
                             # dry-run (autopilot=false -> в очередь не пишем).

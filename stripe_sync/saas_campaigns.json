@@ -114,32 +114,53 @@
             "delay_h": 72,
             "action": "email",
             "subject": "Reminder: update your card",
-            "body": "Quick reminder to update your payment method: {{card_update_url}}. We retry automatically once it is updated."
+            "body": "Quick reminder to update your payment method: {{card_update_url}}. We retry automatically once it is updated.",
+            "channels": [
+              "email",
+              "whatsapp",
+              "sms"
+            ]
           },
           {
             "delay_h": 168,
             "action": "email",
             "subject": "Your access pauses soon - card still declined",
-            "body": "We have tried your card a few times since it was declined. Updating it takes 30 seconds and everything picks up where it left off: {{card_update_url}}"
+            "body": "We have tried your card a few times since it was declined. Updating it takes 30 seconds and everything picks up where it left off: {{card_update_url}}",
+            "channels": [
+              "email",
+              "whatsapp",
+              "sms"
+            ]
           },
           {
             "delay_h": 336,
             "action": "email",
             "subject": "Two weeks without payment - your data is still here",
-            "body": "Your subscription is on hold, but nothing has been deleted. One card update brings it all back: {{card_update_url}}"
+            "body": "Your subscription is on hold, but nothing has been deleted. One card update brings it all back: {{card_update_url}}",
+            "channels": [
+              "email",
+              "whatsapp",
+              "sms"
+            ]
           },
           {
             "delay_h": 672,
             "action": "email",
             "subject": "Last reminder before we close the invoice",
-            "body": "This is the final reminder about the payment that did not go through. If it was deliberate, ignore this - otherwise your account restarts in one click: {{card_update_url}}"
+            "body": "This is the final reminder about the payment that did not go through. If it was deliberate, ignore this - otherwise your account restarts in one click: {{card_update_url}}",
+            "channels": [
+              "email",
+              "whatsapp",
+              "sms"
+            ]
           }
         ],
         "goal": {
           "event_type": "billing.invoice_paid",
           "window_days": 7
         },
-        "reentry_days": 2
+        "reentry_days": 2,
+        "align_retries": true
       },
       {
         "campaign_id": "K4_save",

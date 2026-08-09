@@ -29,6 +29,25 @@ CAMPAIGNS_PATH = Path(__file__).parent / "saas_campaigns.json"
 CONFIDENT_MIN_GROUP = 30
 
 
+def significant_difference(n_t: int, n_c: int, k_t: int, k_c: int) -> bool:
+    """Отличие конверсий реально, а не шум: z-тест двух долей на 95%.
+
+    «n >= 30 в обеих группах» само по себе не отличает 4 п.п. аплифта от
+    случайности - владелец банковал бы шум как заработанные деньги. Считаем
+    объединённую дисперсию и требуем |разница| > 1.96 x SE.
+    """
+    if not n_t or not n_c:
+        return False
+    p_t, p_c = k_t / n_t, k_c / n_c
+    pooled = (k_t + k_c) / (n_t + n_c)
+    var = pooled * (1.0 - pooled) * (1.0 / n_t + 1.0 / n_c)
+    if var <= 0:
+        # обе группы 0% или 100%: разницы нет либо она вырождена
+        return p_t != p_c
+    se = var ** 0.5
+    return abs(p_t - p_c) > 1.96 * se
+
+
 def uplift_math(n_target: int, n_control: int, conv_target_cnt: int,
                 conv_control_cnt: int, avg_check: float,
                 invert: bool = False) -> dict:
@@ -40,10 +59,15 @@ def uplift_math(n_target: int, n_control: int, conv_target_cnt: int,
     incremental = None
     if n_target and n_control:
         incremental = round((conv_t - conv_c) * n_target * avg_check, 2)
+    # «Достоверно» = группы достаточно большие И разница переживает z-тест.
+    # Иначе цифра показывается, но честно помечена ранним сигналом.
     return {"conv_target": round(conv_t, 4), "conv_control": round(conv_c, 4),
             "incremental_usd": incremental,
             "confident": bool(n_target >= CONFIDENT_MIN_GROUP
-                              and n_control >= CONFIDENT_MIN_GROUP)}
+                              and n_control >= CONFIDENT_MIN_GROUP
+                              and significant_difference(
+                                  n_target, n_control,
+                                  conv_target_cnt, conv_control_cnt))}
 
 
 def campaign_report(client, tenant: str, camp: dict, days: int) -> dict | None:

@@ -50,8 +50,13 @@ def test_small_groups_are_marked_as_early_signal():
     small = uplift_math(7, 7, 3, 1, 49.0)
     assert small["incremental_usd"] is not None
     assert small["confident"] is False
-    big = uplift_math(CONFIDENT_MIN_GROUP, CONFIDENT_MIN_GROUP, 12, 6, 49.0)
-    assert big["confident"] is True
+    # 40% vs 20% на 30+30 z-тест НЕ проходит (порог ~23 п.п.) - раньше такое
+    # банковалось как факт, теперь честно ранний сигнал
+    assert uplift_math(CONFIDENT_MIN_GROUP, CONFIDENT_MIN_GROUP,
+                       12, 6, 49.0)["confident"] is False
+    # 50% vs 13% на 30+30 - настоящая разница
+    assert uplift_math(CONFIDENT_MIN_GROUP, CONFIDENT_MIN_GROUP,
+                       15, 4, 49.0)["confident"] is True
 
 
 def test_invert_goal_counts_staying_not_leaving():
@@ -91,3 +96,20 @@ def test_site_plans_complete_the_ladder_from_billing():
     merged = billing + [r for r in site if round(float(r[3]), 2) not in known]
     assert sorted(round(float(r[3]), 2) for r in merged) == [39.0, 99.0]
     assert len(merged) == 2      # Pro не задвоился
+
+
+def test_confident_requires_significance_not_just_headcount():
+    """n>=30 в обеих группах, но разница 2 п.п. - это шум, не заработок."""
+    from stripe_sync.uplift_report import significant_difference, uplift_math
+    # 33% vs 10% на 60+55 - настоящая разница
+    assert significant_difference(60, 55, 20, 5)
+    # 12% vs 10% на 50+50 - шум
+    assert not significant_difference(50, 50, 6, 5)
+    r_noise = uplift_math(50, 50, 6, 5, avg_check=100.0)
+    assert r_noise["confident"] is False
+    assert r_noise["incremental_usd"] is not None   # цифру показываем, но ранним сигналом
+    r_real = uplift_math(60, 55, 20, 5, avg_check=100.0)
+    assert r_real["confident"] is True
+    # вырожденные группы не роняют математику
+    assert not significant_difference(40, 40, 0, 0)
+    assert significant_difference(40, 40, 40, 0)
