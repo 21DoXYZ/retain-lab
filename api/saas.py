@@ -3025,4 +3025,70 @@ def saas_pipeline():
     ran = [s for s in stages if s['status'] != 'never']
     healthy = bool(ran) and all(s['fresh'] for s in ran)
     return api_json({'tenant': tenant, 'stages': stages, 'healthy': healthy,
-                     'ran': len(ran), 'total': len(stages)})
+                     'ran': len(ran), 'total': len(stages),
+                     'data': _data_quality(tenant),
+                     'llm': _llm_runs(tenant)})
+
+
+def _data_quality(tenant: str) -> dict:
+    """Качество ПРИЁМА данных: полнота склейки, достижимость, доля анонимов,
+    лаг источников, богатство меты. Здоровье стадий говорит «джобы бегут»,
+    этот блок - «данные, которые они переносят, полноценны»."""
+    out: dict = {}
+    try:
+        r = q("""
+            SELECT count(), countIf(email_norm != ''),
+                   countIf(stripe_customer_id != ''),
+                   countIf(notEmpty(client_user_ids))
+            FROM identities_current WHERE tenant_id = {t:String}
+            """, {'t': tenant})[1][0]
+        out['identities'] = {'total': int(r[0]), 'with_email': int(r[1]),
+                             'with_stripe': int(r[2]), 'with_product_id': int(r[3])}
+        unmatched = int(q(
+            "SELECT count() FROM identity_unmatched WHERE tenant_id = {t:String}",
+            {'t': tenant})[1][0][0])
+        out['identities']['unmatched'] = unmatched
+
+        r = q("""
+            SELECT count(),
+                   countIf(client_user_id != '' OR email_hash != ''),
+                   countIf(JSONHas(meta, 'visits') OR JSONHas(meta, 'inp')
+                           OR JSONHas(meta, 'seconds'))
+            FROM saas_events
+            WHERE tenant_id = {t:String} AND source = 'snippet'
+              AND ts >= now() - INTERVAL 1 DAY
+            """, {'t': tenant})[1][0]
+        total = int(r[0])
+        out['snippet_24h'] = {'events': total, 'identified': int(r[1]),
+                              'rich_meta': int(r[2])}
+
+        # лаг источников: насколько отстаёт самое свежее событие каждого
+        lags = q("""
+            SELECT source, dateDiff('minute', max(ts), now())
+            FROM saas_events WHERE tenant_id = {t:String}
+              AND source IN ('snippet', 'stripe', 'product')
+            GROUP BY source
+            """, {'t': tenant})[1]
+        out['source_lag_min'] = {str(r0): int(r1) for r0, r1 in lags}
+
+        out['dead_letters_24h'] = int(q(
+            "SELECT count() FROM saas_events_dead "
+            "WHERE received_at >= now() - INTERVAL 1 DAY")[1][0][0])
+    except Exception as exc:  # noqa: BLE001 - блок наблюдаемости не роняет экран
+        print(f'[pipeline] {tenant}: data quality failed: {exc}', flush=True)
+        return {}
+    return out
+
+
+def _llm_runs(tenant: str) -> list:
+    """Последние обращения к LLM: сколько принято/отбраковано валидацией."""
+    try:
+        return [{'stage': r[0], 'status': r[1], 'kept': int(r[2]),
+                 'rejected': int(r[3]), 'ts': str(r[4])} for r in q(
+            """
+            SELECT stage, status, kept, rejected, toString(ts)
+            FROM llm_runs WHERE tenant_id = {t:String}
+            ORDER BY ts DESC LIMIT 8
+            """, {'t': tenant})[1]]
+    except Exception:  # noqa: BLE001
+        return []

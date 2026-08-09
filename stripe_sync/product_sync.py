@@ -109,6 +109,18 @@ def subscription_event(r: dict, tenant: str) -> list | None:
                    "current_period_end": r.get("current_period_end")})]
 
 
+def project_event(r: dict, tenant: str) -> list | None:
+    """Создание проекта: шаг воронки между регистрацией и генерацией.
+    Человек, создавший проект, но не дошедший до генерации - самый точный
+    сегмент активации: намерение было, ценность не случилась."""
+    uid = str(r.get("user_id") or "")
+    if not uid or r.get("deleted_at"):
+        return None
+    return [tenant, f"export:pj:{r.get('id')}", "project_created",
+            _ts(r.get("created_at")), uid, "", "", "product", "",
+            _meta({"status": r.get("status")})]
+
+
 def feedback_event(r: dict, tenant: str) -> list | None:
     """Обратная связь из продукта: категория (bug/complaint/idea) - сигнал
     фрустрации в скоринг и фильтры; текст обрезаем - карточке хватит начала."""
@@ -134,6 +146,7 @@ def support_event(r: dict, tenant: str) -> list | None:
 
 
 DATASETS = {
+    "projects": project_event,
     "jobs": job_event,
     "credit_transactions": credit_event,
     "plan_changes": plan_change_event,
@@ -141,7 +154,8 @@ DATASETS = {
     "feedback": feedback_event,
     "support_conversations": support_event,
 }
-_PREFIX = {"jobs": "export:jobs:", "credit_transactions": "export:ct:",
+_PREFIX = {"projects": "export:pj:",
+           "jobs": "export:jobs:", "credit_transactions": "export:ct:",
            "plan_changes": "export:pc:", "subscriptions": "export:sub:",
            "feedback": "export:fb:", "support_conversations": "export:sc:"}
 

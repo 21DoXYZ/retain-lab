@@ -28,11 +28,33 @@ interface Stage {
   fresh: boolean;
 }
 
+interface DataQuality {
+  identities?: { total: number; with_email: number; with_stripe: number;
+                 with_product_id: number; unmatched: number };
+  snippet_24h?: { events: number; identified: number; rich_meta: number };
+  source_lag_min?: Record<string, number>;
+  dead_letters_24h?: number;
+}
+
+interface LlmRun {
+  stage: string;
+  status: string;
+  kept: number;
+  rejected: number;
+  ts: string;
+}
+
 interface PipelineData {
   stages: Stage[];
   healthy: boolean;
   ran: number;
   total: number;
+  data?: DataQuality;
+  llm?: LlmRun[];
+}
+
+function pct(part: number, total: number): string {
+  return total ? Math.round((part / total) * 100) + "%" : "-";
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -98,6 +120,54 @@ export function PipelineView() {
         </div>
       </div>
 
+      {/* ── качество данных: не «джобы бегут», а «данные полноценны» ── */}
+      {data.data?.identities ? (
+        <div className="rounded-ctl border border-hair bg-surface p-4">
+          <div className="mb-3 text-[13px] font-semibold text-ink">{t("saas.pipeline.dq.title")}</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.pipeline.dq.stitched")}</div>
+              <div className="mt-0.5 font-mono text-[15px] font-semibold text-ink">
+                {data.data.identities.total}
+                <span className={"ml-1.5 text-[11px] " + (data.data.identities.unmatched ? "text-neg" : "text-pos")}>
+                  {data.data.identities.unmatched ? `+${data.data.identities.unmatched} ${t("saas.pipeline.dq.unmatched")}` : t("saas.pipeline.dq.allStitched")}
+                </span>
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.pipeline.dq.reachable")}</div>
+              <div className="mt-0.5 font-mono text-[15px] font-semibold text-ink">
+                {pct(data.data.identities.with_email, data.data.identities.total)}
+                <span className="ml-1.5 text-[11px] text-steel">{t("saas.pipeline.dq.byEmail")}</span>
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.pipeline.dq.snippetIdd")}</div>
+              <div className="mt-0.5 font-mono text-[15px] font-semibold text-ink">
+                {pct(data.data.snippet_24h?.identified ?? 0, data.data.snippet_24h?.events ?? 0)}
+                <span className="ml-1.5 text-[11px] text-steel">{t("saas.pipeline.dq.of", { n: data.data.snippet_24h?.events ?? 0 })}</span>
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.pipeline.dq.dead")}</div>
+              <div className={"mt-0.5 font-mono text-[15px] font-semibold " + ((data.data.dead_letters_24h ?? 0) > 0 ? "text-neg" : "text-pos")}>
+                {data.data.dead_letters_24h ?? 0}
+              </div>
+            </div>
+          </div>
+          {data.data.source_lag_min ? (
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-hair pt-2.5 text-[11.5px] text-steel">
+              {Object.entries(data.data.source_lag_min).map(([src, lag]) => (
+                <span key={src}>
+                  {t(`saas.pipeline.dq.src.${src}` as MessageKey)}:{" "}
+                  <span className={"font-mono " + (lag > 1560 ? "text-neg" : "text-ink")}>{ageLabel(lag)}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-2">
         {data.stages.map((s, i) => (
           <div key={s.stage}
@@ -138,6 +208,27 @@ export function PipelineView() {
           </div>
         ))}
       </div>
+
+      {/* ── LLM-обращения: сколько принято / отбраковано валидацией ── */}
+      {data.llm?.length ? (
+        <div className="rounded-ctl border border-hair bg-surface p-4">
+          <div className="mb-2 text-[13px] font-semibold text-ink">{t("saas.pipeline.llm.title")}</div>
+          <p className="mb-3 text-[12px] text-steel">{t("saas.pipeline.llm.lead")}</p>
+          <div className="flex flex-col gap-1.5">
+            {data.llm.map((r, i) => (
+              <div key={i} className="flex items-center gap-3 text-[12.5px]">
+                <span className="w-20 shrink-0 font-mono text-slate">{r.stage}</span>
+                <span className={"rounded-full border px-2 py-0.5 text-[10.5px] font-semibold "
+                  + (r.status === "ok" ? STATUS_TONE.ok : STATUS_TONE.error)}>
+                  {r.status}
+                </span>
+                <span className="font-mono text-ink">{t("saas.pipeline.llm.kept", { k: r.kept, r: r.rejected })}</span>
+                <span className="ml-auto font-mono text-[11px] text-steel">{r.ts.slice(0, 16)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

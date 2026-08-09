@@ -107,3 +107,13 @@ def test_support_signals_raise_churn():
     calm = compute_scores(dict(base))
     loud = compute_scores(dict(base, support_tickets_30d=2))
     assert loud["p_churn"] == calm["p_churn"] + 0.10
+
+
+def test_project_becomes_funnel_event_deleted_skipped():
+    from product_sync import project_event
+    e = project_event({"id": "p1", "user_id": "u1", "status": "draft",
+                       "created_at": "2026-06-10T13:07:30+00:00",
+                       "deleted_at": None}, "t")
+    assert e[2] == "project_created" and e[1] == "export:pj:p1"
+    assert project_event({"id": "p2", "user_id": "u1",
+                          "deleted_at": "2026-07-01"}, "t") is None

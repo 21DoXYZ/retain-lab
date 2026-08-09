@@ -444,6 +444,9 @@ SELECT
           AND ts < now() - INTERVAL 7 DAY)
       + countIf(event_type = 'heartbeat' AND ts >= now() - INTERVAL 14 DAY
                 AND ts < now() - INTERVAL 7 DAY) * 120                   AS active_sec_prev_7d,
+    -- проекты: шаг воронки между регистрацией и первой генерацией.
+    -- projects>0 при generations=0 - намерение было, ценность не случилась
+    countIf(event_type = 'project_created')                              AS projects_total,
     -- ── поддержка и обратная связь (экспорт продукта) ──
     -- обращение в поддержку и баг-репорт - фрустрация ДО падения активности
     countIf(event_type = 'support_ticket'
