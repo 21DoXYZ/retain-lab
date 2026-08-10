@@ -360,6 +360,8 @@ export const saas: Partial<Messages> = {
   "saas.offers.gift.trial": "Trial extension",
   "saas.offers.gift.pause": "Subscription pause",
   "saas.offers.gift.credit": "Balance credit, $",
+  "saas.offers.gift.downgrade": "Cheaper plan instead of cancel",
+  "saas.offers.p.price_id": "Stripe price id of the cheaper plan",
   "saas.offers.p.amount": "How many we give",
   "saas.offers.p.unit": "Unit name (as in your product)",
   "saas.offers.p.expires_days": "Expires in, days",

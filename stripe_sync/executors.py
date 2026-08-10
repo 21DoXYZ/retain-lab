@@ -125,6 +125,15 @@ def execute(offer: dict, user: dict, tenant_id: str, cfg: ExecConfig) -> tuple[b
     elif executor == "balance_credit":
         payload = {"customer": user.get("stripe_customer_id", ""),
                    **build_balance_credit(offer)}
+    elif executor == "stripe_downgrade":
+        # даунгрейд вместо отмены: подписка переезжает на дешёвый план без
+        # пророации - текущий оплаченный период дослуживается, следующий
+        # инвойс уже по новой цене
+        price = str((offer.get("params") or {}).get("price_id") or "")
+        if not price:
+            return False, "no_price_id"
+        payload = {"subscription": user.get("subscription_id", ""),
+                   "price": price}
     else:
         return False, f"unknown_executor:{executor}"
 
@@ -153,6 +162,14 @@ def execute(offer: dict, user: dict, tenant_id: str, cfg: ExecConfig) -> tuple[b
             stripe.Customer.create_balance_transaction(
                 payload["customer"], amount=payload["amount"], currency=payload["currency"])
             return True, "credited"
+        if executor == "stripe_downgrade":
+            sub = stripe.Subscription.retrieve(payload["subscription"])
+            item_id = sub["items"]["data"][0]["id"]
+            stripe.Subscription.modify(
+                payload["subscription"],
+                items=[{"id": item_id, "price": payload["price"]}],
+                proration_behavior="none")
+            return True, f"downgraded:{payload['price']}"
     except Exception as exc:
         return False, f"stripe_error:{type(exc).__name__}"
     return False, "unreachable"

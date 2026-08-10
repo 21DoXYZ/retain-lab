@@ -357,6 +357,8 @@ export const saas: Partial<Messages> = {
   "saas.offers.gift.trial": "",
   "saas.offers.gift.pause": "",
   "saas.offers.gift.credit": "",
+  "saas.offers.gift.downgrade": "",
+  "saas.offers.p.price_id": "",
   "saas.offers.p.amount": "",
   "saas.offers.p.unit": "",
   "saas.offers.p.expires_days": "",

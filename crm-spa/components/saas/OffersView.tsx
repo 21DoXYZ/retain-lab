@@ -79,6 +79,7 @@ const GIFT_TYPES: { key: string; executor: string; fields: { key: string; kind: 
   { key: "trial", executor: "trial_extend", fields: [{ key: "days", kind: "num", req: true }]},
   { key: "pause", executor: "pause_collection", fields: [{ key: "months", kind: "num", req: true }]},
   { key: "credit", executor: "balance_credit", fields: [{ key: "amount_usd", kind: "num", req: true }]},
+  { key: "downgrade", executor: "stripe_downgrade", fields: [{ key: "price_id", kind: "str", req: true }]},
 ];
 
 const inputCls =

@@ -359,6 +359,8 @@ export const saas = {
   "saas.offers.gift.trial": "Продление триала",
   "saas.offers.gift.pause": "Паузу подписки",
   "saas.offers.gift.credit": "Кредит на баланс, $",
+  "saas.offers.gift.downgrade": "Дешёвый план вместо отмены",
+  "saas.offers.p.price_id": "Stripe price id дешёвого плана",
   "saas.offers.p.amount": "Сколько дарим",
   "saas.offers.p.unit": "Название юнита (как у вас в продукте)",
   "saas.offers.p.expires_days": "Сгорает через, дней",

@@ -99,3 +99,29 @@ def test_callback_integration_real_http_roundtrip():
         assert got["body"]["tokens"] == 100 and got["body"]["identity_id"] == "id-1"
     finally:
         server.shutdown()
+
+
+def test_downgrade_executor_dry_run_and_validation():
+    """Даунгрейд вместо отмены: dry-run уважается, без price_id - отказ."""
+    from executors import ExecConfig, execute
+
+    cfg = ExecConfig(dry_run=True, stripe_api_key="sk_test_x")
+    offer = {"offer_id": "O_down", "executor": "stripe_downgrade",
+             "params": {"price_id": "price_lower"}}
+    ok, detail = execute(offer, {"subscription_id": "sub_1"}, "t", cfg)
+    assert (ok, detail) == (True, "dry_run")
+
+    bad = {"offer_id": "O_down", "executor": "stripe_downgrade", "params": {}}
+    ok2, detail2 = execute(bad, {"subscription_id": "sub_1"}, "t", cfg)
+    assert (ok2, detail2) == (False, "no_price_id")
+
+
+def test_downgrade_offer_passes_schema():
+    from compose import validate_offer
+    offer, reason = validate_offer({
+        "offer_id": "C_downgrade", "title": "Move to Starter instead",
+        "executor": "stripe_downgrade", "params": {"price_id": "price_123"}})
+    assert reason == "" and offer["params"]["price_id"] == "price_123"
+    _o, r2 = validate_offer({"offer_id": "C_x", "title": "No price",
+                             "executor": "stripe_downgrade", "params": {}})
+    assert r2 != ""

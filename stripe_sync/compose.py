@@ -50,6 +50,9 @@ EXECUTOR_SCHEMAS = {
     'trial_extend': {'days': 'num'},
     'pause_collection': {'months': 'num'},
     'balance_credit': {'amount_usd': 'num'},
+    # спасение через даунгрейд: дешёвый план вместо отмены. Сохраняет часть
+    # выручки, которую скидка бы просто сожгла, и не уносит живых денег.
+    'stripe_downgrade': {'price_id': 'str'},
 }
 
 
