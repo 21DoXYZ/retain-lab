@@ -1270,7 +1270,13 @@ def _campaigns_conf(tenant: str) -> dict:
     p = Path(__file__).resolve().parent.parent / 'stripe_sync' / 'saas_campaigns.json'
     data = _json.loads(p.read_text()) if p.exists() else {}
     conf = data.get(tenant) or data.get('_default') or {}
-    return ovr.merge_campaign_conf(conf, ovr.load_tenant(tenant))
+    conf = ovr.merge_campaign_conf(conf, ovr.load_tenant(tenant))
+    try:
+        from stripe_sync.knowledge import load as _kb_load
+        conf = ovr.apply_ab_winners(conf, _kb_load(_ch_direct(), tenant, 'ab_winners'))
+    except Exception:
+        pass
+    return conf
 
 
 def _autopilot_resolved(conf: dict, tenant: str) -> bool:

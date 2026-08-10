@@ -138,6 +138,29 @@ def merge_campaign_conf(conf: dict, ov: dict) -> dict:
     return out
 
 
+def apply_ab_winners(conf: dict, winners: dict) -> dict:
+    """Наложить победителей A/B (knowledge kind='ab_winners') на конфиг.
+
+    Победивший текст замещает шаг, сплит шага гаснет (variants_off), источник
+    'ab' виден бейджем. Зовётся ПОСЛЕ merge_campaign_conf: ручная правка
+    владельца поверх победителя легитимна - но тогда его правка и победит."""
+    if not winners:
+        return conf
+    out = copy.deepcopy(conf)
+    for camp in out.get("campaigns", []):
+        for i, step in enumerate(camp.get("steps", [])):
+            w = winners.get(f"{camp['campaign_id']}#{i}")
+            if not w or step.get("_edited"):
+                continue
+            for f, v in (w.get("patch") or {}).items():
+                if f in STEP_TEXT_FIELDS:
+                    step[f] = str(v)
+            step["variants_off"] = True
+            step["_edited"] = True
+            step["_src"] = "ab"
+    return out
+
+
 def merge_catalog(catalog: dict, ov: dict) -> dict:
     """Копия каталога офферов с правками щедрости/лимитов. params мержатся
     по ключам (новые ключи не добавляются - исполнители ждут свой контракт).

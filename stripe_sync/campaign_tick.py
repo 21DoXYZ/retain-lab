@@ -177,6 +177,65 @@ def quiet_hours_block(campaign_id: str, now_utc: datetime, tz_name: str,
     return ""
 
 
+# ── A/B варианты шага ────────────────────────────────────────────────────────
+# Шаг может нести variants: [{subject, body, cta_label?, cta_url?}, ...] -
+# каждому юзеру достаётся СВОЙ вариант, детерминированно (один и тот же
+# навсегда: человек не должен видеть письмо A, а ресенд - письмо B).
+# variants_off=true (ставит автопобедитель) - сплит выключен, текст шага уже
+# заменён на победителя через overrides.
+
+def pick_variant(identity: str, campaign_id: str, step_idx: int, n: int) -> int:
+    """Стабильный индекс варианта для юзера. n<=1 - вариантов нет."""
+    if n <= 1:
+        return 0
+    import hashlib
+    seed = f"{campaign_id}:{step_idx}:{identity}".encode()
+    return int(hashlib.md5(seed).hexdigest()[:8], 16) % n
+
+
+def apply_variant(step: dict, identity: str, campaign_id: str,
+                  step_idx: int) -> dict:
+    """Шаг с наложенным вариантом юзера. Без вариантов - шаг как есть."""
+    variants = step.get("variants") or []
+    if not variants or step.get("variants_off"):
+        return step
+    k = pick_variant(identity, campaign_id, step_idx, len(variants))
+    v = variants[k] or {}
+    out = dict(step)
+    for f in ("subject", "body", "cta_label", "cta_url"):
+        if v.get(f) is not None:
+            out[f] = str(v[f])
+    out["_variant"] = k
+    return out
+
+
+SEND_TIME_MAX_WAIT_H = 20.0   # дольше письмо не ждёт «лучшего часа» никогда
+
+
+def send_time_block(pref_hour: int | None, tz_name: str, now_utc: datetime,
+                    matured_h: float) -> bool:
+    """Отложить ли письмо до ЛИЧНОГО активного часа юзера. True - ждём.
+
+    Мы знаем, в какой час человек обычно живёт в продукте (local_hour из
+    сниппета). Письмо, пришедшее в его активный час, открывается стабильно
+    лучше письма «когда созрел шаг». Окно щедрое (час до и час после), а
+    ждать дольше SEND_TIME_MAX_WAIT_H нельзя: лучше неидеальный час, чем
+    просроченное касание. Нет данных о часе - шлём как раньше.
+
+    Дуннинг и триггеры сюда НЕ заходят: там момент важнее часа.
+    """
+    if pref_hour is None or matured_h >= SEND_TIME_MAX_WAIT_H:
+        return False
+    try:
+        from zoneinfo import ZoneInfo
+        local = now_utc if now_utc.tzinfo else now_utc.replace(tzinfo=timezone.utc)
+        local_hour = local.astimezone(ZoneInfo(tz_name or "UTC")).hour
+    except Exception:                    # кривая зона - не мешаем отправке
+        return False
+    diff = (local_hour - int(pref_hour)) % 24
+    return not (diff <= 1 or diff == 23)
+
+
 def frequency_block(campaign_id: str, sent_24h: int, sent_7d: int) -> str:
     """Можно ли писать этому человеку сейчас. '' - можно, иначе причина.
 
@@ -327,8 +386,15 @@ def tick(client, tenant: str) -> dict[str, int]:
     control_pct = int(conf.get("control_pct", 10))
     conf = {**conf, "autopilot": resolve_autopilot(conf, load_tenant_channels(tenant))}
     # правки текстов/таймингов из CRM (runtime, без деплоя)
-    from overrides import load_tenant as load_overrides, merge_campaign_conf
+    from overrides import (apply_ab_winners, load_tenant as load_overrides,
+                           merge_campaign_conf)
     conf = merge_campaign_conf(conf, load_overrides(tenant))
+    # победители A/B из knowledge - поверх (ручная правка владельца главнее)
+    try:
+        from knowledge import load as _kb_load
+        conf = apply_ab_winners(conf, _kb_load(client, tenant, "ab_winners"))
+    except Exception:  # noqa: BLE001 - без знаний живём на сплите
+        pass
     email_cfg, exec_cfg = effective_configs(conf, EmailConfig.from_env(),
                                             ExecConfig.from_env())
     msg_cfg = MessagingConfig.from_env()
@@ -346,6 +412,25 @@ def tick(client, tenant: str) -> dict[str, int]:
     tenant_tz = str(_tch.get("timezone") or "UTC")
     tg_bot = str(_tch.get("telegram_bot_username") or "")
     wa_phone = str(_tch.get("wa_phone_display") or "")
+
+    # Личный активный час юзера (send-time): мода local_hour из сниппета за
+    # 30 дней + его таймзона. Нет данных - шлём по расписанию шага.
+    pref_time: dict[str, tuple[int, str]] = {}
+    try:
+        for r in client.query(
+            """
+            SELECT identity_id,
+                   topK(1)(JSONExtractInt(meta, 'local_hour'))[1],
+                   topK(1)(JSONExtractString(meta, 'tz'))[1]
+            FROM retention.saas_events_resolved
+            WHERE tenant_id = %(t)s AND JSONHas(meta, 'local_hour')
+              AND ts >= now() - INTERVAL 30 DAY
+            GROUP BY identity_id
+            """, parameters={"t": tenant}).result_rows:
+            pref_time[r[0]] = (int(r[1]), str(r[2] or "UTC"))
+    except Exception as exc:  # noqa: BLE001 - send-time опционален
+        print(f"[tick] {tenant}: pref hours unavailable: {type(exc).__name__}",
+              flush=True)
 
     # Факты юзера для персональных плейсхолдеров ({{credits_left}}): остаток
     # кредитов из последнего списания, фолбэк - баланс из импорта юзеров.
@@ -494,7 +579,9 @@ def tick(client, tenant: str) -> dict[str, int]:
             stage_now, email, cuid = stages.get(identity, ("", "", "", 0, 0))[:3]
 
             for i in due_steps(steps, enrolled_at, int(row["step_idx"]), now):
-                step = steps[i]
+                # вариант юзера накладывается ДО всех веток: и email, и in-app,
+                # и лестница каналов видят один и тот же текст его группы
+                step = apply_variant(steps[i], identity, cid, i)
                 retry_step = False
                 try:
                     if not row["control"]:
@@ -528,6 +615,18 @@ def tick(client, tenant: str) -> dict[str, int]:
                                           step.get("channel", "email"),
                                           step.get("subject", ""), "rejected",
                                           "quiet_hours")
+                                retry_step = True
+                            elif (cid not in FREQ_EXEMPT
+                                    and camp.get("entry_stage") != "TRIGGER"
+                                    and not camp.get("manual_audience")
+                                    and send_time_block(
+                                        *(pref_time.get(identity) or (None, "")),
+                                        now,
+                                        (now - enrolled_at).total_seconds() / 3600
+                                        - float(step.get("delay_h", 0)))):
+                                # send-time: письмо подождёт ЛИЧНЫЙ активный час
+                                # юзера (тихо, без спама в лог - шаг просто
+                                # созреет на одном из следующих тиков)
                                 retry_step = True
                             elif frequency_block(cid, *touches.get(identity, (0, 0))):
                                 # Шаг НЕ отработан: он созреет снова, когда

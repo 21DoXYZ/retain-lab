@@ -693,3 +693,71 @@ def test_no_gates_is_plain_stage_match():
     k1 = {"campaign_id": "K1_activation", "entry_stage": "ACTIVATE"}
     assert enroll_entry(k1, "ACTIVATE", 0.0, 0.0) == "ACTIVATE"
     assert enroll_entry(k1, "MONITOR", 0.9, 0.9) == ""
+
+
+def test_send_time_waits_for_personal_hour():
+    """Письмо ждёт личный активный час юзера, но не дольше 20 часов."""
+    from datetime import datetime, timezone
+    from campaign_tick import send_time_block
+
+    # 12:00 UTC, юзер живёт в продукте в 20:00 своего пояса (UTC) - ждём
+    noon = datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc)
+    assert send_time_block(20, "UTC", noon, 1.0) is True
+    # его час настал (окно 19-21) - шлём
+    evening = datetime(2026, 8, 9, 20, 30, tzinfo=timezone.utc)
+    assert send_time_block(20, "UTC", evening, 9.0) is False
+    assert send_time_block(20, "UTC",
+                           datetime(2026, 8, 9, 19, 10, tzinfo=timezone.utc),
+                           8.0) is False
+    # ждали слишком долго - шлём в неидеальный час, касание важнее
+    assert send_time_block(20, "UTC", noon, 21.0) is False
+    # нет данных о часе - как раньше
+    assert send_time_block(None, "UTC", noon, 1.0) is False
+    # таймзона юзера: 12:00 UTC = 19:00 в Джакарте (UTC+7), его час 19 - шлём
+    assert send_time_block(19, "Asia/Jakarta", noon, 1.0) is False
+    # кривая зона в данных - не мешаем отправке
+    assert send_time_block(20, "Х/Й", noon, 1.0) is False
+
+
+def test_ab_variant_is_stable_and_splits():
+    """Юзеру навсегда достаётся один вариант; сплит делит аудиторию."""
+    from campaign_tick import apply_variant, pick_variant
+
+    assert pick_variant("u1", "K1", 1, 2) == pick_variant("u1", "K1", 1, 2)
+    seen = {pick_variant(f"u{i}", "K1", 1, 2) for i in range(50)}
+    assert seen == {0, 1}                        # обе группы живут
+    step = {"action": "email", "subject": "base", "body": "base", "delay_h": 0,
+            "variants": [{"subject": "A"}, {"subject": "B"}]}
+    got = {apply_variant(step, f"u{i}", "K1", 1)["subject"] for i in range(50)}
+    assert got == {"A", "B"}
+    # variants_off (победитель зафиксирован) - сплита больше нет
+    step["variants_off"] = True
+    assert apply_variant(step, "u1", "K1", 1)["subject"] == "base"
+
+
+def test_ab_winner_requires_data_and_lift():
+    from ab_winner import winner
+    # мало отправок - решения нет
+    assert winner({0: {"sent": 10, "clicked": 5}, 1: {"sent": 40, "clicked": 1}}) is None
+    # отрыв меньше 20% относительных - копим дальше
+    assert winner({0: {"sent": 100, "clicked": 10}, 1: {"sent": 100, "clicked": 11}}) is None
+    # честный победитель
+    assert winner({0: {"sent": 100, "clicked": 5}, 1: {"sent": 100, "clicked": 9}}) == 1
+    # соперник с нулём кликов: любой клик лидера решает
+    assert winner({0: {"sent": 50, "clicked": 0}, 1: {"sent": 50, "clicked": 3}}) == 1
+
+
+def test_ab_winner_applies_over_conf_but_owner_edit_wins():
+    from overrides import apply_ab_winners
+    conf = {"campaigns": [{"campaign_id": "K1", "steps": [
+        {"subject": "s0", "body": "b0", "delay_h": 0},
+        {"subject": "s1", "body": "b1", "delay_h": 0,
+         "variants": [{"subject": "A"}, {"subject": "B"}]}]}]}
+    out = apply_ab_winners(conf, {"K1#1": {"variant": 1, "patch": {"subject": "B"}}})
+    step = out["campaigns"][0]["steps"][1]
+    assert step["subject"] == "B" and step["variants_off"] and step["_src"] == "ab"
+    # шаг, правленный владельцем руками, победитель НЕ перетирает
+    conf["campaigns"][0]["steps"][1]["_edited"] = True
+    conf["campaigns"][0]["steps"][1]["subject"] = "owner"
+    out2 = apply_ab_winners(conf, {"K1#1": {"patch": {"subject": "B"}}})
+    assert out2["campaigns"][0]["steps"][1]["subject"] == "owner"

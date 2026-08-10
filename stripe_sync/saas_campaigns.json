@@ -22,7 +22,17 @@
             "action": "email",
             "subject": "You signed up - here is the fastest first win",
             "body": "Hi! The quickest way to see if this is for you: open the product and finish one small thing. {{app_url}}\n\nStuck on anything? Reply to this email - a person reads it.",
-            "cta_label": "Open the product"
+            "cta_label": "Open the product",
+            "variants": [
+              {
+                "subject": "You signed up - here is the fastest first win",
+                "body": "Hi! The quickest way to see if this is for you: open the product and finish one small thing. {{app_url}}\n\nStuck on anything? Reply to this email - a person reads it."
+              },
+              {
+                "subject": "Your first result takes about two minutes",
+                "body": "Hi! Most people who stay started with one small finished thing in the first day.\n\nOpen the product and finish one piece - that is the whole ask: {{app_url}}\n\nStuck? Reply to this email, a human answers."
+              }
+            ]
           },
           {
             "delay_h": 24,
@@ -355,7 +365,17 @@
             "subject": "Out of credits mid-flow?",
             "body": "Hi! Yesterday you ran your balance down to {{credits_left}} credits - that usually means the product is working for you.\n\nPick up where you left off: {{app_url}}\n\nQuestions about plans? Reply to this email.",
             "cta_label": "Continue",
-            "cta_url": "{{app_url}}"
+            "cta_url": "{{app_url}}",
+            "variants": [
+              {
+                "subject": "Out of credits mid-flow?",
+                "body": "Hi! Yesterday you ran your balance down to {{credits_left}} credits - that usually means the product is working for you.\n\nPick up where you left off: {{app_url}}\n\nQuestions about plans? Reply to this email."
+              },
+              {
+                "subject": "Your balance hit {{credits_left}} - here is the fastest way back",
+                "body": "Hi! You used everything you had - that is the best possible signal.\n\nUpgrade or top up and keep the streak going: {{app_url}}\n\nNot sure which plan fits? Reply and we will do the math with you."
+              }
+            ]
           }
         ]
       },

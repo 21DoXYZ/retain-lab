@@ -194,6 +194,14 @@ def main() -> None:
                      incr if incr is not None else 0.0, rep["goal_event"],
                      now.strftime("%Y-%m-%d %H:%M:%S.000")])
 
+    # A/B: созревшие победители вариантов фиксируются тем же недельным ритмом
+    try:
+        from ab_winner import run as ab_run
+        for line in ab_run(client, tenant, conf):
+            lines.append(f"A/B winner: {line}")
+    except Exception as exc:  # noqa: BLE001 - A/B не роняет замер
+        print(f"[uplift] {tenant}: ab pass failed: {type(exc).__name__}", flush=True)
+
     report = f"Revenue Autopilot · uplift {period_start} → {now.date()} ({tenant})\n" + \
              ("\n".join(lines) if lines else "no enrolled cohorts in period")
     if lines and not autopilot_on:
