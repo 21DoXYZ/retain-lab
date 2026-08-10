@@ -507,6 +507,7 @@ export const saas: Partial<Messages> = {
   "saas.home.measured.unitCost": "",
   "saas.home.measured.note": "",
   "saas.leak.noData": "",
+  "saas.leak.peopleOnly": "",
 
   "saas.offers.empty.title": "",
   "saas.offers.empty.desc": "",

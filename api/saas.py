@@ -82,6 +82,24 @@ def leak_audit():
           AND s.trial_end IS NOT NULL AND s.trial_end < now()
         """,
         {'t': tenant})[1][0]
+    dead_count, dead_mrr = int(dead_trials[0]), _flt(dead_trials[1])
+
+    # Триал живёт не только в Stripe: у продуктов с экспортом «триал» - это
+    # план в САМОМ продукте. Мёртвый триал по-продуктовому: человек РЕАЛЬНО
+    # пробовал (есть ценные действия), аккаунту 14+ дней, платить не начал.
+    # Потенциал деньгами не выдумываем - конверсию триала мы ещё не измерили,
+    # поэтому продуктовые триалы добавляют СЧЁТ, а не сумму.
+    product_trials = int(q(
+        """
+        SELECT count() FROM user_actions ua
+        LEFT JOIN user_event_features f
+          ON f.tenant_id = ua.tenant_id AND f.identity_id = ua.identity_id
+        WHERE ua.tenant_id = {t:String}
+          AND ua.sub_status NOT IN ('active', 'past_due', 'trialing')
+          AND f.generations_total > 0
+          AND f.first_seen <= now() - INTERVAL 14 DAY
+        """, {'t': tenant})[1][0][0])
+    dead_count += product_trials
 
     silent = q(
         """
@@ -123,8 +141,8 @@ def leak_audit():
         'upgrade_estimate_known': ladder_known,
         'blocks': {
             'dunning': {'count': int(dunning[0]), 'mrr': round(dunning_mrr, 2)},
-            'dead_trials': {'count': int(dead_trials[0]),
-                            'potential_mrr': round(_flt(dead_trials[1]), 2)},
+            'dead_trials': {'count': dead_count,
+                            'potential_mrr': round(dead_mrr, 2)},
             'silent_cancels_30d': {'count': int(silent[0]),
                                    'mrr': round(silent_mrr, 2)},
             'under_upgrades': {'count': int(upgrades[0]),

@@ -510,6 +510,7 @@ export const saas: Partial<Messages> = {
   "saas.home.measured.unitCost": "Cost per unit",
   "saas.home.measured.note": "Measured from your real provider costs and Stripe revenue, not estimates. Offers are priced against these numbers.",
   "saas.leak.noData": "No data yet. Connect billing and the snippet - this will show how much you are losing every month.",
+  "saas.leak.peopleOnly": "There is leak in people below - the dollar size will appear once trial conversion is measured",
 
   "saas.offers.empty.title": "No offers yet",
   "saas.offers.empty.desc": "They appear after you answer the nine questions on Get started - or add your own with the button above.",

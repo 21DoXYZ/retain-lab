@@ -423,7 +423,12 @@ SELECT
     countIf(event_type = 'checkout_started')                            AS checkout_starts,
     countIf(event_type = 'cancel_flow_started'
             AND ts >= now() - INTERVAL 14 DAY)                           AS cancel_flow_14d,
-    sumIf(tokens_spent, ts >= toStartOfMonth(now()))                     AS tokens_spent_month,
+    -- юниты за месяц: колонка tokens_spent (Server Events API) ПЛЮС списания
+    -- кредитов из экспорта продукта - у клиента с экспортом burn живёт на них
+    sumIf(tokens_spent, ts >= toStartOfMonth(now()))
+      + toInt64(sumIf(abs(JSONExtractFloat(meta, 'amount')),
+                      event_type = 'credit_spend'
+                      AND ts >= toStartOfMonth(now())))                  AS tokens_spent_month,
     -- billing.* только из Stripe: шлюз чужие billing-события отбивает, но
     -- витрина не доверяет и историческим строкам (второй рубеж)
     maxIf(ts, event_type = 'billing.payment_failed' AND source = 'stripe')  AS last_payment_failed,
@@ -547,10 +552,16 @@ GROUP BY tenant_id, customer_id;
 CREATE OR REPLACE VIEW retention.user_period_usage AS
 SELECT e.tenant_id                AS tenant_id,
        e.identity_id              AS identity_id,
-       sum(e.tokens_spent)        AS tokens_spent_period
+       sum(e.units_spent)         AS tokens_spent_period
 FROM (
+    -- юниты = колонка tokens_spent (Server Events API) ПЛЮС списания кредитов
+    -- из экспорта: иначе у клиента с экспортом периодный расход был вечным
+    -- нулём, а НЕ-NULL ноль побеждал месячную фичу в coalesce - burn умирал
     SELECT tenant_id, identity_id, event_id,
-           any(ts) AS ts, any(tokens_spent) AS tokens_spent
+           any(ts) AS ts,
+           any(tokens_spent)
+             + toInt64(if(any(event_type) = 'credit_spend',
+                          abs(any(JSONExtractFloat(meta, 'amount'))), 0)) AS units_spent
     FROM retention.saas_events_resolved
     GROUP BY tenant_id, identity_id, event_id
 ) e

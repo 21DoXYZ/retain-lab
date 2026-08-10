@@ -69,7 +69,12 @@ export function LeakAuditView() {
               <span className="text-[15px] font-semibold">
                 {data.headline_monthly_leak > 0
                   ? t("saas.leak.headline", { amount: usd(data.headline_monthly_leak) })
-                  : t("saas.leak.noData")}
+                  : Object.values(data.blocks).some((b) => (b.count ?? 0) > 0)
+                    // утечка есть ЛЮДЬМИ, но в долларах её честно не измерить
+                    // (продуктовые триалы без измеренной конверсии) - говорим
+                    // про людей, а не «нет данных»
+                    ? t("saas.leak.peopleOnly")
+                    : t("saas.leak.noData")}
               </span>
               {data.headline_monthly_leak > 0 && (
                 <p className="mt-1.5 text-[12.5px] leading-relaxed text-steel">
