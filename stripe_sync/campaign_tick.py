@@ -432,6 +432,22 @@ def tick(client, tenant: str) -> dict[str, int]:
         print(f"[tick] {tenant}: pref hours unavailable: {type(exc).__name__}",
               flush=True)
 
+    # Дневной бюджет ЛИЧНОГО WhatsApp: сколько автокасаний номер ещё может
+    # отправить сегодня. Считаем по логу (все wa-отправки суток), лимит -
+    # wa_personal_daily_cap тенанта (деф. 20). Бан прилетает личному номеру
+    # клиента - массовая рассылка отсюда невозможна ФИЗИЧЕСКИ, а не по
+    # договорённости. Словарь мутируется сендером по мере отправок.
+    if msg_cfg.wa_personal_tenant:
+        wa_cap = int(_tch.get("wa_personal_daily_cap") or 20)
+        wa_sent_today = int(client.query(
+            "SELECT count() FROM retention.campaign_send_log "
+            "WHERE tenant_id = %(t)s AND action = 'whatsapp' "
+            "AND status = 'sent' AND ts >= today()",
+            parameters={"t": tenant}).result_rows[0][0])
+        from dataclasses import replace as _rep
+        msg_cfg = _rep(msg_cfg,
+                       wa_personal_budget={"left": max(0, wa_cap - wa_sent_today)})
+
     # Факты юзера для персональных плейсхолдеров ({{credits_left}}): остаток
     # кредитов из последнего списания, фолбэк - баланс из импорта юзеров.
     # Письмо «вы сожгли всё» с конкретным числом бьёт generic-текст всегда.

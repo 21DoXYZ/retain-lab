@@ -1148,7 +1148,9 @@ def _wa_channel_row(tenant: str, tch: dict, cov: dict) -> dict:
                       or tch.get('wa_personal_number') or ''),
         'whatsapp': {
             'personal': {'status': personal_status,
-                         'number': str(tch.get('wa_personal_number') or '')},
+                         'number': str(tch.get('wa_personal_number') or ''),
+                         'automation': bool(tch.get('wa_personal_automation')),
+                         'daily_cap': int(tch.get('wa_personal_daily_cap') or 20)},
             'cloud_connected': connected,
             'phone_display': str(tch.get('wa_phone_display') or ''),
             'has_waba': bool(tch.get('wa_waba_id')),
@@ -2336,6 +2338,34 @@ def wa_personal_qr():
         ca.update_tenant(tenant, {'wa_personal_status': status,
                                   'wa_personal_number': number or None})
     return api_json({'status': status, 'number': number, 'qr_png': qr})
+
+
+@bp.post('/saas/channels/whatsapp/personal/automation')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def wa_personal_automation():
+    """Тумблер автокасаний с личного номера. Отдельное согласие поверх
+    QR-подключения: автоматика с личного номера - повышенный риск бана,
+    и включает её владелец сам, с дневным лимитом (деф. 20/день)."""
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    enabled = bool(body.get('enabled'))
+    patch = {'wa_personal_automation': enabled}
+    try:
+        cap = int(body.get('daily_cap') or 0)
+        if 1 <= cap <= 100:
+            patch['wa_personal_daily_cap'] = cap
+    except (TypeError, ValueError):
+        pass
+    tch = ca.load_tenants().get(tenant, {}) or {}
+    if enabled and str(tch.get('wa_personal_status') or '') != 'WORKING':
+        return _bad('wa_session_not_working')
+    ca.update_tenant(tenant, patch)
+    print(f'[wa-personal] {tenant}: automation={"on" if enabled else "off"}', flush=True)
+    return api_json({'enabled': enabled,
+                     'daily_cap': patch.get('wa_personal_daily_cap',
+                                            int(tch.get('wa_personal_daily_cap') or 20))})
 
 
 @bp.post('/saas/channels/whatsapp/personal/disconnect')

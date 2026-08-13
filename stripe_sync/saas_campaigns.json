@@ -125,7 +125,11 @@
             "action": "email",
             "subject": "Payment issue - your account is safe",
             "body": "Your last payment did not go through - usually the card expired, hit a limit, or the bank asked for extra confirmation. Nothing is wrong on your side of the product and your work is safe.\n\nUpdating the card takes about 30 seconds: {{card_update_url}}",
-            "cta_label": "Update card"
+            "cta_label": "Update card",
+            "channels": [
+              "whatsapp",
+              "email"
+            ]
           },
           {
             "delay_h": 72,
@@ -133,8 +137,8 @@
             "subject": "Reminder: your card is still declining",
             "body": "Quick reminder - your payment method still needs an update: {{card_update_url}}\n\nThe charge retries automatically once it is fixed, nothing else to do.",
             "channels": [
-              "email",
               "whatsapp",
+              "email",
               "sms"
             ],
             "cta_label": "Update card"
@@ -145,8 +149,8 @@
             "subject": "Your subscription will pause if the card keeps declining",
             "body": "The card has been declined several times now. If it stays that way, the subscription pauses - your data stays safe, but access stops. Updating takes 30 seconds and everything continues as if nothing happened: {{card_update_url}}",
             "channels": [
-              "email",
               "whatsapp",
+              "email",
               "sms"
             ],
             "cta_label": "Update card"
@@ -157,8 +161,8 @@
             "subject": "Two weeks unpaid - your data is still safe",
             "body": "Your subscription is on hold, nothing has been deleted. One card update brings everything back exactly as it was: {{card_update_url}}\n\nIf you meant to cancel instead, just ignore this - we will stop reminding soon.",
             "channels": [
-              "email",
               "whatsapp",
+              "email",
               "sms"
             ],
             "cta_label": "Update card"
@@ -169,8 +173,8 @@
             "subject": "Last reminder - then we stop emailing about this",
             "body": "This is the final reminder about the payment that did not go through. If it was deliberate, ignore this - otherwise your account restarts in one click: {{card_update_url}}",
             "channels": [
-              "email",
               "whatsapp",
+              "email",
               "sms"
             ],
             "cta_label": "Update card"
@@ -335,7 +339,11 @@
             "subject": "You were one step from your plan",
             "body": "Hi! You started upgrading a few hours ago and something interrupted you.\n\nYour checkout is still open - it takes under a minute to finish: {{app_url}}\n\nIf a question stopped you, just reply to this email and a human will answer.",
             "cta_label": "Finish checkout",
-            "cta_url": "{{app_url}}"
+            "cta_url": "{{app_url}}",
+            "channels": [
+              "whatsapp",
+              "email"
+            ]
           }
         ]
       },
@@ -375,6 +383,10 @@
                 "subject": "Your balance hit {{credits_left}} - here is the fastest way back",
                 "body": "Hi! You used everything you had - that is the best possible signal.\n\nUpgrade or top up and keep the streak going: {{app_url}}\n\nNot sure which plan fits? Reply and we will do the math with you."
               }
+            ],
+            "channels": [
+              "whatsapp",
+              "email"
             ]
           }
         ]
@@ -397,7 +409,11 @@
             "subject": "Your card expires soon - 30 seconds to keep everything running",
             "body": "Hi! The card on your subscription expires at the end of the month. Updating it takes about 30 seconds and nothing gets interrupted: {{card_update_url}}\n\nAfter it expires the renewal fails silently - this is exactly the kind of loss nobody notices until access stops.",
             "cta_label": "Update card",
-            "cta_url": "{{card_update_url}}"
+            "cta_url": "{{card_update_url}}",
+            "channels": [
+              "whatsapp",
+              "email"
+            ]
           },
           {
             "delay_h": 168,

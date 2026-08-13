@@ -653,15 +653,18 @@ def test_quiet_hours_jitter_spreads_the_morning():
 
 
 def test_channel_ladder_declared_in_default_dunning():
-    """K3: догонялки объявляют лестницу email -> whatsapp -> sms и
-    align_retries - конфиг, который исполняет новая ветка раннера."""
+    """K3: догонялки объявляют лестницу whatsapp -> email -> sms (личный WA
+    первым с 2026-08-13 - читаемость выше, email обязательный запасной) и
+    align_retries - конфиг, который исполняет ветка лестницы раннера."""
     import json as _json
     import campaign_tick as ct
     conf = _json.loads(ct.CAMPAIGNS_PATH.read_text())["_default"]
     k3 = next(c for c in conf["campaigns"] if c["campaign_id"] == "K3_payment_recovery")
     assert k3.get("align_retries") is True
     laddered = [s for s in k3["steps"] if s.get("channels")]
-    assert laddered and all(s["channels"][0] == "email" for s in laddered)
+    assert laddered and all(
+        s["channels"][0] == "whatsapp" and "email" in s["channels"]
+        for s in laddered)
 
 
 # ── Сигналы в решениях: buy_intent/churn меняют отбор (архитектура №1) ────────

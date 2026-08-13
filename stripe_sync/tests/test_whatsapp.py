@@ -229,8 +229,12 @@ def test_personal_transport_has_no_scheduled_send_path():
     senders = [n for n in dir(wap) if "send" in n.lower()]
     assert senders == [], senders          # send_* не появилось
     assert hasattr(wap, "reply_as_human")  # ручной путь есть и один
-    for mod in (campaign_tick, saas_senders):
-        assert "wa_personal" not in inspect.getsource(mod), mod.__name__
+    # ГРАНИЦА ПЕРЕДВИНУТА ОСОЗНАННО (2026-08-13, решение владельца):
+    # автокасания разрешены, но только через ЯВНЫЙ тумблер
+    # (wa_personal_automation) и дневной бюджет номера. Дефолт - выключено:
+    # без тумблера wa_personal_tenant пуст и конвейер канал не видит.
+    assert saas_senders.MessagingConfig().wa_personal_tenant == ""
+    assert "wa_personal_daily_cap" in inspect.getsource(campaign_tick)
 
 
 def test_personal_outbound_echo_lands_in_the_thread():
@@ -255,11 +259,8 @@ def test_human_reply_is_the_only_send_and_needs_text():
     assert not ok and why == "empty"
     ok, why = wap.reply_as_human("t", "258948@lid", "   ")
     assert not ok and why == "empty"
-    # автокампании этот путь не видят: route_message wa_personal не знает
-    import saas_senders
-    import inspect
-    src = inspect.getsource(saas_senders)
-    assert "wa_personal" not in src
+    # автокампании ходят ТОЛЬКО через бюджетную ветку send_whatsapp
+    # (тумблер + дневной лимит); reply_as_human остаётся ручным путём инбокса
 
 
 def test_whatsapp_statuses_are_not_conversations():
@@ -268,3 +269,75 @@ def test_whatsapp_statuses_are_not_conversations():
     assert wap.parse_event({"event": "message.any", "payload": {
         "id": "s1", "from": "status@broadcast", "fromMe": False,
         "body": "somebody's story"}})["kind"] == "ignore"
+
+
+def test_personal_first_with_budget(monkeypatch):
+    """Личный канал: явный тумблер + бюджет; исчерпан и без Cloud - честный
+    отказ, а не тихая массовая рассылка с личного номера."""
+    import saas_senders as ss
+
+    sent = []
+    monkeypatch.setattr("wa_personal.reply_as_human",
+                        lambda t, chat, text: (sent.append((t, chat, text)) or (True, "sent")),
+                        raising=False)
+    import wa_personal
+    monkeypatch.setattr(wa_personal, "reply_as_human",
+                        lambda t, chat, text: (sent.append((t, chat, text)) or (True, "sent")))
+
+    budget = {"left": 2}
+    cfg = ss.MessagingConfig(dry_run=False, wa_personal_tenant="t1",
+                             wa_personal_budget=budget)
+    ok, reason = ss.send_whatsapp("+62 812-345-678", "hello", cfg, {})
+    assert ok and reason == "sent"
+    assert sent[0][1].endswith("@c.us") and budget["left"] == 1
+
+    budget["left"] = 0
+    ok2, reason2 = ss.send_whatsapp("+62812345678", "hello", cfg, {})
+    assert not ok2 and reason2 == "wa_personal_budget_exhausted"
+
+
+def test_personal_dry_run_spends_budget_but_sends_nothing():
+    import saas_senders as ss
+    budget = {"left": 1}
+    cfg = ss.MessagingConfig(dry_run=True, wa_personal_tenant="t1",
+                             wa_personal_budget=budget)
+    ok, reason = ss.send_whatsapp("+62812345678", "hello", cfg, {})
+    assert ok and reason == "dry_run" and budget["left"] == 0
+
+
+def test_personal_requires_explicit_automation_flag():
+    """WORKING-сессии мало: без тумблера wa_personal_automation канал в
+    цепочки не попадает."""
+    import saas_senders as ss
+    e, m = ss.EmailConfig.from_env(), ss.MessagingConfig.from_env()
+
+    def fake_channels(tc):
+        import saas_senders
+        return lambda t: tc
+    import saas_senders
+    orig = saas_senders.load_tenant_channels
+    try:
+        saas_senders.load_tenant_channels = lambda t: {
+            "wa_personal_status": "WORKING"}
+        _e, m1 = ss.tenant_configs("t1", e, m)
+        assert m1.wa_personal_tenant == ""
+        saas_senders.load_tenant_channels = lambda t: {
+            "wa_personal_status": "WORKING", "wa_personal_automation": True}
+        _e, m2 = ss.tenant_configs("t1", e, m)
+        assert m2.wa_personal_tenant == "t1"
+    finally:
+        saas_senders.load_tenant_channels = orig
+
+
+def test_dunning_and_triggers_have_wa_ladder():
+    import json
+    from pathlib import Path
+    conf = json.loads((Path(__file__).parent.parent / "saas_campaigns.json")
+                      .read_text())["_default"]
+    for c in conf["campaigns"]:
+        if c["campaign_id"].startswith(("K3", "T1", "T2", "T3")):
+            email_steps = [s for s in c["steps"] if s.get("action") == "email"]
+            assert email_steps and all(
+                (s.get("channels") or [""])[0] == "whatsapp"
+                and "email" in (s.get("channels") or []) for s in email_steps), \
+                c["campaign_id"]

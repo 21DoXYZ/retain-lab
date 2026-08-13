@@ -134,6 +134,12 @@ class MessagingConfig:
     wa_lang: str = "en"
     wa_tenant: str = ""
     wa_templates: tuple = ()        # реестр (имя, статус, кампания, шаг, params)
+    # ЛИЧНЫЙ WhatsApp (WAHA) как канал цепочек. Пусто = автокасания выключены.
+    # Включается ЯВНЫМ тумблером владельца (wa_personal_automation) при живой
+    # сессии; бюджет - остаток дневного лимита номера, СЛОВАРЬ {'left': N}
+    # намеренно (мутируется по мере отправок внутри одного тика).
+    wa_personal_tenant: str = ""
+    wa_personal_budget: dict | None = None
 
     @classmethod
     def from_env(cls) -> "MessagingConfig":
@@ -243,15 +249,48 @@ def send_viber(phone: str, text: str, cfg: MessagingConfig) -> tuple[bool, str]:
 
 def send_whatsapp(phone: str, text: str, cfg: MessagingConfig,
                   ctx: dict | None = None) -> tuple[bool, str]:
-    """WhatsApp Cloud API, только одобренные шаблоны.
+    """WhatsApp: сначала ЛИЧНЫЙ номер (если владелец явно разрешил
+    автокасания), затем Cloud API с одобренными шаблонами.
 
-    Вне 24-часового окна Meta принимает ТОЛЬКО шаблон, а кампании удержания
-    почти всегда пишут первыми - поэтому свободный текст здесь не шлётся
-    вовсе. Шаблон ищется в реестре тенанта по (кампания, шаг); без
-    одобренного шаблона касание отбивается с причиной, а не молчит.
+    Личный канал - неофициальный протокол, бан прилетает номеру клиента,
+    поэтому три предохранителя зашиты здесь и в тике:
+      • шлём только когда wa_personal_tenant непуст: сессия WORKING И
+        владелец сам включил тумблер автокасаний (осознанный риск);
+      • дневной бюджет номера (деф. 20): исчерпан - падаем на Cloud API
+        или честно отбиваемся, массовой рассылки с личного номера не
+        бывает физически;
+      • контакт и согласие проверил тик ДО вызова (no_contact/no_consent).
+
+    Cloud API: вне 24-часового окна Meta принимает ТОЛЬКО шаблон, а кампании
+    удержания почти всегда пишут первыми - свободный текст туда не шлётся.
+    Шаблон ищется по (кампания, шаг); без одобренного - отказ с причиной.
     """
-    if not normalize_phone(phone):
+    digits = normalize_phone(phone)
+    if not digits:
         return False, "invalid_phone"
+
+    if cfg.wa_personal_tenant:
+        budget = cfg.wa_personal_budget if cfg.wa_personal_budget is not None else {"left": 0}
+        if budget.get("left", 0) > 0:
+            if cfg.dry_run:
+                budget["left"] -= 1
+                print(f"[wa-personal dry_run] to={digits}", flush=True)
+                return True, "dry_run"
+            try:                        # борд пакетом, джобы плоско
+                from wa_personal import reply_as_human
+            except ImportError:
+                from stripe_sync.wa_personal import reply_as_human  # type: ignore
+            ok, reason = reply_as_human(cfg.wa_personal_tenant,
+                                        f"{digits}@c.us", text)
+            if ok:
+                budget["left"] -= 1
+                return True, "sent"
+            # личный канал не смог (сессия упала и т.п.) - пробуем Cloud ниже
+            print(f"[wa-personal] fallback to cloud: {reason}", flush=True)
+        elif not (cfg.wa_token and cfg.wa_phone_number_id):
+            # бюджет номера исчерпан и Cloud не настроен - честный отказ,
+            # завтра бюджет обнулится и шаг дозреет снова
+            return False, "wa_personal_budget_exhausted"
     if not (cfg.wa_token and cfg.wa_phone_number_id):
         return False, "whatsapp_not_configured"
     try:                                # борд пакетом, джобы плоско
@@ -362,6 +401,12 @@ def tenant_configs(tenant_id: str, email_cfg: EmailConfig,
              int(info.get("version") or 1), tuple(info.get("params") or ()))
             for name, info in dict(tc["wa_templates"]).items())
     msg_over["wa_tenant"] = tenant_id
+    # Личный WhatsApp в цепочках: ТОЛЬКО живая сессия + явный тумблер
+    # автокасаний. Одного QR-подключения мало - владелец отдельно
+    # соглашается, что автоматика пишет с его личного номера.
+    if (str(tc.get("wa_personal_status") or "") == "WORKING"
+            and tc.get("wa_personal_automation")):
+        msg_over["wa_personal_tenant"] = tenant_id
     if msg_over:
         msg_cfg = replace(msg_cfg, **msg_over)
     return email_cfg, msg_cfg

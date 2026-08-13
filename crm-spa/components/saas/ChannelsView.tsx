@@ -36,7 +36,8 @@ interface ChannelRow {
   };
   telegram?: { bot_username: string; connect_link: string };
   whatsapp?: {
-    personal?: { status: string; number: string };
+    personal?: { status: string; number: string;
+                 automation?: boolean; daily_cap?: number };
     cloud_connected?: boolean;
     phone_display: string; has_waba: boolean; has_app_secret: boolean;
     webhook_url: string; webhook_verify_token: string;
@@ -674,6 +675,25 @@ function WhatsappBody({ row, onSaved }: { row: ChannelRow; onSaved: () => void }
         <p className="max-w-[560px] text-[12.5px] leading-relaxed text-steel">
           {t("saas.channels.wa.personal.inboundOnly")}
         </p>
+        {/* автокасания: отдельное согласие поверх QR - риск бана выше */}
+        <div className="max-w-[560px] rounded-ctl border border-hair bg-surface p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[12.5px] font-medium text-ink">
+              {t("saas.channels.wa.personal.autoTitle")}
+            </div>
+            <Button
+              variant={wa?.personal?.automation ? "ghost" : "brand"} size="sm" loading={busy}
+              onClick={() => post("/api/v1/saas/channels/whatsapp/personal/automation",
+                                  { enabled: !wa?.personal?.automation }, () => {})}>
+              {wa?.personal?.automation
+                ? t("saas.channels.wa.personal.autoOff")
+                : t("saas.channels.wa.personal.autoOn")}
+            </Button>
+          </div>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-steel">
+            {t("saas.channels.wa.personal.autoDesc", { cap: wa?.personal?.daily_cap ?? 20 })}
+          </p>
+        </div>
         <div>
           <Button variant="ghost" size="sm" loading={busy}
                   onClick={() => post("/api/v1/saas/channels/whatsapp/personal/disconnect",
