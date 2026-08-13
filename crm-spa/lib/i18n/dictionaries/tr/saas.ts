@@ -58,6 +58,7 @@ export const saas: Partial<Messages> = {
   "saas.pipeline.stage.scoring": "",
   "saas.pipeline.stage.campaigns": "",
   "saas.pipeline.stage.triggers": "",
+  "saas.pipeline.stage.guard": "",
   "saas.pipeline.stage.uplift": "",
   "saas.pipeline.stage.analyst": "",
   "saas.uplift.title": "",

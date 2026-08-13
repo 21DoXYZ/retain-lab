@@ -3002,13 +3002,14 @@ _PIPELINE_STAGES = [
     ('scoring', 'scoring'), ('campaign_tick', 'campaigns'),
     ('triggers', 'triggers'),
     ('uplift_report', 'uplift'), ('ai_analyst', 'analyst'),
+    ('ops_guard', 'guard'),
 ]
 
 # Окно свежести выхода стадии (часы) - зеркало ops_loop.STAGES.fresh_h.
 _STAGE_FRESH_H = {
     'stitch': 2, 'plans': 26, 'contacts': 26, 'users_sync': 26,
     'product_sync': 26, 'cancel_reasons': 26, 'scoring': 26, 'campaign_tick': 26,
-    'triggers': 1,
+    'triggers': 1, 'ops_guard': 1,
     'uplift_report': 24, 'ai_analyst': 24,
 }
 

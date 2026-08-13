@@ -5,6 +5,13 @@
 # закрыт правилом в цепочке DOCKER-USER (см. память/отчёт Phase 0).
 #   запуск:  docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d <svc...>
 services:
+  # ротация docker-логов: борд и джобы пишут много - без лимита
+  # json-лог растёт до заполнения диска
+  saas-ops:
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "3"}
+
   redpanda:
     volumes:
       - redpanda_data:/var/lib/redpanda/data
@@ -12,6 +19,9 @@ services:
     ports: !override
       - "127.0.0.1:19092:19092"
   board:
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "3"}
     ports:
       - "127.0.0.1:8050:8050"
     environment:
@@ -44,6 +54,9 @@ services:
       DECISION_VIBER_SENDER: ${DECISION_VIBER_SENDER:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
   ingest:
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "3"}
     ports:
       - "127.0.0.1:8081:8081"
   stripe-webhook:
@@ -57,6 +70,9 @@ services:
   # server-runtime (proxy/route handlers), и в браузере (через SSH-туннель) — в
   # bridge-сети контейнерный 127.0.0.1 указывал бы на сам контейнер.
   crm-spa:
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "3"}
     network_mode: host
     build:
       args:
@@ -74,6 +90,9 @@ services:
   # только Cloud API. Неофициальный протокол: сессию может забанить Meta,
   # клиент подключает её с явным подтверждением риска.
   waha:
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "3"}
     image: devlikeapro/waha:latest
     environment:
       WHATSAPP_API_KEY: ${WAHA_API_KEY:-}

@@ -933,6 +933,7 @@ CREATE TABLE IF NOT EXISTS retention.pipeline_runs
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(started_at)
 ORDER BY (tenant_id, stage, started_at)
+TTL toDateTime(started_at) + INTERVAL 90 DAY
 TTL toDateTime(started_at) + INTERVAL 90 DAY;
 
 -- Текущее здоровье: последний прогон каждой стадии по тенанту + его возраст.
