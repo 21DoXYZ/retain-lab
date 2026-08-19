@@ -89,6 +89,36 @@ def text_to_html(body: str, unsubscribe: str, brand: str = "") -> str:
     )
 
 
+def signature_block(email_from: str, brand: str = "") -> str:
+    """Человеческая подпись письма, выведенная из отправителя.
+
+    «Michael from Hubcontent <care@...>» -> «Michael\nHubcontent».
+    Только бренд («Hubcontent <care@...>») -> «The Hubcontent team».
+    Пусто - подписи нет (лучше ничего, чем выдуманное имя)."""
+    name = str(email_from or "").split("<")[0].strip()
+    if not name:
+        return ""
+    low = name.lower()
+    for sep in (" from ", " at ", " @ "):
+        if sep in low:
+            person = name[:low.index(sep)].strip()
+            company = brand or name[low.index(sep) + len(sep):].strip()
+            return f"{person}\n{company}" if person else ""
+    return f"The {brand or name} team"
+
+
+def with_signature(body: str, email_from: str, brand: str = "") -> str:
+    """Дописывает подпись, если автор текста не подписался сам."""
+    sig = signature_block(email_from, brand)
+    if not sig:
+        return body
+    first = sig.split("\n")[0].lower()
+    tail = str(body or "")[-120:].lower()
+    if first and first in tail:          # уже подписано - не дублируем
+        return body
+    return str(body or "").rstrip() + "\n\n" + sig
+
+
 def build_email_payload(to: str, subject: str, body: str, email_from: str,
                         unsubscribe: str, brand: str = "", cta_label: str = "",
                         brand_color: str = "", logo_url: str = "") -> dict:

@@ -151,6 +151,7 @@ export const saas = {
   "saas.launch.verdict.almost": "Почти готово",
   "saas.launch.verdict.not_ready": "Не готово",
   "saas.launch.c.sender": "Отправитель человечный (имя + адрес, без noreply)",
+  "saas.launch.c.signature": "Каждое письмо подписано человеком ({d})",
   "saas.launch.c.tailored": "Тексты собраны под ваш продукт, а не нейтральный каркас",
   "saas.launch.c.domain": "Домен отправки верифицирован (DKIM/SPF)",
   "saas.launch.c.timezone": "Часовой пояс аудитории задан - тихие часы работают верно",

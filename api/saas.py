@@ -1600,6 +1600,13 @@ def saas_launch_check():
     tailored = bool(tch.get('onboarding_answers'))
 
     checks = [check_sender(str(tch.get('email_from') or ''))]
+    # подпись в теле: выводится из отправителя автоматически (email_delivery)
+    from stripe_sync.email_delivery import signature_block
+    _sig = signature_block(str(tch.get('email_from') or ''),
+                           str((tch.get('onboarding_answers') or {})
+                               .get('product_name') or ''))
+    checks.append({'key': 'signature', 'status': 'pass' if _sig else 'warn',
+                   'detail': _sig.replace('\n', ' / ')})
     checks += check_identity(tch, tailored)
     checks += check_copy(conf)
     checks.append(check_offers_bound(conf))

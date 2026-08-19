@@ -82,10 +82,14 @@ def send_email(to: str, subject: str, body: str, cfg: EmailConfig,
         return False, "email_not_configured"
 
     try:
-        from email_delivery import build_email_payload, unsub_url
+        from email_delivery import build_email_payload, unsub_url, with_signature
     except ImportError:
-        from stripe_sync.email_delivery import build_email_payload, unsub_url
+        from stripe_sync.email_delivery import (build_email_payload,  # type: ignore
+                                                unsub_url, with_signature)
 
+    # человеческая подпись из отправителя («Michael / Hubcontent»); если
+    # автор текста подписался сам - не дублируем
+    body_r = with_signature(body_r, cfg.email_from, cfg.brand)
     unsub = unsub_url(cfg.saas_host or "retivo.digital", cfg.tenant_id or "", to)
     payload = json.dumps(build_email_payload(
         to, subject_r, body_r, cfg.email_from, unsub, cfg.brand,

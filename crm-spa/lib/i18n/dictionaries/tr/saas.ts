@@ -149,6 +149,7 @@ export const saas: Partial<Messages> = {
   "saas.launch.verdict.almost": "",
   "saas.launch.verdict.not_ready": "",
   "saas.launch.c.sender": "",
+  "saas.launch.c.signature": "",
   "saas.launch.c.tailored": "",
   "saas.launch.c.domain": "",
   "saas.launch.c.timezone": "",

@@ -50,3 +50,15 @@ def test_verdict_ladder():
     ms = manual_items({"dmarc": True})
     assert {m["key"]: m["status"] for m in ms}["dmarc"] == "pass"
     assert {m["key"]: m["status"] for m in ms}["reply_mailbox"] == "manual"
+
+
+def test_signature_derived_from_sender():
+    from email_delivery import signature_block, with_signature
+    assert signature_block("Michael from Hubcontent <c@h.ai>") == "Michael\nHubcontent"
+    assert signature_block("Hubcontent <c@h.ai>") == "The Hubcontent team"
+    assert signature_block("") == ""
+    body = with_signature("Hi! Try this.", "Michael from Hubcontent <c@h.ai>")
+    assert body.endswith("Michael\nHubcontent")
+    # автор подписался сам - не дублируем
+    signed = "Hi!\n\nMichael\nHubcontent"
+    assert with_signature(signed, "Michael from Hubcontent <c@h.ai>") == signed
