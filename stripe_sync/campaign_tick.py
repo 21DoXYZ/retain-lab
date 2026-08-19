@@ -377,6 +377,27 @@ def _log_send(client, tenant: str, camp_id: str, identity: str, step_idx: int,
     )
 
 
+# Отказы-«подожди» (тихие часы, частота, окно ретрая) повторяются КАЖДЫЙ тик,
+# пока шаг не созреет заново: 96 тиков за ночь писали 96 одинаковых строк на
+# человека - лог раздувался тысячами, а «удержано предохранителями» на
+# дашборде превращалось в бессмысленное число. Пишем такой отказ раз в сутки.
+RETRY_REASONS = ("quiet_hours", "freq_cap_day", "freq_cap_week", "awaiting_retry")
+
+
+def _logged_retries_today(client, tenant: str) -> set:
+    """Best-effort: не смогли прочитать - лог просто будет многословнее."""
+    try:
+        return {(r[0], int(r[1]), r[2], r[3]) for r in client.query(
+            "SELECT campaign_id, step_idx, identity_id, reason "
+            "FROM retention.campaign_send_log "
+            "WHERE tenant_id = %(t)s AND status = 'rejected' "
+            "AND reason IN %(rr)s AND ts >= today()",
+            parameters={"t": tenant, "rr": list(RETRY_REASONS)}).result_rows
+            if len(r) >= 4}
+    except Exception:  # noqa: BLE001
+        return set()
+
+
 def tick(client, tenant: str) -> dict[str, int]:
     cfgs = json.loads(CAMPAIGNS_PATH.read_text())
     # тенант без git-блока живёт на универсальном каркасе _default
@@ -500,6 +521,17 @@ def tick(client, tenant: str) -> dict[str, int]:
         "FROM retention.user_actions WHERE tenant_id = %(t)s",
         parameters={"t": tenant}).result_rows}
 
+    # «подожди»-отказы уже записанные сегодня: повторно не логируем
+    retry_logged = _logged_retries_today(client, tenant)
+
+    def _log_retry(cid_, i_, identity_, channel_, subject_, reason_):
+        key = (cid_, i_, identity_, reason_)
+        if key in retry_logged:
+            return
+        retry_logged.add(key)
+        _log_send(client, tenant, cid_, identity_, i_, channel_,
+                  subject_, "rejected", reason_)
+
     # Подавление email: кому писать НЕЛЬЗЯ (отписался, пожаловался, баунс).
     # Fail-closed: сомнений нет - адрес в списке, значит письма не будет.
     suppressed = {r[0] for r in client.query(
@@ -619,18 +651,16 @@ def tick(client, tenant: str) -> dict[str, int]:
                                 # РЕАЛЬНОГО ретрая Stripe, уходит в никуда:
                                 # человеку не к чему действовать. Шаг дозреет
                                 # в окне суток перед попыткой списания.
-                                _log_send(client, tenant, cid, identity, i,
-                                          step.get("channel", "email"),
-                                          step.get("subject", ""), "rejected",
-                                          "awaiting_retry")
+                                _log_retry(cid, i, identity,
+                                           step.get("channel", "email"),
+                                           step.get("subject", ""), "awaiting_retry")
                                 retry_step = True
                             elif quiet_hours_block(cid, now, tenant_tz, identity):
                                 # ночь у аудитории: шаг НЕ отработан, созреет
                                 # утром. В ОАЭ ночное промо ещё и незаконно.
-                                _log_send(client, tenant, cid, identity, i,
-                                          step.get("channel", "email"),
-                                          step.get("subject", ""), "rejected",
-                                          "quiet_hours")
+                                _log_retry(cid, i, identity,
+                                           step.get("channel", "email"),
+                                           step.get("subject", ""), "quiet_hours")
                                 retry_step = True
                             elif (cid not in FREQ_EXEMPT
                                     and camp.get("entry_stage") != "TRIGGER"
@@ -648,10 +678,10 @@ def tick(client, tenant: str) -> dict[str, int]:
                                 # Шаг НЕ отработан: он созреет снова, когда
                                 # частота позволит. Иначе касание пропадало бы
                                 # навсегда из-за соседней кампании.
-                                _log_send(client, tenant, cid, identity, i,
-                                          step.get("channel", "email"),
-                                          step.get("subject", ""), "rejected",
-                                          frequency_block(cid, *touches.get(identity, (0, 0))))
+                                _log_retry(cid, i, identity,
+                                           step.get("channel", "email"),
+                                           step.get("subject", ""),
+                                           frequency_block(cid, *touches.get(identity, (0, 0))))
                                 retry_step = True
                             else:
                                 # ЛЕСТНИЦА КАНАЛОВ. Шаг может объявить

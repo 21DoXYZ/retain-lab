@@ -5,6 +5,7 @@ import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Banner, Button, Card, PageHeader } from "@/components/ui";
 import { CampaignBuilder } from "./CampaignBuilder";
+import { LaunchCheck } from "./LaunchCheck";
 import { NoTenant, isNoTenant } from "./NoTenant";
 import Link from "next/link";
 
@@ -374,6 +375,8 @@ export function CampaignsView() {
               ))}
             </div>
           </Card>
+
+          <LaunchCheck />
 
           <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div className="min-w-0">

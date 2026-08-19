@@ -1582,6 +1582,75 @@ def saas_campaigns():
     return api_json(_campaigns_payload(_tenant_arg()))
 
 
+@bp.get('/saas/launch-check')
+@require_auth(roles=LEAK_ROLES)
+def saas_launch_check():
+    """Предполётный чеклист: не опозоримся ли, когда письма начнут доходить.
+
+    Автопроверки - кодом (подписи, плейсхолдеры, тире, привязки, домен),
+    ручные (ящик для ответов, DMARC, «прочитал тестовое письмо сам») -
+    подтверждает владелец, подтверждения хранятся в конфиге тенанта."""
+    from stripe_sync.launch_check import (check_copy, check_identity,
+                                          check_offers_bound, check_sender,
+                                          manual_items, verdict)
+
+    tenant = _tenant_arg()
+    tch = ca.load_tenants().get(tenant, {}) or {}
+    conf = _campaigns_conf(tenant)
+    tailored = bool(tch.get('onboarding_answers'))
+
+    checks = [check_sender(str(tch.get('email_from') or ''))]
+    checks += check_identity(tch, tailored)
+    checks += check_copy(conf)
+    checks.append(check_offers_bound(conf))
+
+    # предохранители - показываем значениями, чтобы владелец видел страховку
+    import os as _os5
+    platform_live = _os5.environ.get('SIGNALS_DRY_RUN', '1') in ('0', 'false', 'False', '')
+    checks.append({'key': 'platform_live',
+                   'status': 'pass' if platform_live else 'fail', 'detail': ''})
+    try:
+        supp = int(q('SELECT count() FROM email_suppressions_current '
+                     'WHERE tenant_id = {t:String}', {'t': tenant})[1][0][0])
+        checks.append({'key': 'suppressions', 'status': 'pass', 'detail': str(supp)})
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        due24 = int(q("""
+            SELECT uniqExact(identity_id) FROM campaign_enrollments_current
+            WHERE tenant_id = {t:String} AND status = 'active'
+              AND next_step_at <= now() + INTERVAL 1 DAY
+            """, {'t': tenant})[1][0][0])
+        checks.append({'key': 'first_wave', 'status': 'pass', 'detail': str(due24)})
+    except Exception:  # noqa: BLE001
+        pass
+
+    checks += manual_items(dict(tch.get('launch_confirms') or {}))
+    return api_json({'tenant': tenant, 'checks': checks,
+                     'verdict': verdict(checks),
+                     'autopilot': _autopilot_resolved(conf, tenant)})
+
+
+@bp.post('/saas/launch-check/confirm')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_launch_check_confirm():
+    from stripe_sync.launch_check import MANUAL_KEYS
+
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
+    body = request.get_json(silent=True) or {}
+    key = str(body.get('key') or '')
+    if key not in MANUAL_KEYS:
+        return _bad('unknown_check')
+    tch = ca.load_tenants().get(tenant, {}) or {}
+    confirms = dict(tch.get('launch_confirms') or {})
+    confirms[key] = bool(body.get('ok', True))
+    ca.update_tenant(tenant, {'launch_confirms': confirms})
+    print(f'[launch] {tenant}: {key} -> {confirms[key]}', flush=True)
+    return api_json({'key': key, 'ok': confirms[key]})
+
+
 # ── Ручные кампании: сегмент по фильтрам + свои шаги, исполняет штатный тик ──
 
 
