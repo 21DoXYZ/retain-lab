@@ -431,6 +431,23 @@ def _home_actions(tenant: str) -> list | None:
             "AND stage = 'ops_guard'", {'t': tenant})[1]
         if guard and str(guard[0][0]) == 'error':
             out.append({'key': 'infra', 'count': 0, 'href': '/pipeline'})
+
+        # ТРЕВОГА ДОСТАВЛЯЕМОСТИ: bounce > 3% или жалобы > 0.1% за сутки
+        # (при >= 20 реальных отправках) - домен под угрозой, чинить сразу
+        dl = q("""
+            SELECT
+              (SELECT countIf(status = 'sent') FROM campaign_send_log
+               WHERE tenant_id = {t:String} AND action = 'email'
+                 AND ts >= now() - INTERVAL 1 DAY) AS sent,
+              countIf(event_type IN ('bounced', 'delivery_delayed')),
+              countIf(event_type = 'complained')
+            FROM email_events
+            WHERE tenant_id = {t:String} AND ts >= now() - INTERVAL 1 DAY
+            """, {'t': tenant})[1][0]
+        sent, bounced, complained = int(dl[0]), int(dl[1]), int(dl[2])
+        if sent >= 20 and (bounced / sent > 0.03 or complained / sent > 0.001):
+            out.append({'key': 'delivery_alarm',
+                        'count': bounced + complained, 'href': '/uplift'})
         return out
     except Exception as exc:  # noqa: BLE001
         print(f'[home] {tenant}: actions failed: {exc}', flush=True)
@@ -3063,6 +3080,22 @@ def saas_user_card():
             {'t': tenant, 'c': f'{wa_addr}@c.us', 'l': f'{wa_addr}@lid'})[1]
         wa_chat = str(hit[0][0]) if hit else ''
 
+    # Голос человека: его тикеты и отзывы - обязательный контекст перед
+    # ручным касанием («вы нам писали про баг - починили»)
+    voice = []
+    try:
+        voice = [{'ts': str(r[0])[:16], 'kind': r[1], 'category': r[2],
+                  'text': r[3]} for r in q("""
+            SELECT ts, event_type, JSONExtractString(meta, 'category'),
+                   JSONExtractString(meta, 'message')
+            FROM saas_events_deduped
+            WHERE tenant_id = {t:String} AND identity_id = {i:String}
+              AND event_type IN ('feedback', 'support_ticket')
+            ORDER BY ts DESC LIMIT 5
+            """, {'t': tenant, 'i': identity})[1]]
+    except Exception:  # noqa: BLE001
+        pass
+
     from flask import g
     role = str((getattr(g, 'api_user', None) or {}).get('role') or '')
     return api_json({
@@ -3070,7 +3103,7 @@ def saas_user_card():
         'email_suppressed': email_suppressed, 'enrollments': enrollments,
         'touches': touches, 'offers': offers, 'events': events,
         'campaigns': _campaign_titles(tenant), 'wa_chat': wa_chat,
-        'behavior': behavior, 'card': card,
+        'behavior': behavior, 'card': card, 'voice': voice,
         'autopilot': _autopilot_on(tenant),
         # что может ЭТА роль: support пишет людям, но кампании не трогает
         'can_touch': role in CLIENT_WRITE_ROLES,

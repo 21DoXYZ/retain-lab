@@ -78,6 +78,7 @@ interface CardData {
   campaigns: { id: string; title: string }[];
   wa_chat: string;
   behavior: Behavior | null;
+  voice?: { ts: string; kind: string; category: string; text: string }[];
   card: { brand: string; last4: string; exp_month: number; exp_year: number;
           days_to_expiry: number; expiring_soon: boolean } | null;
   autopilot: boolean;
@@ -409,6 +410,33 @@ export function UserCardView({ identity }: { identity: string }) {
               </div>
             )}
           </section>
+          ) : null}
+
+          {/* голос человека: тикеты и отзывы - контекст перед касанием */}
+          {data.voice?.length ? (
+            <section className="rounded-ctl border border-hair bg-surface p-4">
+              <h2 className="text-[13.5px] font-semibold text-ink">{t("saas.ucard.voice.title")}</h2>
+              <div className="mt-2 flex flex-col gap-2">
+                {data.voice.map((v, i) => (
+                  <div key={i} className="border-b border-hair pb-2 text-[12.5px] last:border-0 last:pb-0">
+                    <div className="flex items-center gap-2">
+                      <span className={"rounded-full border px-1.5 py-0.5 text-[10.5px] font-semibold " +
+                        (v.category === "bug" || v.kind === "support_ticket"
+                          ? "border-[#fedf89] bg-[#fffaeb] text-[#b54708]"
+                          : "border-hair2 bg-canvas text-steel")}>
+                        {v.kind === "support_ticket"
+                          ? t("saas.ucard.voice.ticket")
+                          : (v.category || t("saas.ucard.voice.feedback"))}
+                      </span>
+                      <span className="font-mono text-[11px] text-steel">{v.ts}</span>
+                    </div>
+                    {v.text ? (
+                      <p className="mt-1 leading-relaxed text-slate">{v.text}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
           ) : null}
 
           <section className="rounded-ctl border border-hair bg-surface p-4">

@@ -381,7 +381,25 @@ def _log_send(client, tenant: str, camp_id: str, identity: str, step_idx: int,
 # пока шаг не созреет заново: 96 тиков за ночь писали 96 одинаковых строк на
 # человека - лог раздувался тысячами, а «удержано предохранителями» на
 # дашборде превращалось в бессмысленное число. Пишем такой отказ раз в сутки.
-RETRY_REASONS = ("quiet_hours", "freq_cap_day", "freq_cap_week", "awaiting_retry")
+RETRY_REASONS = ("quiet_hours", "freq_cap_day", "freq_cap_week",
+                 "awaiting_retry", "warmup_cap")
+
+# ПРОГРЕВ ДОМЕНА. Свежий отправитель, у которого в первый день уходит сотня
+# писем с нулевой историей - спам-паттерн для Gmail: репутация портится на
+# недели. Дневной потолок растёт с возрастом канала (дни с ПЕРВОЙ реальной
+# отправки): 20 -> 40 -> 80 -> 150, дальше без прогрева. Дуннинг (FREQ_EXEMPT)
+# под потолок не попадает - сервисные письма о сломанной оплате не ждут.
+WARMUP_SCHEDULE = ((2, 20), (4, 40), (7, 80), (14, 150))
+
+
+def warmup_cap(days_since_first_send: int | None) -> int:
+    """Потолок писем в день. 0 дней истории = самый строгий. None (ещё ни
+    одной отправки) = первый день."""
+    days = 0 if days_since_first_send is None else int(days_since_first_send)
+    for upto, cap in WARMUP_SCHEDULE:
+        if days < upto:
+            return cap
+    return 10_000                        # прогрев пройден
 
 
 def _logged_retries_today(client, tenant: str) -> set:
@@ -520,6 +538,23 @@ def tick(client, tenant: str) -> dict[str, int]:
         "coalesce(buy_intent, 0), coalesce(p_churn, 0) "
         "FROM retention.user_actions WHERE tenant_id = %(t)s",
         parameters={"t": tenant}).result_rows}
+
+    # Прогрев: сколько email ещё можно сегодня. Возраст канала - дни с первой
+    # РЕАЛЬНОЙ отправки; бюджет мутируется по мере отправок этого тика.
+    email_budget = {"left": 10_000}
+    try:
+        row = client.query(
+            "SELECT countIf(ts >= today()), "
+            "  if(min(ts) > '1971-01-01', dateDiff('day', min(ts), now()), NULL) "
+            "FROM retention.campaign_send_log "
+            "WHERE tenant_id = %(t)s AND action = 'email' AND status = 'sent'",
+            parameters={"t": tenant}).result_rows[0]
+        sent_today = int(row[0] or 0)
+        cap = warmup_cap(row[1] if row[1] is not None else None)
+        email_budget["left"] = max(0, cap - sent_today)
+    except Exception as exc:  # noqa: BLE001 - без данных живём без прогрева
+        print(f"[tick] {tenant}: warmup budget unavailable: {type(exc).__name__}",
+              flush=True)
 
     # «подожди»-отказы уже записанные сегодня: повторно не логируем
     retry_logged = _logged_retries_today(client, tenant)
@@ -714,6 +749,15 @@ def tick(client, tenant: str) -> dict[str, int]:
                                         _log_send(client, tenant, cid, identity, i, channel,
                                                   step.get("subject", ""), "rejected", "suppressed")
                                         continue
+                                    if (channel == "email" and cid not in FREQ_EXEMPT
+                                            and email_budget["left"] <= 0):
+                                        # прогрев домена: дневной потолок исчерпан -
+                                        # шаг ждёт завтрашнего бюджета (дуннинг
+                                        # под прогрев не попадает)
+                                        _log_retry(cid, i, identity, "email",
+                                                   step.get("subject", ""), "warmup_cap")
+                                        retry_step = True
+                                        break
                                     if not consent:
                                         _log_send(client, tenant, cid, identity, i, channel,
                                                   step.get("subject", ""), "rejected", "no_consent")
@@ -757,6 +801,8 @@ def tick(client, tenant: str) -> dict[str, int]:
                                                   step.get("subject", ""),
                                                   "dry_run" if detail == "dry_run" else "sent",
                                                   "", pid)
+                                        if channel == "email" and detail != "dry_run":
+                                            email_budget["left"] -= 1
                                         delivered = True
                                         break
                                     # Провайдер лёг или придушил лимитом - касание

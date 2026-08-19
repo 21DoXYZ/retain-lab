@@ -12,6 +12,15 @@ services:
       driver: json-file
       options: {max-size: "50m", max-file: "3"}
 
+  clickhouse:
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./ch_users.d:/etc/clickhouse-server/users.d:ro
+      - ./ch_config.d:/etc/clickhouse-server/config.d:ro
+      # ночные бэкапы (retain_backup.sh, cron 03:30): BACKUP DATABASE сюда
+      - /opt/backups/clickhouse:/backups
+
   redpanda:
     volumes:
       - redpanda_data:/var/lib/redpanda/data
