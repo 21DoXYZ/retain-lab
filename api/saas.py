@@ -275,6 +275,14 @@ def home():
     measured = _measured_costs(tenant)
 
     return api_json({
+        # каждый блок собран в своём try/except (_home_*): упавший кусок
+        # отдаёт None, а не роняет весь дашборд - урок инцидента 08-13
+        'digest': _home_digest(tenant),
+        'series': _home_series(tenant),
+        'funnel': _home_funnel(tenant),
+        'actions': _home_actions(tenant),
+        'machine_week': _home_machine_week(tenant),
+        'people': _home_people(tenant),
         'tenant': tenant,
         'mrr': round(mrr, 2),
         'users_total': sum(stages.values()),
@@ -298,6 +306,196 @@ def home():
                   'offers_ready': _offers_step_done(tenant),
                   'autopilot': _autopilot_resolved(_campaigns_conf(tenant), tenant)},
     })
+
+
+# ── Блоки дашборда владельца: история, тренды, решения ───────────────────────
+# Дашборд отвечает на четыре вопроса собственника: что случилось пока меня не
+# было, куда движется, что машина сделала за меня и что требует МЕНЯ.
+
+def _home_digest(tenant: str) -> dict | None:
+    """«Пока вас не было»: человеческий дайджест за 24 часа."""
+    try:
+        ev = q("""
+            SELECT
+              uniqExactIf(identity_id, event_type = 'signup'),
+              uniqExactIf(identity_id, event_type = 'billing.invoice_paid'),
+              uniqExactIf(identity_id, event_type IN
+                ('billing.subscription_cancelled', 'billing.subscription_cancel_scheduled')),
+              countIf(event_type = 'feedback'
+                      AND JSONExtractString(meta, 'category') IN ('bug', 'complaint')),
+              countIf(event_type = 'support_ticket'),
+              uniqExactIf(identity_id, event_type = 'generation_completed'),
+              countIf(event_type = 'generation_completed'),
+              uniqExactIf(identity_id, event_type = 'checkout_started')
+            FROM saas_events_deduped
+            WHERE tenant_id = {t:String} AND ts >= now() - INTERVAL 1 DAY
+            """, {'t': tenant})[1][0]
+        return {'signups': int(ev[0]), 'new_paying': int(ev[1]),
+                'cancels': int(ev[2]), 'bug_reports': int(ev[3]),
+                'tickets': int(ev[4]), 'creators': int(ev[5]),
+                'generations': int(ev[6]), 'checkouts': int(ev[7])}
+    except Exception as exc:  # noqa: BLE001
+        print(f'[home] {tenant}: digest failed: {exc}', flush=True)
+        return None
+
+
+def _home_series(tenant: str) -> dict | None:
+    """Спарклайны за 14 дней: тренд важнее числа."""
+    try:
+        days = [r for r in q("""
+            SELECT toDate(ts) AS d,
+                   uniqExactIf(identity_id, source IN ('snippet', 'product')),
+                   countIf(event_type = 'generation_completed')
+            FROM saas_events_deduped
+            WHERE tenant_id = {t:String} AND ts >= today() - 13
+            GROUP BY d ORDER BY d
+            """, {'t': tenant})[1]]
+        signup_days = {str(r[0]): int(r[1]) for r in q("""
+            SELECT toDate(first_seen) AS d, count()
+            FROM user_event_features
+            WHERE tenant_id = {t:String} AND first_seen >= today() - 13
+            GROUP BY d
+            """, {'t': tenant})[1]}
+        from datetime import date, timedelta
+        grid = [(date.today() - timedelta(days=13 - i)) for i in range(14)]
+        by_day = {str(r[0]): (int(r[1]), int(r[2])) for r in days}
+        return {
+            'days': [d.strftime('%d.%m') for d in grid],
+            'active': [by_day.get(str(d), (0, 0))[0] for d in grid],
+            'generations': [by_day.get(str(d), (0, 0))[1] for d in grid],
+            'signups': [signup_days.get(str(d), 0) for d in grid],
+        }
+    except Exception as exc:  # noqa: BLE001
+        print(f'[home] {tenant}: series failed: {exc}', flush=True)
+        return None
+
+
+def _home_funnel(tenant: str) -> dict | None:
+    """Воронка до денег: где именно теряются люди. Наши данные позволяют
+    видеть каждый шаг - signup -> проект -> ценность -> оплата."""
+    try:
+        r = q("""
+            SELECT count(),
+                   countIf(coalesce(f.projects_total, 0) > 0),
+                   countIf(coalesce(f.generations_total, 0) > 0),
+                   countIf(ua.sub_status IN ('active', 'past_due'))
+            FROM user_actions ua
+            LEFT JOIN user_event_features f
+              ON f.tenant_id = ua.tenant_id AND f.identity_id = ua.identity_id
+            WHERE ua.tenant_id = {t:String}
+            """, {'t': tenant})[1][0]
+        steps = [int(r[0]), int(r[1]), int(r[2]), int(r[3])]
+        # самый большой обрыв (в людях) - его дашборд подсвечивает красным
+        drops = [steps[i] - steps[i + 1] for i in range(3)]
+        worst = drops.index(max(drops)) if any(drops) else -1
+        return {'steps': steps, 'worst_gap': worst}
+    except Exception as exc:  # noqa: BLE001
+        print(f'[home] {tenant}: funnel failed: {exc}', flush=True)
+        return None
+
+
+def _home_actions(tenant: str) -> list | None:
+    """Очередь «требует вашего решения»: дашборд-пульт, а не витрина."""
+    out = []
+    try:
+        tch = ca.load_tenants().get(tenant, {}) or {}
+
+        pending = int(q(
+            "SELECT count() FROM ai_insights_current WHERE tenant_id = {t:String} "
+            "AND status = 'new'", {'t': tenant})[1][0][0])
+        if pending:
+            out.append({'key': 'insights', 'count': pending, 'href': '/insights'})
+
+        if not _autopilot_resolved(_campaigns_conf(tenant), tenant):
+            waiting = int(q(
+                "SELECT countIf(status = 'active') FROM campaign_enrollments_current "
+                "WHERE tenant_id = {t:String}", {'t': tenant})[1][0][0])
+            out.append({'key': 'autopilot_off', 'count': waiting, 'href': '/campaigns'})
+
+        wa_status = str(tch.get('wa_personal_status') or '')
+        if wa_status and wa_status != 'WORKING':
+            out.append({'key': 'wa_down', 'count': 0, 'href': '/channel-settings'})
+
+        cards = int(q("""
+            SELECT count() FROM card_expiry_current ce
+            JOIN user_actions ua ON ua.tenant_id = {t:String}
+              AND ua.stripe_customer_id = ce.customer_id
+            WHERE ce.tenant_id = {t:String} AND ce.days_to_expiry BETWEEN 0 AND 14
+              AND ua.sub_status IN ('active', 'past_due')
+            """, {'t': tenant})[1][0][0])
+        if cards:
+            out.append({'key': 'cards_expiring', 'count': cards, 'href': '/users'})
+
+        guard = q(
+            "SELECT status FROM pipeline_health WHERE tenant_id = {t:String} "
+            "AND stage = 'ops_guard'", {'t': tenant})[1]
+        if guard and str(guard[0][0]) == 'error':
+            out.append({'key': 'infra', 'count': 0, 'href': '/pipeline'})
+        return out
+    except Exception as exc:  # noqa: BLE001
+        print(f'[home] {tenant}: actions failed: {exc}', flush=True)
+        return out or None
+
+
+def _home_machine_week(tenant: str) -> dict | None:
+    """«Автопилот за неделю»: что машина сделала за владельца."""
+    try:
+        t = q("""
+            SELECT countIf(status IN ('sent', 'queued')),
+                   countIf(status = 'dry_run'),
+                   countIf(status = 'rejected')
+            FROM campaign_send_log
+            WHERE tenant_id = {t:String} AND ts >= now() - INTERVAL 7 DAY
+            """, {'t': tenant})[1][0]
+        shown = int(q(
+            "SELECT count() FROM saas_events_deduped WHERE tenant_id = {t:String} "
+            "AND event_type = 'inapp_shown' AND ts >= now() - INTERVAL 7 DAY",
+            {'t': tenant})[1][0][0])
+        offers = q("""
+            SELECT countIf(status IN ('issued', 'dry_run')), countIf(status = 'rejected')
+            FROM offers_issued
+            WHERE tenant_id = {t:String} AND issued_at >= now() - INTERVAL 7 DAY
+            """, {'t': tenant})[1][0]
+        uplift = _flt(q(
+            "SELECT coalesce(sum(inc), 0) FROM ("
+            "  SELECT campaign_id, argMax(incremental_usd, computed_at) AS inc"
+            "  FROM uplift_reports WHERE tenant_id = {t:String} GROUP BY campaign_id)",
+            {'t': tenant})[1][0][0])
+        return {'sent': int(t[0]), 'dry_run': int(t[1]), 'rejected': int(t[2]),
+                'inapp_shown': shown, 'offers_issued': int(offers[0]),
+                'offers_rejected': int(offers[1]),
+                'uplift_usd': round(uplift, 2)}
+    except Exception as exc:  # noqa: BLE001
+        print(f'[home] {tenant}: machine failed: {exc}', flush=True)
+        return None
+
+
+def _home_people(tenant: str) -> dict | None:
+    """На кого смотреть сегодня: деньги под риском и горячие к покупке."""
+    try:
+        def _rows(sql):
+            return [{'identity_id': r[0],
+                     'email': r[1] or r[2] or str(r[0])[:8],
+                     'mrr': round(_flt(r[3]), 0), 'score': round(_flt(r[4]), 2)}
+                    for r in q(sql, {'t': tenant})[1]]
+        at_risk = _rows("""
+            SELECT identity_id, email_norm, client_user_id, toFloat64(mrr),
+                   coalesce(p_churn, 0)
+            FROM user_actions WHERE tenant_id = {t:String}
+              AND sub_status IN ('active', 'past_due') AND coalesce(p_churn, 0) >= 0.2
+            ORDER BY value_at_stake DESC, p_churn DESC LIMIT 5""")
+        hot = _rows("""
+            SELECT identity_id, email_norm, client_user_id, toFloat64(mrr),
+                   greatest(coalesce(buy_intent, 0), coalesce(burn_rate, 0))
+            FROM user_actions WHERE tenant_id = {t:String}
+              AND (coalesce(buy_intent, 0) >= 0.3 OR coalesce(burn_rate, 0) >= 0.6)
+            ORDER BY 5 DESC LIMIT 5""")
+        if not at_risk and not hot:
+            return None
+        return {'at_risk': at_risk, 'hot': hot}
+    except Exception as exc:  # noqa: BLE001
+        print(f'[home] {tenant}: people failed: {exc}', flush=True)
+        return None
 
 
 def _autopilot_blockers(tenant: str) -> list:

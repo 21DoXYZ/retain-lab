@@ -12,7 +12,7 @@ import { Banner, Card, Icon, SCard, SCardGrid } from "@/components/ui";
  * Данные - один вызов GET /api/v1/saas/home (+ leak-audit для headline).
  */
 
-interface HomeData {
+interface HomeData extends HomeExtras {
   mrr: number;
   users_total: number;
   stages: Record<string, number>;
@@ -34,6 +34,40 @@ interface HomeData {
 
 interface LeakData {
   headline_monthly_leak: number;
+}
+
+interface HomeExtras {
+  digest?: {
+    signups: number; new_paying: number; cancels: number; bug_reports: number;
+    tickets: number; creators: number; generations: number; checkouts: number;
+  } | null;
+  series?: { days: string[]; active: number[]; generations: number[]; signups: number[] } | null;
+  funnel?: { steps: number[]; worst_gap: number } | null;
+  actions?: { key: string; count: number; href: string }[] | null;
+  machine_week?: {
+    sent: number; dry_run: number; rejected: number; inapp_shown: number;
+    offers_issued: number; offers_rejected: number; uplift_usd: number;
+  } | null;
+  people?: {
+    at_risk: { identity_id: string; email: string; mrr: number; score: number }[];
+    hot: { identity_id: string; email: string; mrr: number; score: number }[];
+  } | null;
+}
+
+/** Мини-график: тренд важнее числа. Чистый SVG, без библиотек. */
+function Sparkline({ data, tone }: { data: number[]; tone?: "pos" | "ink" }) {
+  const w = 120, h = 28;
+  const max = Math.max(...data, 1);
+  const pts = data
+    .map((v, i) => `${(i / (data.length - 1)) * w},${h - 3 - (v / max) * (h - 6)}`)
+    .join(" ");
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block" aria-hidden>
+      <polyline points={pts} fill="none" strokeWidth="1.5"
+                className={tone === "pos" ? "stroke-pos" : "stroke-primary"}
+                strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function usd(n: number | undefined): string {
@@ -108,6 +142,88 @@ export function HomeView() {
         <p className="text-[13px] text-steel">{t("saas.home.noData")}</p>
       ) : null}
 
+      {/* Очередь решений: дашборд-пульт, а не витрина. Каждая строка - кнопка */}
+      {data?.actions?.length ? (
+        <div className="rounded-card border border-[#fedf89] bg-[#fffcf5] p-4">
+          <div className="mb-2.5 text-[13px] font-semibold text-ink">
+            {t("saas.home.act.title", { n: data.actions.length })}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {data.actions.map((a) => (
+              <Link key={a.key} href={a.href}
+                className="group flex items-center justify-between gap-3 rounded-ctl border border-transparent px-2 py-1.5 transition-colors hover:border-hair2 hover:bg-canvas">
+                <span className="text-[13px] text-slate">
+                  {t(`saas.home.act.${a.key}` as MessageKey, { n: a.count })}
+                </span>
+                <span className="text-[12px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                  {t("saas.home.act.open")} &rarr;
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* «Пока вас не было»: сутки продукта пятью строками */}
+      {data?.digest ? (
+        <Card className="p-4">
+          <div className="mb-2 text-[13px] font-semibold text-ink">{t("saas.home.dg.title")}</div>
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-slate">
+            <span>{t("saas.home.dg.signups", { n: data.digest.signups })}</span>
+            <span>{t("saas.home.dg.creators", { n: data.digest.creators, g: data.digest.generations })}</span>
+            {data.digest.new_paying ? (
+              <span className="font-medium text-pos">{t("saas.home.dg.paying", { n: data.digest.new_paying })}</span>
+            ) : null}
+            {data.digest.checkouts ? (
+              <span>{t("saas.home.dg.checkouts", { n: data.digest.checkouts })}</span>
+            ) : null}
+            {data.digest.cancels ? (
+              <span className="font-medium text-neg">{t("saas.home.dg.cancels", { n: data.digest.cancels })}</span>
+            ) : null}
+            {data.digest.bug_reports || data.digest.tickets ? (
+              <span className="text-[#b54708]">
+                {t("saas.home.dg.support", { b: data.digest.bug_reports, tk: data.digest.tickets })}
+              </span>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
+      {/* Воронка до денег: где именно теряются люди */}
+      {data?.funnel && data.funnel.steps[0] > 0 ? (
+        <Card className="p-4">
+          <div className="mb-3 text-[13px] font-semibold text-ink">{t("saas.home.fn.title")}</div>
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-stretch sm:gap-0">
+            {data.funnel.steps.map((n, i) => {
+              const prev = i === 0 ? n : data.funnel!.steps[i - 1];
+              const pct = i === 0 ? 100 : prev ? Math.round((n / prev) * 100) : 0;
+              const isWorst = data.funnel!.worst_gap === i - 1 && i > 0;
+              return (
+                <div key={i} className="flex flex-1 items-center gap-1.5 sm:gap-0">
+                  {i > 0 ? (
+                    <div className={"px-2 font-mono text-[11px] " + (isWorst ? "font-semibold text-neg" : "text-steel")}>
+                      {pct}%&rarr;
+                    </div>
+                  ) : null}
+                  <div className={"flex-1 rounded-ctl border px-3 py-2.5 " +
+                    (isWorst ? "border-[#fecdca] bg-[#fef3f2]" : "border-hair bg-surface")}>
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-steel">
+                      {t(`saas.home.fn.s${i}` as MessageKey)}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[17px] font-semibold text-ink">{n}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {data.funnel.worst_gap >= 0 ? (
+            <p className="mt-2.5 text-[12px] text-steel">
+              {t(`saas.home.fn.gap${data.funnel.worst_gap}` as MessageKey)}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
       {/* Живой пульс: клик по плитке ведёт в /users с уже включённым срезом */}
       {data?.pulse ? (
         <div>
@@ -125,16 +241,19 @@ export function HomeView() {
             <div className="rounded-card border border-hair2 bg-canvas px-4 py-3.5">
               <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.pulse.activeToday")}</div>
               <div className="mt-1 font-mono text-[20px] font-semibold text-ink">{data.pulse.active_today}</div>
+              {data.series ? <div className="mt-1"><Sparkline data={data.series.active} /></div> : null}
               <div className="text-[11px] text-steel">{t("saas.home.pulse.active7d", { n: data.pulse.active_7d })}</div>
             </div>
             <div className="rounded-card border border-hair2 bg-canvas px-4 py-3.5">
               <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.pulse.signups7d")}</div>
               <div className="mt-1 font-mono text-[20px] font-semibold text-ink">{data.pulse.signups_7d}</div>
+              {data.series ? <div className="mt-1"><Sparkline data={data.series.signups} tone="pos" /></div> : null}
               <div className="text-[11px] text-steel">{t("saas.home.pulse.payTrial", { p: data.pulse.paying, tr: data.pulse.trialing })}</div>
             </div>
             <div className="rounded-card border border-hair2 bg-canvas px-4 py-3.5">
               <div className="text-[11px] font-medium uppercase tracking-wide text-steel">{t("saas.home.pulse.gens")}</div>
               <div className="mt-1 font-mono text-[20px] font-semibold text-ink">{data.pulse.generations_today}</div>
+              {data.series ? <div className="mt-1"><Sparkline data={data.series.generations} /></div> : null}
               <div className="text-[11px] text-steel">{t("saas.home.pulse.gens7d", { n: data.pulse.generations_7d })}</div>
             </div>
           </div>
@@ -174,6 +293,57 @@ export function HomeView() {
           </div>
           <p className="mt-3 text-[12px] text-steel">{t("saas.home.measured.note")}</p>
         </Card>
+      ) : null}
+
+      {/* «Автопилот за неделю»: что машина сделала за владельца */}
+      {data?.machine_week ? (
+        <Card className="p-4">
+          <div className="mb-2.5 text-[13px] font-semibold text-ink">{t("saas.home.mw.title")}</div>
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-slate">
+            <span>{t("saas.home.mw.touches", {
+              n: data.machine_week.sent + data.machine_week.dry_run })}</span>
+            {data.machine_week.inapp_shown ? (
+              <span>{t("saas.home.mw.inapp", { n: data.machine_week.inapp_shown })}</span>
+            ) : null}
+            <span>{t("saas.home.mw.offers", {
+              i: data.machine_week.offers_issued, r: data.machine_week.offers_rejected })}</span>
+            <span>{t("saas.home.mw.guarded", { n: data.machine_week.rejected })}</span>
+            {data.machine_week.uplift_usd > 0 ? (
+              <span className="font-semibold text-pos">
+                {t("saas.home.mw.uplift", { a: usd(data.machine_week.uplift_usd) })}
+              </span>
+            ) : null}
+          </div>
+          {data.machine_week.sent === 0 && data.machine_week.dry_run > 0 ? (
+            <p className="mt-2 text-[12px] text-[#b54708]">{t("saas.home.mw.dryNote")}</p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {/* На кого смотреть сегодня */}
+      {data?.people ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([["at_risk", data.people.at_risk], ["hot", data.people.hot]] as const)
+            .filter(([, list]) => list.length)
+            .map(([key, list]) => (
+            <Card key={key} className="p-4">
+              <div className="mb-2 text-[13px] font-semibold text-ink">
+                {t(`saas.home.pp.${key}` as MessageKey)}
+              </div>
+              <div className="flex flex-col">
+                {list.map((p) => (
+                  <Link key={p.identity_id} href={`/users/${encodeURIComponent(p.identity_id)}`}
+                    className="flex items-center justify-between gap-3 border-b border-hair py-1.5 text-[13px] last:border-0 hover:text-primary">
+                    <span className="min-w-0 truncate text-slate">{p.email}</span>
+                    <span className="flex-none font-mono text-[12px] text-steel">
+                      {p.mrr > 0 ? `$${p.mrr} · ` : ""}{Math.round(p.score * 100)}%
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
       ) : null}
 
       {!loading && goliveDone < golive.length ? (
