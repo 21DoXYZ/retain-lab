@@ -764,3 +764,16 @@ def test_ab_winner_applies_over_conf_but_owner_edit_wins():
     conf["campaigns"][0]["steps"][1]["subject"] = "owner"
     out2 = apply_ab_winners(conf, {"K1#1": {"patch": {"subject": "B"}}})
     assert out2["campaigns"][0]["steps"][1]["subject"] == "owner"
+
+
+def test_warmup_modes():
+    """Тёплая база (свои юзеры) греется в разы быстрее холодной; off - без
+    потолка вовсе (осознанный выбор владельца)."""
+    from campaign_tick import warmup_cap
+    assert warmup_cap(None, "fast") == 60         # день 1
+    assert warmup_cap(2, "fast") == 150
+    assert warmup_cap(5, "fast") == 300
+    assert warmup_cap(10, "fast") == 10_000       # прогрев пройден за неделю
+    assert warmup_cap(0, "safe") == 20
+    assert warmup_cap(0, "off") == 10_000
+    assert warmup_cap(0, "мусор") == 60           # неизвестный режим = fast

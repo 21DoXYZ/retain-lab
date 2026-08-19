@@ -385,18 +385,25 @@ RETRY_REASONS = ("quiet_hours", "freq_cap_day", "freq_cap_week",
                  "awaiting_retry", "warmup_cap")
 
 # ПРОГРЕВ ДОМЕНА. Свежий отправитель, у которого в первый день уходит сотня
-# писем с нулевой историей - спам-паттерн для Gmail: репутация портится на
-# недели. Дневной потолок растёт с возрастом канала (дни с ПЕРВОЙ реальной
-# отправки): 20 -> 40 -> 80 -> 150, дальше без прогрева. Дуннинг (FREQ_EXEMPT)
-# под потолок не попадает - сервисные письма о сломанной оплате не ждут.
-WARMUP_SCHEDULE = ((2, 20), (4, 40), (7, 80), (14, 150))
+# писем с нулевой историей - спам-паттерн для Gmail. Но темп зависит от того,
+# КОМУ шлём: своим зарегистрированным юзерам (тёплая база, домен уже живёт на
+# Google, IP у Resend прогретые) можно в разы быстрее, чем холодной базе.
+# Режим - tenants.json email_warmup: 'safe' | 'fast' (деф.) | 'off'.
+# Дуннинг (FREQ_EXEMPT) под потолок не попадает в любом режиме.
+WARMUP_SCHEDULES = {
+    "safe": ((2, 20), (4, 40), (7, 80), (14, 150)),     # холодная/чужая база
+    "fast": ((1, 60), (3, 150), (7, 300)),              # свои юзеры (деф.)
+}
 
 
-def warmup_cap(days_since_first_send: int | None) -> int:
-    """Потолок писем в день. 0 дней истории = самый строгий. None (ещё ни
-    одной отправки) = первый день."""
+def warmup_cap(days_since_first_send: int | None, mode: str = "fast") -> int:
+    """Потолок писем в день. None (ещё ни одной отправки) = первый день.
+    'off' - потолка нет вовсе (осознанный выбор владельца)."""
+    if mode == "off":
+        return 10_000
+    schedule = WARMUP_SCHEDULES.get(mode, WARMUP_SCHEDULES["fast"])
     days = 0 if days_since_first_send is None else int(days_since_first_send)
-    for upto, cap in WARMUP_SCHEDULE:
+    for upto, cap in schedule:
         if days < upto:
             return cap
     return 10_000                        # прогрев пройден
@@ -550,7 +557,8 @@ def tick(client, tenant: str) -> dict[str, int]:
             "WHERE tenant_id = %(t)s AND action = 'email' AND status = 'sent'",
             parameters={"t": tenant}).result_rows[0]
         sent_today = int(row[0] or 0)
-        cap = warmup_cap(row[1] if row[1] is not None else None)
+        cap = warmup_cap(row[1] if row[1] is not None else None,
+                         str(_tch.get("email_warmup") or "fast"))
         email_budget["left"] = max(0, cap - sent_today)
     except Exception as exc:  # noqa: BLE001 - без данных живём без прогрева
         print(f"[tick] {tenant}: warmup budget unavailable: {type(exc).__name__}",
