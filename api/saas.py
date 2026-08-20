@@ -87,8 +87,6 @@ def leak_audit():
     # Триал живёт не только в Stripe: у продуктов с экспортом «триал» - это
     # план в САМОМ продукте. Мёртвый триал по-продуктовому: человек РЕАЛЬНО
     # пробовал (есть ценные действия), аккаунту 14+ дней, платить не начал.
-    # Потенциал деньгами не выдумываем - конверсию триала мы ещё не измерили,
-    # поэтому продуктовые триалы добавляют СЧЁТ, а не сумму.
     product_trials = int(q(
         """
         SELECT count() FROM user_actions ua
@@ -100,6 +98,20 @@ def leak_audit():
           AND f.first_seen <= now() - INTERVAL 14 DAY
         """, {'t': tenant})[1][0][0])
     dead_count += product_trials
+
+    # Деньги мёртвых триалов - ТОЛЬКО по измеренной конверсии (scoring пишет
+    # trial_conv в lifecycle_measured): count x средний чек x конверсия.
+    # Замера нет - показываем счёт без суммы, а не выдумку.
+    if product_trials:
+        try:
+            from stripe_sync.knowledge import load as _kb
+            lc = _kb(_ch_direct(), tenant, 'lifecycle_measured')
+            conv = lc.get('trial_conv')
+            avgp = _flt(lc.get('avg_price'))
+            if conv is not None and avgp > 0:
+                dead_mrr += round(product_trials * avgp * float(conv), 2)
+        except Exception:  # noqa: BLE001
+            pass
 
     silent = q(
         """
@@ -1521,6 +1533,61 @@ def _autopilot_resolved(conf: dict, tenant: str) -> bool:
     return bool(conf.get('autopilot'))
 
 
+def _ab_stats(tenant: str, cid: str, step_idx: int, variants: list) -> dict:
+    """Статистика A/B шага для экрана: отправки/открытия/клики по вариантам.
+
+    Вариант юзера восстанавливается тем же хэшем, что его назначал движок
+    (pick_variant) - хранить назначение не нужно. dry_run считаем отдельно:
+    до включения автопилота владелец видит, что сплит уже делит людей."""
+    from stripe_sync.ab_winner import winner as _winner
+
+    # тот же хэш, что назначает вариант в движке (campaign_tick.pick_variant);
+    # сам campaign_tick борду не импортировать - он flat-only (executors)
+    import hashlib as _hl2
+
+    def pick_variant(identity: str, campaign_id: str, step_idx_: int, n_: int) -> int:
+        if n_ <= 1:
+            return 0
+        seed = f"{campaign_id}:{step_idx_}:{identity}".encode()
+        return int(_hl2.md5(seed).hexdigest()[:8], 16) % n_
+
+    n = len(variants)
+    sent_rows = q("""
+        SELECT identity_id, countIf(status = 'sent'), countIf(status = 'dry_run')
+        FROM campaign_send_log
+        WHERE tenant_id = {t:String} AND campaign_id = {c:String}
+          AND step_idx = {i:UInt32} AND action = 'email'
+          AND status IN ('sent', 'dry_run')
+        GROUP BY identity_id
+        """, {'t': tenant, 'c': cid, 'i': step_idx})[1]
+    emails = {r[0]: str(r[1] or '').lower() for r in q(
+        "SELECT identity_id, email_norm FROM identities_current "
+        "WHERE tenant_id = {t:String}", {'t': tenant})[1]}
+    engaged = {}
+    for r in q("""
+        SELECT lower(address), event_type FROM email_events
+        WHERE tenant_id = {t:String} AND campaign_id = {c:String}
+          AND step_idx = {i:UInt32} AND event_type IN ('opened', 'clicked')
+        """, {'t': tenant, 'c': cid, 'i': step_idx})[1]:
+        engaged.setdefault(str(r[0]), set()).add(str(r[1]))
+
+    stats = [{'sent': 0, 'dry': 0, 'opened': 0, 'clicked': 0} for _ in range(n)]
+    for ident, sent, dry in sent_rows:
+        k = pick_variant(ident, cid, step_idx, n)
+        stats[k]['sent'] += int(sent)
+        stats[k]['dry'] += int(dry)
+        ev = engaged.get(emails.get(ident, ''), set())
+        if int(sent):
+            stats[k]['opened'] += 1 if 'opened' in ev or 'clicked' in ev else 0
+            stats[k]['clicked'] += 1 if 'clicked' in ev else 0
+
+    win = _winner({k: {'sent': s['sent'], 'clicked': s['clicked']}
+                   for k, s in enumerate(stats)})
+    return {'variants': [{'subject': str((v or {}).get('subject') or ''),
+                          **stats[k]} for k, v in enumerate(variants)],
+            'winner': win}
+
+
 def _campaigns_payload(tenant: str) -> dict:
     conf = _campaigns_conf(tenant)
 
@@ -1578,6 +1645,18 @@ def _campaigns_payload(tenant: str) -> dict:
         'status': str(c.get('status') or 'active'),
         'audience_note': str(c.get('audience_note') or ''),
     } for c in conf.get('campaigns', [])]
+
+    # A/B: статистика вариантов у шагов, где сплит объявлен
+    for c_out, c_in in zip(campaigns, conf.get('campaigns', [])):
+        for idx, (s_out, s_in) in enumerate(zip(c_out['steps'],
+                                                c_in.get('steps', []))):
+            variants = s_in.get('variants') or []
+            if len(variants) >= 2 and not s_in.get('variants_off'):
+                try:
+                    s_out['ab'] = _ab_stats(tenant, c_out['campaign_id'],
+                                            idx, variants)
+                except Exception as exc:  # noqa: BLE001 - статистика не роняет экран
+                    print(f'[campaigns] {tenant}: ab stats failed: {exc}', flush=True)
 
     import os as _os3
     platform_dry = _os3.environ.get('SIGNALS_DRY_RUN', '1') not in ('0', 'false', 'False', '')

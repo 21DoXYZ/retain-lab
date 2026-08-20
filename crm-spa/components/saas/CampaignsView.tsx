@@ -15,7 +15,16 @@ import Link from "next/link";
  * GET /api/v1/saas/campaigns, POST /api/v1/saas/campaigns/autopilot.
  */
 
+interface AbVariant {
+  subject: string;
+  sent: number;
+  dry: number;
+  opened: number;
+  clicked: number;
+}
+
 interface Step {
+  ab?: { variants: AbVariant[]; winner: number | null };
   delay_h: number;
   action: string;
   channel: string;
@@ -183,6 +192,43 @@ function StepRow({
         {!editing && step.body && (
           <p className="mt-0.5 text-[12.5px] leading-relaxed text-steel">{step.body}</p>
         )}
+
+        {/* A/B: петля замкнута визуально - владелец видит, какой текст побеждает */}
+        {!editing && step.ab ? (
+          <div className="mt-2 flex flex-col gap-1 rounded-ctl border border-hair bg-canvas p-2.5">
+            <div className="text-[10.5px] font-semibold uppercase tracking-wide text-steel">
+              {t("saas.camp.ab.title")}
+            </div>
+            {step.ab.variants.map((v, k) => {
+              const rate = (n: number) => (v.sent ? Math.round((n / v.sent) * 100) + "%" : "-");
+              const isWin = step.ab!.winner === k;
+              return (
+                <div key={k} className="flex items-center gap-2 text-[12px]">
+                  <span className={"w-4 flex-none text-center font-mono font-bold " +
+                    (isWin ? "text-pos" : "text-steel")}>
+                    {String.fromCharCode(65 + k)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-slate" title={v.subject}>
+                    {v.subject}
+                  </span>
+                  <span className="flex-none font-mono text-[11.5px] text-steel">
+                    {v.sent > 0
+                      ? t("saas.camp.ab.stats", { s: v.sent, o: rate(v.opened), c: rate(v.clicked) })
+                      : t("saas.camp.ab.dryOnly", { d: v.dry })}
+                  </span>
+                  {isWin ? (
+                    <span className="flex-none rounded-full border border-[#abefc6] bg-[#ecfdf3] px-1.5 py-0.5 text-[10px] font-semibold text-pos">
+                      {t("saas.camp.ab.winner")}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+            {step.ab.winner === null ? (
+              <div className="text-[11px] text-steel">{t("saas.camp.ab.collecting")}</div>
+            ) : null}
+          </div>
+        ) : null}
 
         {editing && (
           <div className="mt-2 flex flex-col gap-2">

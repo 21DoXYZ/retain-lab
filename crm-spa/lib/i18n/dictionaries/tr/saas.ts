@@ -142,6 +142,11 @@ export const saas: Partial<Messages> = {
   "saas.offers.no": "",
 
   "saas.camp.title": "",
+  "saas.camp.ab.title": "",
+  "saas.camp.ab.stats": "",
+  "saas.camp.ab.dryOnly": "",
+  "saas.camp.ab.winner": "",
+  "saas.camp.ab.collecting": "",
   "saas.launch.title": "",
   "saas.launch.lead": "",
   "saas.launch.confirm": "",

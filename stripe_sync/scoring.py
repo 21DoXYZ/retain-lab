@@ -59,8 +59,30 @@ def tenant_lifecycle(client, tenant: str) -> dict:
         parameters={"t": tenant}).result_rows
     avg_price = float(price_rows[0][0] or 0) if price_rows else 0.0
 
+    # ИЗМЕРЕННАЯ конверсия триала: доля СОЗРЕВШЕЙ когорты (аккаунту 14+
+    # дней - триал успел прожить), которая стала платить. Ею leak-audit
+    # оценивает мёртвые триалы в деньгах вместо «не знаем». Меньше 50
+    # созревших - честный None, не выдумываем.
+    conv = None
+    try:
+        r = client.query("""
+            SELECT countIf(ua.sub_status IN ('active', 'past_due')), count()
+            FROM retention.user_actions ua
+            LEFT JOIN retention.user_event_features f
+              ON f.tenant_id = ua.tenant_id AND f.identity_id = ua.identity_id
+            WHERE ua.tenant_id = %(t)s
+              AND toUnixTimestamp(f.first_seen) > 0
+              AND f.first_seen <= now() - INTERVAL 14 DAY
+            """, parameters={"t": tenant}).result_rows[0]
+        matured = int(r[1] or 0)
+        if matured >= 50:
+            conv = round(int(r[0] or 0) / matured, 4)
+    except Exception:  # noqa: BLE001 - замер опционален
+        pass
+
     return {"base_churn_m": base, "obs_months": obs, "avg_price": avg_price,
-            "churned": churned, "sub_months": round(sub_months, 1)}
+            "churned": churned, "sub_months": round(sub_months, 1),
+            "trial_conv": conv}
 
 FEATURE_QUERY = """
 SELECT

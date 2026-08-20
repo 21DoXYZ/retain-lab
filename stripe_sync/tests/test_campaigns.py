@@ -777,3 +777,13 @@ def test_warmup_modes():
     assert warmup_cap(0, "safe") == 20
     assert warmup_cap(0, "off") == 10_000
     assert warmup_cap(0, "мусор") == 60           # неизвестный режим = fast
+
+
+def test_pick_variant_hash_is_a_frozen_contract():
+    """Хэш назначения варианта продублирован в борде (api._ab_stats) - flat-only
+    модуль борду не импортировать. Золотые значения замораживают контракт:
+    поменяется формула - статистика A/B разъедется с реальной раздачей."""
+    from campaign_tick import pick_variant
+    assert pick_variant("id1", "K1", 0, 2) == 1
+    assert pick_variant("id2", "K1", 0, 2) == 0
+    assert pick_variant("u-42", "K1_activation", 1, 3) == 1

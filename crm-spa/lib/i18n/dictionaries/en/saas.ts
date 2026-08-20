@@ -145,6 +145,11 @@ export const saas: Partial<Messages> = {
   "saas.offers.no": "no",
 
   "saas.camp.title": "Campaigns",
+  "saas.camp.ab.title": "A/B test",
+  "saas.camp.ab.stats": "{s} sent · {o} opened · {c} clicked",
+  "saas.camp.ab.dryOnly": "{d} dry-run - real stats start with the autopilot",
+  "saas.camp.ab.winner": "Winner",
+  "saas.camp.ab.collecting": "Collecting data - the winner locks in automatically (30+ sends per variant, 20%+ lead)",
   "saas.launch.title": "Pre-flight check",
   "saas.launch.lead": "Everything that must be true before real people get real messages. Green checks are verified by code; the rest you confirm yourself.",
   "saas.launch.confirm": "Done, confirm",
