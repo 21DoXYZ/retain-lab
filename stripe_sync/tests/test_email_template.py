@@ -31,9 +31,20 @@ def test_rendered_email_has_everything_a_letter_needs():
                   "https://retivo.digital/public/unsubscribe?t=1",
                   brand="Hub Content", cta_label="Update card", brand_color="#f21d32")
     assert "Update card" in html and "unsubscribe" in html.lower()
-    assert "Hub Content" in html and "#f21d32" in html
+    # человеческий стиль: бренд-шапки больше НЕТ (нотификационная обвязка
+    # ссылала письмо во вкладку Updates) - бренд живёт в подписи
+    assert "#f21d32" in html
     assert "display:none" in html                 # строка предпросмотра
-    assert "<img" not in html and "http://cdn" not in html   # без внешних ресурсов
+    assert "http://cdn" not in html               # никаких чужих ресурсов
+
+    signed = render("s", "b", "https://u.x", brand_color="#f21d32",
+                    signature={"name": "Michael McKonnor",
+                               "role": "Customer Success",
+                               "company": "Hubcontent",
+                               "site": "https://hubcontent.ai"})
+    assert "Michael McKonnor" in signed and "Customer Success" in signed
+    assert 'href="https://hubcontent.ai"' in signed
+    assert "MM" in signed                         # круг с инициалами без фото
 
 
 def test_html_is_escaped_and_bad_colour_is_ignored():

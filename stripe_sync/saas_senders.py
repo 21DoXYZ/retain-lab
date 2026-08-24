@@ -35,6 +35,9 @@ class EmailConfig:
     brand: str = ""              # имя продукта в подвале письма
     brand_color: str = ""        # цвет кнопки/акцентов (#rrggbb из tenants.json)
     logo_url: str = ""           # логотип в шапке письма (https, опционально)
+    # корпоративная подпись живого человека (email_identity в tenants.json):
+    # {name, role, company, avatar_url, site}; None - выводится из email_from
+    identity: dict | None = None
 
     @classmethod
     def from_env(cls) -> "EmailConfig":
@@ -82,19 +85,25 @@ def send_email(to: str, subject: str, body: str, cfg: EmailConfig,
         return False, "email_not_configured"
 
     try:
-        from email_delivery import build_email_payload, unsub_url, with_signature
+        from email_delivery import (build_email_payload, signature_block,
+                                    unsub_url)
     except ImportError:
         from stripe_sync.email_delivery import (build_email_payload,  # type: ignore
-                                                unsub_url, with_signature)
+                                                signature_block, unsub_url)
 
-    # человеческая подпись из отправителя («Michael / Hubcontent»); если
-    # автор текста подписался сам - не дублируем
-    body_r = with_signature(body_r, cfg.email_from, cfg.brand)
+    # корпоративная подпись: конфиг тенанта, фолбэк - вывод из отправителя
+    sig = dict(cfg.identity or {})
+    if not sig.get("name"):
+        derived = signature_block(cfg.email_from, cfg.brand)
+        parts = derived.split("\n") if derived else []
+        sig = {"name": parts[0] if parts else "",
+               "company": parts[1] if len(parts) > 1 else cfg.brand}
     unsub = unsub_url(cfg.saas_host or "retivo.digital", cfg.tenant_id or "", to)
     payload = json.dumps(build_email_payload(
         to, subject_r, body_r, cfg.email_from, unsub, cfg.brand,
         cta_label=str((ctx or {}).get("cta_label") or ""),
-        brand_color=cfg.brand_color, logo_url=cfg.logo_url)).encode()
+        brand_color=cfg.brand_color, logo_url=cfg.logo_url,
+        signature=sig)).encode()
     req = urllib.request.Request(
         "https://api.resend.com/emails", data=payload, method="POST",
         headers={"Content-Type": "application/json",
@@ -389,6 +398,8 @@ def tenant_configs(tenant_id: str, email_cfg: EmailConfig,
         email_cfg = replace(email_cfg, resend_api_key=str(tc["resend_api_key"]))
     if tc.get("email_from"):
         email_cfg = replace(email_cfg, email_from=str(tc["email_from"]))
+    if tc.get("email_identity"):
+        email_cfg = replace(email_cfg, identity=dict(tc["email_identity"]))
     msg_over = {}
     for src, dst in (("sms_sender", "sms_sender"), ("viber_sender", "viber_sender"),
                      ("telegram_bot_token", "telegram_bot_token"),

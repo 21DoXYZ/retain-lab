@@ -121,19 +121,31 @@ def with_signature(body: str, email_from: str, brand: str = "") -> str:
 
 def build_email_payload(to: str, subject: str, body: str, email_from: str,
                         unsubscribe: str, brand: str = "", cta_label: str = "",
-                        brand_color: str = "", logo_url: str = "") -> dict:
+                        brand_color: str = "", logo_url: str = "",
+                        signature: dict | None = None) -> dict:
     """Тело запроса к Resend: и HTML, и текст (клиенты без HTML), плюс
-    заголовки отписки - их читают Gmail/Outlook и показывают свою кнопку."""
+    заголовки отписки - их читают Gmail/Outlook и показывают свою кнопку.
+
+    body сюда приходит БЕЗ подписи: HTML получает корпоративный блок
+    (фото/имя/роль/компания), текстовая версия - плоскую подпись."""
     try:                                    # борд импортирует пакетом, джобы плоско
         from email_template import render
     except ImportError:
         from stripe_sync.email_template import render
+    sig = signature or {}
+    plain_sig = "\n".join(x for x in (
+        str(sig.get("name") or "").strip(),
+        " · ".join(s for s in (str(sig.get("role") or "").strip(),
+                               str(sig.get("company") or "").strip()) if s),
+        str(sig.get("site") or "").strip()) if x)
+    text = body.strip() + (f"\n\n{plain_sig}" if plain_sig else "")
     return {
         "from": email_from,
         "to": [to],
         "subject": subject,
-        "html": render(subject, body, unsubscribe, brand, cta_label, brand_color, logo_url),
-        "text": f"{body.strip()}\n\n---\nUnsubscribe: {unsubscribe}",
+        "html": render(subject, body, unsubscribe, brand, cta_label,
+                       brand_color, logo_url, signature=sig),
+        "text": f"{text}\n\n---\nUnsubscribe: {unsubscribe}",
         "headers": {
             "List-Unsubscribe": f"<{unsubscribe}>",
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
