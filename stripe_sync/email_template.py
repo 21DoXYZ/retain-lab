@@ -68,39 +68,63 @@ def _safe_logo(raw: str) -> str:
 
 
 def signature_html(sig: dict, color: str) -> str:
-    """Корпоративная подпись как у живого человека в Gmail: фото (или круг с
-    инициалами), имя жирным, роль, компания-ссылка. Всё инлайном, одна
-    строка таблицы - переживает любой почтовик."""
+    """Корпоративная подпись: прощание («Best,»), фото, вертикальная
+    брендовая линия, имя / роль / компания / сайт / почта - классический
+    деловой блок, как у людей из настоящих компаний. Всё инлайном, таблицы -
+    переживает любой почтовик."""
     name = _html.escape(str(sig.get("name") or "").strip())
     if not name:
         return ""
     role = _html.escape(str(sig.get("role") or "").strip())
     company = _html.escape(str(sig.get("company") or "").strip())
     site = str(sig.get("site") or "").strip()
+    email = _html.escape(str(sig.get("email") or "").strip())
+    closing = _html.escape(str(sig.get("closing") or "Best,").strip())
     avatar = _safe_logo(str(sig.get("avatar_url") or ""))
 
     if avatar:
-        photo = (f'<img src="{avatar}" width="44" height="44" alt="{name}" '
-                 'style="display:block;border-radius:50%;border:0">')
+        photo = (f'<img src="{avatar}" width="56" height="56" alt="{name}" '
+                 'style="display:block;border-radius:50%;border:0;'
+                 'object-fit:cover">')
     else:
         initials = "".join(w[0] for w in name.split()[:2]).upper()
-        photo = (f'<div style="width:44px;height:44px;border-radius:50%;'
+        photo = (f'<div style="width:56px;height:56px;border-radius:50%;'
                  f'background:{color};color:#ffffff;font-weight:700;'
-                 'font-size:17px;line-height:44px;text-align:center">'
+                 'font-size:20px;line-height:56px;text-align:center">'
                  f'{initials}</div>')
 
-    company_html = company
-    if company and site.lower().startswith("https://"):
-        company_html = (f'<a href="{site}" style="color:#667085;'
-                        f'text-decoration:none">{company}</a>')
-    line2 = " · ".join(x for x in (role, company_html) if x)
+    site_disp = site.replace("https://", "").replace("http://", "").rstrip("/")
+    links = []
+    if site.lower().startswith("https://"):
+        links.append(f'<a href="{site}" style="color:{color};font-weight:600;'
+                     f'text-decoration:none">{_html.escape(site_disp)}</a>')
+    if email:
+        links.append(f'<a href="mailto:{email}" style="color:#475467;'
+                     f'text-decoration:none">{email}</a>')
+    links_row = ('<div style="font-size:12.5px;line-height:1;margin-top:10px">'
+                 + '<span style="color:#d0d5dd">&nbsp;|&nbsp;</span>'.join(links)
+                 + '</div>' if links else "")
+
+    role_line = ""
+    if role or company:
+        role_html = role
+        if company:
+            role_html += (', ' if role else '') + (
+                f'<span style="font-weight:600;color:{color}">{company}</span>')
+        role_line = (f'<div style="font-size:13.5px;color:#475467;'
+                     f'margin-top:2px">{role_html}</div>')
+
     return (
-        '<table role="presentation" cellpadding="0" cellspacing="0" '
-        'style="margin-top:26px"><tr>'
-        f'<td style="vertical-align:middle;padding-right:12px">{photo}</td>'
-        '<td style="vertical-align:middle;font-size:14px;line-height:1.45">'
-        f'<div style="font-weight:600;color:#101828">{name}</div>'
-        + (f'<div style="font-size:13px;color:#667085">{line2}</div>' if line2 else "")
+        f'<p style="margin:26px 0 16px;line-height:1.5">{closing}</p>'
+        '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
+        f'<td style="vertical-align:top;padding-right:16px">{photo}</td>'
+        '<td style="vertical-align:top;padding-top:2px">'
+        f'<div style="font-weight:700;font-size:16px;letter-spacing:-.2px;'
+        f'color:#101828;line-height:1.25">{name}</div>'
+        + role_line
+        + ('<div style="height:1px;background:#e4e7ec;margin:10px 0 0;'
+           'font-size:0;line-height:0">&nbsp;</div>' if links else "")
+        + links_row
         + '</td></tr></table>')
 
 
