@@ -157,7 +157,7 @@ export const saas: Partial<Messages> = {
   "saas.launch.verdict.almost": "Almost ready",
   "saas.launch.verdict.not_ready": "Not ready",
   "saas.launch.c.sender": "Sender looks human (name + address, no noreply)",
-  "saas.launch.c.signature": "Every email is signed by a human ({d})",
+  "saas.launch.c.signature": "Corporate signature is complete: name, role, company, photo ({d})",
   "saas.launch.c.tailored": "Copy is tailored to your product, not a neutral skeleton",
   "saas.launch.c.domain": "Sending domain is verified (DKIM/SPF)",
   "saas.launch.c.timezone": "Audience timezone set - quiet hours work correctly",

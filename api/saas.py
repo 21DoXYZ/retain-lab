@@ -1696,13 +1696,24 @@ def saas_launch_check():
     tailored = bool(tch.get('onboarding_answers'))
 
     checks = [check_sender(str(tch.get('email_from') or ''))]
-    # подпись в теле: выводится из отправителя автоматически (email_delivery)
-    from stripe_sync.email_delivery import signature_block
-    _sig = signature_block(str(tch.get('email_from') or ''),
-                           str((tch.get('onboarding_answers') or {})
-                               .get('product_name') or ''))
-    checks.append({'key': 'signature', 'status': 'pass' if _sig else 'warn',
-                   'detail': _sig.replace('\n', ' / ')})
+    # Корпоративная подпись (методология §8a): полный комплект = имя + роль +
+    # компания + фото. Фолбэк из отправителя работает, но это жёлтый статус -
+    # письмо без лица и роли выглядит системным.
+    ident = dict(tch.get('email_identity') or {})
+    full = all(str(ident.get(k) or '').strip()
+               for k in ('name', 'role', 'company', 'avatar_url'))
+    if full:
+        sig_detail = f"{ident['name']} · {ident['role']} · фото"
+        checks.append({'key': 'signature', 'status': 'pass', 'detail': sig_detail})
+    else:
+        from stripe_sync.email_delivery import signature_block
+        _sig = signature_block(str(tch.get('email_from') or ''),
+                               str((tch.get('onboarding_answers') or {})
+                                   .get('product_name') or ''))
+        missing = [k for k in ('name', 'role', 'company', 'avatar_url')
+                   if not str(ident.get(k) or '').strip()]
+        checks.append({'key': 'signature', 'status': 'warn' if _sig else 'fail',
+                       'detail': 'нет: ' + ', '.join(missing)})
     checks += check_identity(tch, tailored)
     checks += check_copy(conf)
     checks.append(check_offers_bound(conf))
