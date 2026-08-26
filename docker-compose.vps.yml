@@ -112,6 +112,26 @@ services:
     # порт наружу не публикуем: борд ходит по внутренней сети
     restart: unless-stopped
 
+  # Второй инстанс WAHA: free-версия держит ОДНУ сессию на контейнер, поэтому
+  # у второго клиента (simbago) свой контейнер со своими томами и своим ключом.
+  # Тенанту в secrets/tenants.json прописывается:
+  #   "waha_url": "http://waha-simbago:3000",
+  #   "waha_api_key": "<значение WAHA_SIMBAGO_API_KEY>"
+  # - иначе он ходил бы в платформенный waha (env-фолбэк) и выбивал сессию
+  # hubcontent. Порт наружу не публикуем: борд ходит по внутренней сети.
+  waha-simbago:
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "3"}
+    image: devlikeapro/waha:latest
+    environment:
+      WHATSAPP_API_KEY: ${WAHA_SIMBAGO_API_KEY:-}
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
+    volumes:
+      - waha_simbago_sessions:/app/.sessions
+      - waha_simbago_media:/app/.media
+    restart: unless-stopped
+
   caddy-saas:
     image: caddy:2-alpine
     network_mode: host
@@ -131,3 +151,5 @@ volumes:
   caddy_saas_config:
   waha_sessions:
   waha_media:
+  waha_simbago_sessions:
+  waha_simbago_media:

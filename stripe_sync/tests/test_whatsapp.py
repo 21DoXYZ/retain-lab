@@ -160,6 +160,23 @@ def test_webhook_parses_statuses_inbound_and_template_updates():
                                      "templates": []}
 
 
+def test_webhook_surfaces_button_and_interactive_replies_as_text():
+    """Ответ кнопкой шаблона (payload с RB_-кодом) и интерактивной кнопкой
+    попадает в inbound.text - дальше его разбирает parse_reply_intent."""
+    doc = {"entry": [{"changes": [{"field": "messages", "value": {
+        "messages": [
+            {"id": "wamid.b", "from": "97150", "type": "button",
+             "button": {"payload": "RB_cGxhbjE_0123456789", "text": "Order again"}},
+            {"id": "wamid.i", "from": "97150", "type": "interactive",
+             "interactive": {"type": "button_reply",
+                             "button_reply": {"id": "still_have",
+                                              "title": "Still have"}}},
+        ]}}]}]}
+    out = wac.parse_webhook(doc)
+    assert out["inbound"][0]["text"] == "RB_cGxhbjE_0123456789"
+    assert out["inbound"][1]["text"] == "still_have"
+
+
 # ── Connect-флоу: человек пишет первым ───────────────────────────────────────
 
 def test_connect_url_roundtrip_binds_the_account():
@@ -327,6 +344,68 @@ def test_personal_requires_explicit_automation_flag():
         assert m2.wa_personal_tenant == "t1"
     finally:
         saas_senders.load_tenant_channels = orig
+
+
+def test_waha_target_resolves_per_tenant(monkeypatch, tmp_path):
+    """WAHA free = одна сессия на инстанс: тенант с waha_url/waha_api_key в
+    tenants.json ходит в СВОЙ контейнер, остальные - в платформенный из env."""
+    import channels_admin as ca
+    import wa_personal as wap
+
+    f = tmp_path / "tenants.json"
+    f.write_text(json.dumps({"simbago": {
+        "waha_url": "http://waha-simbago:3000/",     # хвостовой / срезается
+        "waha_api_key": " sk-simba "}}))             # пробелы срезаются
+    monkeypatch.setattr(ca, "TENANTS_FILE", str(f))
+    monkeypatch.setattr(wap, "WAHA_URL", "http://waha:3000")
+    monkeypatch.setattr(wap, "WAHA_API_KEY", "platform-key")
+
+    assert wap.waha_target("simbago") == ("http://waha-simbago:3000", "sk-simba")
+    # hubcontent без waha_* в конфиге - прежнее поведение (env)
+    assert wap.waha_target("hubcontent") == ("http://waha:3000", "platform-key")
+    # tenants.json недоступен - тоже env-фолбэк, а не падение
+    monkeypatch.setattr(ca, "TENANTS_FILE", str(tmp_path / "nope.json"))
+    assert wap.waha_target("simbago") == ("http://waha:3000", "platform-key")
+
+
+def test_waha_calls_hit_the_tenant_instance(monkeypatch):
+    """HTTP-вызовы реально уходят на инстанс тенанта и с его ключом."""
+    import wa_personal as wap
+
+    seen = {}
+
+    class _Resp:
+        status = 200
+
+        def read(self):
+            return b'{"status": "WORKING", "me": {"id": "62812@c.us"}}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_urlopen(req, timeout=0):
+        seen["url"] = req.full_url
+        seen["key"] = req.get_header("X-api-key")
+        return _Resp()
+
+    monkeypatch.setattr(
+        wap, "waha_target",
+        lambda t: ("http://waha-simbago:3000", "sk-simba")
+        if t == "simbago" else ("http://waha:3000", "env-key"))
+    monkeypatch.setattr(wap.urllib.request, "urlopen", fake_urlopen)
+
+    ok, status, number = wap.get_status("simbago")
+    assert ok and status == "WORKING" and number == "62812"
+    assert seen["url"].startswith(
+        "http://waha-simbago:3000/api/sessions/tenant_simbago")
+    assert seen["key"] == "sk-simba"
+
+    wap.get_status("hubcontent")
+    assert seen["url"].startswith("http://waha:3000/api/sessions/")
+    assert seen["key"] == "env-key"
 
 
 def test_dunning_and_triggers_have_wa_ladder():

@@ -42,6 +42,25 @@ BOARD_INTERNAL = os.environ.get("BOARD_INTERNAL_URL", "http://board:8050").rstri
 _TIMEOUT = 30
 
 
+def waha_target(tenant: str) -> tuple[str, str]:
+    """(url, api_key) инстанса WAHA для тенанта.
+
+    WAHA free держит ОДНУ сессию на инстанс, поэтому второй клиент живёт в
+    СВОЁМ контейнере: адрес и ключ берутся из конфига тенанта в tenants.json
+    (ключи waha_url / waha_api_key, напр. http://waha-simbago:3000). Тенант
+    без этих ключей ходит в платформенный инстанс из env WAHA_URL/WAHA_API_KEY -
+    hubcontent работает ровно как раньше.
+    """
+    try:                                # борд импортирует пакетом, джобы плоско
+        from channels_admin import load_tenants
+    except ImportError:
+        from stripe_sync.channels_admin import load_tenants  # type: ignore
+    conf = load_tenants().get(str(tenant or "")) or {}
+    url = str(conf.get("waha_url") or "").strip().rstrip("/") or WAHA_URL
+    key = str(conf.get("waha_api_key") or "").strip() or WAHA_API_KEY
+    return url, key
+
+
 def session_name(tenant: str) -> str:
     return f"tenant_{tenant}"
 
@@ -62,13 +81,15 @@ def verify_webhook(tenant: str, body: bytes, header: str,
     return hmac.compare_digest(str(header), expected)
 
 
-def _call(method: str, path: str, payload: dict | None = None) -> tuple[int, dict]:
+def _call(tenant: str, method: str, path: str,
+          payload: dict | None = None) -> tuple[int, dict]:
+    url, api_key = waha_target(tenant)
     req = urllib.request.Request(
-        f"{WAHA_URL}{path}",
+        f"{url}{path}",
         data=json.dumps(payload).encode() if payload is not None else None,
         method=method,
         headers={"Content-Type": "application/json",
-                 "X-Api-Key": WAHA_API_KEY})
+                 "X-Api-Key": api_key})
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
             raw = resp.read().decode() or "{}"
@@ -102,7 +123,7 @@ def start_session(tenant: str) -> tuple[bool, str]:
                 "hmac": {"key": webhook_hmac_key(tenant)},
             }]},
     }
-    status, doc = _call("POST", "/api/sessions", payload)
+    status, doc = _call(tenant, "POST", "/api/sessions", payload)
     if status in (200, 201):
         return True, str(doc.get("status") or "STARTING")
     if status in (409, 422):
@@ -113,7 +134,7 @@ def start_session(tenant: str) -> tuple[bool, str]:
         if current not in ("FAILED", "STOPPED"):
             return True, current
         drop_session(tenant)
-        status, doc = _call("POST", "/api/sessions", payload)
+        status, doc = _call(tenant, "POST", "/api/sessions", payload)
         if status in (200, 201):
             return True, str(doc.get("status") or "STARTING")
     return False, f"waha_{status}:{str(doc)[:120]}"
@@ -121,7 +142,7 @@ def start_session(tenant: str) -> tuple[bool, str]:
 
 def get_status(tenant: str) -> tuple[bool, str, str]:
     """(ok, status, номер). SCAN_QR_CODE | WORKING | STARTING | FAILED..."""
-    status, doc = _call("GET", f"/api/sessions/{session_name(tenant)}")
+    status, doc = _call(tenant, "GET", f"/api/sessions/{session_name(tenant)}")
     if status == 404:
         return True, "NOT_STARTED", ""
     if 200 <= status < 300:
@@ -133,9 +154,10 @@ def get_status(tenant: str) -> tuple[bool, str, str]:
 
 def get_qr_png(tenant: str) -> str:
     """QR картинкой (base64 png) - фронт показывает <img>, без QR-библиотек."""
+    url, api_key = waha_target(tenant)
     req = urllib.request.Request(
-        f"{WAHA_URL}/api/{session_name(tenant)}/auth/qr?format=image",
-        headers={"X-Api-Key": WAHA_API_KEY, "Accept": "image/png"})
+        f"{url}/api/{session_name(tenant)}/auth/qr?format=image",
+        headers={"X-Api-Key": api_key, "Accept": "image/png"})
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
             if resp.status != 200:
@@ -148,8 +170,8 @@ def get_qr_png(tenant: str) -> str:
 
 def drop_session(tenant: str) -> None:
     """Логаут + удаление: телефон клиента отвязывается от платформы."""
-    _call("POST", f"/api/sessions/{session_name(tenant)}/logout")
-    _call("DELETE", f"/api/sessions/{session_name(tenant)}")
+    _call(tenant, "POST", f"/api/sessions/{session_name(tenant)}/logout")
+    _call(tenant, "DELETE", f"/api/sessions/{session_name(tenant)}")
 
 
 def parse_event(doc: dict) -> dict:
@@ -209,7 +231,7 @@ def reply_as_human(tenant: str, chat_id: str, text: str) -> tuple[bool, str]:
     text = str(text or "").strip()
     if not text or not chat_id:
         return False, "empty"
-    status, doc = _call("POST", "/api/sendText", {
+    status, doc = _call(tenant, "POST", "/api/sendText", {
         "session": session_name(tenant), "chatId": chat_id, "text": text[:4096]})
     if 200 <= status < 300:
         return True, "sent"
@@ -232,10 +254,10 @@ def update_session_config(tenant: str) -> tuple[bool, str]:
                 "hmac": {"key": webhook_hmac_key(tenant)},
             }]},
     }
-    status, doc = _call("PUT", f"/api/sessions/{session_name(tenant)}", payload)
+    status, doc = _call(tenant, "PUT", f"/api/sessions/{session_name(tenant)}", payload)
     if not (200 <= status < 300):
         return False, f"waha_{status}:{str(doc)[:120]}"
-    status, doc = _call("POST", f"/api/sessions/{session_name(tenant)}/restart")
+    status, doc = _call(tenant, "POST", f"/api/sessions/{session_name(tenant)}/restart")
     if 200 <= status < 300:
         return True, "restarted"
     return False, f"waha_{status}:{str(doc)[:120]}"
@@ -249,7 +271,7 @@ def fetch_history(tenant: str, chat_limit: int = 30,
     (@broadcast) выброшены. Пустой список - хранилище ещё не синхронизировано.
     """
     sess = session_name(tenant)
-    status, chats = _call("GET", f"/api/{sess}/chats?limit={chat_limit}")
+    status, chats = _call(tenant, "GET", f"/api/{sess}/chats?limit={chat_limit}")
     if status != 200 or not isinstance(chats, list):
         return []
     out: list[dict] = []
@@ -261,7 +283,7 @@ def fetch_history(tenant: str, chat_limit: int = 30,
         if not cid or "@broadcast" in cid:
             continue
         status, msgs = _call(
-            "GET", f"/api/{sess}/chats/{cid}/messages?limit={msg_limit}"
+            tenant, "GET", f"/api/{sess}/chats/{cid}/messages?limit={msg_limit}"
                    f"&downloadMedia=false")
         if status != 200 or not isinstance(msgs, list):
             continue
@@ -292,7 +314,7 @@ def list_lids(tenant: str) -> dict:
     соответствие - WAHA отдаёт его целиком. Без этого карточка контакта
     показывает бессмысленный LID вместо телефона.
     """
-    status, doc = _call("GET", f"/api/{session_name(tenant)}/lids?limit=500")
+    status, doc = _call(tenant, "GET", f"/api/{session_name(tenant)}/lids?limit=500")
     if status != 200 or not isinstance(doc, list):
         return {}
     out = {}
@@ -315,7 +337,7 @@ def check_number(tenant: str, phone: str) -> tuple[bool, str]:
     if not 8 <= len(digits) <= 15:
         return False, ""
     status, doc = _call(
-        "GET", f"/api/contacts/check-exists?phone={digits}"
+        tenant, "GET", f"/api/contacts/check-exists?phone={digits}"
                f"&session={session_name(tenant)}")
     if status != 200 or not isinstance(doc, dict):
         return False, ""
