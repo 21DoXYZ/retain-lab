@@ -27,12 +27,16 @@ Revenue Autopilot (Retention Brain), соединённые уже постро�
 
 ## Критические долги перед внешним мерчантом (из инвентаря кода)
 
-1. deliveries: вебхук курьера БЕЗ подписи (любой запрос меняет статусы).
-2. deliveries/gosend.py - заглушка с фейковыми booking_id в проде.
-3. payments: ноль тестов на идемпотентность вебхука оплаты.
-4. marketplace: OAuth-callback не смонтирован - магазин нечем авторизовать.
-5. warehouse: FIFO заявлен, не реализован; финансовый контур без тестов.
-6. notifications: FCM/Resend-заглушки ставят SENT (ложная доставка).
+ЗАКРЫТЫ 2026-08-27 (upstream main bf04451..cbc5c9d): подпись вебхука
+курьера (fail-closed), фейковые GoSend-брони за флагом (деф. выкл),
+34 теста payments, честные статусы уведомлений + живые Resend/FCM
+(FCM ждёт google-auth в requirements), OAuth connect+callback
+Shopee/TikTok/Tokopedia с подписанным state.
+
+ОСТАЛОСЬ:
+1. warehouse: FIFO заявлен, не реализован; финансовый контур без тестов.
+2. Три ленты общения (WaMessage/Interaction/SupportTicket) не слиты.
+3. WhatsApp-stub без Twilio тоже ставит SENT (мелочь, той же правкой).
 
 ## Решения за владельцем
 
