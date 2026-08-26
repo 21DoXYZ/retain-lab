@@ -351,6 +351,12 @@ def ingest_saas():
             return jsonify(error="billing.* events come only from the Stripe "
                                  "webhook", index=i), 403
         meta = e.get("meta")
+        # Контракт: meta в шине - JSON-строка. Часть интеграций (Django-бэкенды)
+        # шлёт вложенный объект - нормализуем здесь, иначе гео/UA-обогащение
+        # молча пропускается, а CH рискует увезти событие в dead-letter.
+        if isinstance(meta, (dict, list)):
+            meta = json.dumps(meta, separators=(",", ":"), ensure_ascii=False)
+            e["meta"] = meta
         if meta is not None and len(str(meta)) > MAX_META_BYTES:
             return jsonify(error=f"meta too large (max {MAX_META_BYTES})",
                            index=i), 413

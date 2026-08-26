@@ -1,0 +1,17 @@
+{
+  "event_id": "simbago-mp_order:SHOPEE_ID:SHP-CONTRACT-1",
+  "tenant_id": "simbago",
+  "event_type": "mp_order",
+  "ts": "<TS>",
+  "client_user_id": "mp:shopee_id:987654",
+  "source": "api",
+  "meta": {
+    "channel": "SHOPEE_ID",
+    "external_order_id": "SHP-CONTRACT-1",
+    "order_ref": "SHP-CONTRACT-1",
+    "total": "150000.00",
+    "items": [
+      {"sku": "FOOD-2KG", "qty": 2, "name": "Dog Food 2kg"}
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "event_id": "simbago-order_confirmed:SG-CONTRACT-G1",
+  "tenant_id": "simbago",
+  "event_type": "order_confirmed",
+  "ts": "<TS>",
+  "client_user_id": "guest:+628123456789",
+  "source": "api",
+  "meta": {
+    "order_id": "SG-CONTRACT-G1",
+    "order_ref": "SG-CONTRACT-G1",
+    "total_idr": 150000,
+    "items": [
+      {"sku": "BALL-1-V", "qty": 2, "name": "Ball"}
+    ]
+  }
+}

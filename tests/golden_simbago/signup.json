@@ -1,0 +1,10 @@
+{
+  "event_id": "simbago-signup:<USER_ID>",
+  "tenant_id": "simbago",
+  "event_type": "signup",
+  "ts": "<TS>",
+  "client_user_id": "<USER_ID>",
+  "source": "api",
+  "email": "cust@example.com",
+  "email_hash": "8e65ee01ba8379ede618efe3f0b4e9cb4308b43f86011a0cf65525a52b6eec77"
+}

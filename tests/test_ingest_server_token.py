@@ -114,3 +114,12 @@ def test_server_token_billing_still_banned(ingest_app):
     resp = _post(ingest_app, "srv-token-acme",
                  _event(event_type="billing.invoice_paid"))
     assert resp.status_code == 403
+
+
+def test_dict_meta_normalized_to_json_string(ingest_app):
+    resp = _post(ingest_app, "srv-token-acme",
+                 _event(meta={"order_id": "SG-1", "items": [{"sku": "A", "qty": 1}]}))
+    assert resp.status_code == 200
+    (_, _, ev), = ingest_app.producer.messages
+    assert isinstance(ev["meta"], str)
+    assert json.loads(ev["meta"])["order_id"] == "SG-1"

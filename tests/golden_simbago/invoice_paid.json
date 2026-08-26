@@ -1,0 +1,18 @@
+{
+  "event_id": "simbago-invoice_paid:SG-CONTRACT-1",
+  "tenant_id": "simbago",
+  "event_type": "invoice_paid",
+  "ts": "<TS>",
+  "client_user_id": "<USER_ID>",
+  "source": "api",
+  "email": "buyer@example.com",
+  "email_hash": "6a6c26195c3682faa816966af789717c3bfa834eee6c599d667d2b3429c27cfd",
+  "meta": {
+    "order_id": "SG-CONTRACT-1",
+    "order_ref": "SG-CONTRACT-1",
+    "total_idr": 150000,
+    "items": [
+      {"sku": "BALL-1-V", "qty": 2, "name": "Ball"}
+    ]
+  }
+}

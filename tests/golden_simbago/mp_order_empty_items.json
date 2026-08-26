@@ -1,0 +1,15 @@
+{
+  "event_id": "simbago-mp_order:SHOPEE_ID:SHP-CONTRACT-2",
+  "tenant_id": "simbago",
+  "event_type": "mp_order",
+  "ts": "<TS>",
+  "client_user_id": "mp:shopee_id:555",
+  "source": "api",
+  "meta": {
+    "channel": "SHOPEE_ID",
+    "external_order_id": "SHP-CONTRACT-2",
+    "order_ref": "SHP-CONTRACT-2",
+    "total": "99000.00",
+    "items": []
+  }
+}
