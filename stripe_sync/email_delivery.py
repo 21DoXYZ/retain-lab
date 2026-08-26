@@ -210,7 +210,9 @@ def parse_webhook(doc: dict) -> dict:
     to = data.get("to")
     address = (to[0] if isinstance(to, list) and to else str(to or "")).strip().lower()
     return {
-        "event_type": etype,
+        # БЕЗ префикса "email.": все потребители (A/B, догонялки «только
+        # неоткрывшим», тревога доставляемости) фильтруют по коротким именам
+        "event_type": etype.split(".", 1)[-1],
         "provider_id": str(data.get("email_id") or data.get("id") or ""),
         "address": address,
         "subject": str(data.get("subject") or "")[:200],
