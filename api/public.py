@@ -74,7 +74,7 @@ def _cors(resp):
     if origin:
         resp.headers['Access-Control-Allow-Origin'] = origin
         resp.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
-        resp.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
         resp.headers['Vary'] = 'Origin'
     return resp
 
@@ -165,6 +165,62 @@ def inbox():
         {'message_id': r[0], 'title': r[1], 'body': r[2],
          'cta_label': r[3], 'cta_url': r[4],
          'kind': (r[5] if len(r) > 5 else 'banner') or 'banner'} for r in rows]})
+
+# ── WhatsApp connect-ссылки для бэкенда тенанта (QR-вкладыш в посылку) ───────
+# Тенантский WMS минтит подписанные wa.me-ссылки пачкой (упаковочный лист с QR:
+# покупатель сканирует - привязка client_user_id + согласие, см. parse_connect_
+# text). Auth и класс токена те же, что у inbox: Bearer = ingest-токен тенанта,
+# fail-closed 401. Подпись выдаём только владельцу токена - голая генерация
+# без auth позволяла бы увести чужие уведомления в свой чат.
+
+_CONNECT_LINKS_MAX = 100
+
+
+@bp.route('/saas/wa/connect-links', methods=['OPTIONS'])
+def wa_connect_links_preflight():
+    return '', 204
+
+
+@bp.post('/saas/wa/connect-links')
+def wa_connect_links():
+    ip = request.headers.get('X-Real-Client-IP', request.remote_addr or '')
+    if not _rate_ok(f'{ip}|wa-connect-links'):
+        return api_json(None, 429, 'rate_limited')
+    body = request.get_json(silent=True) or {}
+    tenant = str(body.get('tenant') or request.args.get('tenant') or '').strip()
+    if not _token_ok(tenant):
+        return api_json(None, 401, 'unauthorized')
+    if not tenant:
+        return api_json(None, 400, 'tenant_required')
+    ids = body.get('client_user_ids')
+    if not isinstance(ids, list) or not ids:
+        return api_json(None, 400, 'client_user_ids_required')
+    if len(ids) > _CONNECT_LINKS_MAX:
+        return api_json(None, 400, 'too_many_ids')
+
+    try:
+        from stripe_sync.channels_admin import load_tenants
+        from stripe_sync.wa_templates import connect_url as wa_connect_url
+        tc = load_tenants().get(tenant, {}) or {}
+        # Cloud API номер - основной; личный WhatsApp (WAHA) - фолбэк: оба
+        # вебхука парсят один и тот же connect-код.
+        phone = str(tc.get('wa_phone_display') or tc.get('wa_personal_number')
+                    or '')
+    except Exception:  # noqa: BLE001 - конфиг недоступен = канал не настроен
+        phone, wa_connect_url = '', None
+    if not phone or wa_connect_url is None:
+        return api_json({'links': {}, 'reason': 'wa_not_configured'})
+
+    links: dict[str, str] = {}
+    for raw in ids:
+        uid = str(raw or '').strip()
+        if not uid:
+            continue
+        url = wa_connect_url(phone, tenant, uid)
+        if url:
+            links[uid] = url
+    return api_json({'links': links})
+
 
 # ── Email: отписка и вебхуки доставки Resend ─────────────────────────────────
 
@@ -322,6 +378,69 @@ def _wa_verify_token(tenant: str) -> str:
                     __import__('hashlib').sha256).hexdigest()[:32]
 
 
+# ── Ответы на реордер-напоминания (Replenishment Autopilot) ──────────────────
+# Оба вебхука (Cloud API и личный WAHA) прогоняют входящее через один хелпер:
+# валидный RB_-код или точная кнопочная фраза от ПРИВЯЗАННОГО контакта
+# становится событием replenishment_* в шине - его потребляет replenishment.py.
+# Свободный текст событием не становится никогда: он для оператора в инбоксе.
+
+_REPLY_EVENT = {'confirmed': 'replenishment_confirmed',
+                'still_have': 'replenishment_still_have',
+                'optout': 'replenishment_optout'}
+
+
+def _replenishment_reply(ch, tenant: str, text: str, sender: str,
+                         msg_id: str, now) -> str:
+    """Кнопочный ответ -> событие retention.saas_events. '' - события нет.
+
+    Правила уверенности:
+      - confirmed ТОЛЬКО по валидному подписанному RB_-коду (двигает EWMA);
+      - still_have/optout по точной фразе - но только когда у identity РОВНО
+        ОДИН активный план: при нескольких не гадаем, оставляем оператору;
+      - непривязанный отправитель (нет contact с согласием) - ничего.
+    Возвращает event_type записанного события (для лога/тестов).
+    """
+    from stripe_sync.wa_templates import parse_reply_intent
+    intent, plan_id = parse_reply_intent(tenant, text)
+    if not intent:
+        return ''
+    rows = ch.query(
+        "SELECT client_user_id FROM retention.contacts_current "
+        "WHERE tenant_id = %(t)s AND channel = 'whatsapp' "
+        "AND address = %(a)s AND consent = 1",
+        parameters={'t': tenant, 'a': str(sender or '')}).result_rows
+    if not rows or not str(rows[0][0] or ''):
+        return ''                    # непривязанный отправитель - не наш ответ
+    uid = str(rows[0][0])
+    active = ch.query(
+        "SELECT plan_id, sku FROM retention.replenishment_plans_current "
+        "WHERE tenant_id = %(t)s AND status = 'ACTIVE' AND identity_id IN ("
+        "SELECT identity_id FROM retention.identities_current "
+        "WHERE tenant_id = %(t)s AND client_user_id = %(u)s)",
+        parameters={'t': tenant, 'u': uid}).result_rows
+    by_plan = {str(r[0]): str(r[1] or '') for r in active}
+    if plan_id:
+        if plan_id not in by_plan:
+            return ''                # старый/чужой код: цикл уже не активен
+    elif len(by_plan) == 1:
+        plan_id = next(iter(by_plan))
+    else:
+        return ''                    # 0 планов - не о чем; >1 - не гадаем
+    event_type = _REPLY_EVENT[intent]
+    ch.insert(
+        'retention.saas_events',
+        [[tenant, f'wa-reply-{msg_id}', event_type, now, uid, '', '',
+          'wa_reply', '',
+          json.dumps({'plan_id': plan_id, 'sku': by_plan.get(plan_id, ''),
+                      'from': str(sender or '')})]],
+        column_names=['tenant_id', 'event_id', 'event_type', 'ts',
+                      'client_user_id', 'email_hash', 'email', 'source',
+                      'stripe_customer_id', 'meta'])
+    print(f'[wa-reply] {tenant}: {event_type} uid={uid} plan={plan_id}',
+          flush=True)
+    return event_type
+
+
 @bp.route('/wa/webhook/<tenant>', methods=['GET'])
 def wa_webhook_verify(tenant: str):
     from flask import Response
@@ -404,6 +523,11 @@ def wa_webhook(tenant: str):
                                        'address', 'consent', 'consent_ts',
                                        'updated_at'])
             print(f"[wa] {tenant}: connect uid={uid} from={msg['from']}", flush=True)
+        else:
+            # ответ на реордер-напоминание (RB_-код в payload кнопки или
+            # точная кнопочная фраза) -> событие replenishment_*
+            _replenishment_reply(_ch(), tenant, msg['text'], msg['from'],
+                                 msg['wa_msg_id'], now)
 
     # СТАТУСЫ ШАБЛОНОВ - в реестр tenants.json: слать можно только APPROVED,
     # и отправка узнаёт об одобрении отсюда, а не по таймеру.
@@ -486,5 +610,11 @@ def wa_personal_webhook(tenant: str):
                                     'address', 'consent', 'consent_ts',
                                     'updated_at'])
             print(f"[wa-personal] {tenant}: connect uid={uid}", flush=True)
+        else:
+            # ответ на реордер-напоминание текстом (личный канал шлёт код в
+            # тексте ссылки, кнопок нет) -> событие replenishment_*
+            _replenishment_reply(
+                ch, tenant, ev['text'], ev['from'],
+                ev['wa_msg_id'] or f"wap-{now.timestamp()}", now)
 
     return api_json({'ok': True})
