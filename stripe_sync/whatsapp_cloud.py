@@ -162,12 +162,23 @@ def parse_webhook(doc: dict) -> dict:
                     "error_code": int(err.get("code") or 0),
                 })
             for msg in value.get("messages") or []:
+                text = str(((msg.get("text") or {}).get("body")) or "")
+                if not text:
+                    # ответ кнопкой шаблона: payload несёт наш код, text -
+                    # надпись кнопки; интерактив - button_reply/list_reply
+                    btn = msg.get("button") or {}
+                    text = str(btn.get("payload") or btn.get("text") or "")
+                if not text:
+                    reply = ((msg.get("interactive") or {}).get("button_reply")
+                             or (msg.get("interactive") or {}).get("list_reply")
+                             or {})
+                    text = str(reply.get("id") or reply.get("title") or "")
                 inbound.append({
                     "wa_msg_id": str(msg.get("id") or ""),
                     "from": str(msg.get("from") or ""),
                     "ts": str(msg.get("timestamp") or ""),
                     "type": str(msg.get("type") or ""),
-                    "text": str(((msg.get("text") or {}).get("body")) or "")[:4096],
+                    "text": text[:4096],
                 })
     return {"statuses": statuses, "inbound": inbound, "templates": templates}
 
