@@ -221,11 +221,20 @@ def verdict(cost: float | None, plan_price: float,
                 "note": "не хватает цены тарифа или лимита юнитов"}
 
     price = float(plan_price)
-    basis = "margin" if margin else "price"
-    monthly_margin = round(price * margin, 2) if margin else price
+    # margin==0.0 - ИЗМЕРЕННЫЙ ноль, не «неизвестно» (аудит 2026-08-26): при
+    # нём месячная маржа = 0, а не полная цена, иначе cash-подарок выглядит
+    # окупаемым там, где он уносит чистый убыток. None-маржа - другое дело:
+    # там честно не знаем, считаем по цене и помечаем basis='price'.
+    known = margin is not None
+    basis = "margin" if known else "price"
+    monthly_margin = round(price * margin, 2) if known else price
     share = round(float(cost) / price, 3)
     back = payback_months(cost, monthly_margin)
     ok = share <= SAFE_GIFT_SHARE and (back or 0) <= MAX_PAYBACK_MONTHS
+    # известная нулевая маржа: окупаться нечем - любая ненулевая уступка
+    # никогда не возвращается (аудит 2026-08-26)
+    if known and monthly_margin == 0 and float(cost) > 0:
+        ok = False
 
     if cost == 0:
         note = "ничего не стоит: человек ещё не платил"
@@ -237,7 +246,7 @@ def verdict(cost: float | None, plan_price: float,
                 f"возврат {back} мес. маржи")
     # Живые деньги дороже недополученной выручки: их платят вперёд и не
     # возвращают, если человек всё равно ушёл. Об этом говорим отдельно.
-    if cash and margin and cash > monthly_margin:
+    if cash and known and cash > monthly_margin:
         ok = False
         note = (f"уносит ${cash:.2f} живыми деньгами при марже "
                 f"${monthly_margin:.2f} в месяц - выдача дороже, чем месяц клиента")

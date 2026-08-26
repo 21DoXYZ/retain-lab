@@ -563,9 +563,14 @@ def tick(client, tenant: str) -> dict[str, int]:
         cap = warmup_cap(row[1] if row[1] is not None else None,
                          str(_tch.get("email_warmup") or "fast"))
         email_budget["left"] = max(0, cap - sent_today)
-    except Exception as exc:  # noqa: BLE001 - без данных живём без прогрева
-        print(f"[tick] {tenant}: warmup budget unavailable: {type(exc).__name__}",
-              flush=True)
+    except Exception as exc:  # noqa: BLE001
+        # FAIL-CLOSED (аудит 2026-08-26): не смогли прочитать бюджет прогрева -
+        # НЕ шлём email этим тиком вместо «10000 без лимита». Свежий домен не
+        # должен выплюнуть залп из-за транзиентной ошибки CH ровно на этом
+        # запросе. Off-режим прогрева задаётся конфигом, не сбоем.
+        email_budget["left"] = 0
+        print(f"[tick] {tenant}: warmup budget unavailable, email held: "
+              f"{type(exc).__name__}", flush=True)
 
     # «подожди»-отказы уже записанные сегодня: повторно не логируем
     retry_logged = _logged_retries_today(client, tenant)

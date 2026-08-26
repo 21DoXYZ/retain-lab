@@ -124,7 +124,11 @@ def margin_at_stake(monthly_margin: float | None, expected_months: float | None,
     та же ошибка, что считать стоимость подарка в цене: приз раздувается, и
     любая уступка начинает выглядеть оправданной.
     """
-    if not monthly_margin or not expected_months:
+    # margin==0.0 - это ИЗМЕРЕННЫЙ ноль («маржи нет»), НЕ «неизвестно»: ставка
+    # честно 0, и её нельзя схлопывать в None - иначе все экономические гарды
+    # в rank() (stake_too_small/budget/negative_value) молча отключаются, и
+    # cash-подарок выдаётся в худшем для бизнеса состоянии (аудит 2026-08-26).
+    if monthly_margin is None or not expected_months:
         return None
     stake = float(monthly_margin) * float(expected_months)
     if churn_risk is not None:

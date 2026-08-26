@@ -277,7 +277,9 @@ def home():
         "SELECT uniqExactIf(identity_id, event_type = 'signup' AND ts >= now() - INTERVAL 7 DAY),"
         " countIf(event_type = 'generation_completed' AND ts >= today()),"
         " countIf(event_type = 'generation_completed' AND ts >= now() - INTERVAL 7 DAY)"
-        " FROM saas_events_resolved WHERE tenant_id = {t:String}", {'t': tenant})[1][0]
+        # deduped, не resolved: пересинк экспорта кладёт события повторно, а
+        # resolved их не схлопывает - pulse завышал генерации (аудит 08-26)
+        " FROM saas_events_deduped WHERE tenant_id = {t:String}", {'t': tenant})[1][0]
     pulse = {'online_now': int(pr[0] or 0), 'active_today': int(pr[1] or 0),
              'active_7d': int(pr[2] or 0), 'paying': int(pr[3] or 0),
              'trialing': int(pr[4] or 0), 'signups_7d': int(ur[0] or 0),

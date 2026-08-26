@@ -53,9 +53,18 @@ class EmailConfig:
         )
 
 
+# Плейсхолдер: {{key}} с любыми пробелами/дефисами вокруг ключа. Один паттерн
+# для рендера И для проверки - иначе «{{ app_url }}» (пробелы) или
+# «{{card-update-url}}» (дефис) не подставится, но и не будет пойман сырым, и
+# уйдёт живому человеку буквально (аудит 2026-08-26).
+_PLACEHOLDER = re.compile(r"\{\{\s*([\w-]+)\s*\}\}")
+
+
 def render(template: str, ctx: dict) -> str:
-    return re.sub(r"\{\{(\w+)\}\}",
-                  lambda m: str(ctx.get(m.group(1), m.group(0))), template)
+    def _sub(m):
+        key = m.group(1).replace("-", "_")
+        return str(ctx.get(key, m.group(0)))
+    return _PLACEHOLDER.sub(_sub, template)
 
 
 def unresolved(text: str) -> bool:
@@ -64,9 +73,9 @@ def unresolved(text: str) -> bool:
     «Reply to {{telegram_connect_url}}» с фигурными скобками в письме - это
     артефакт шаблона, показанный живому человеку: бот не подключён или в
     тексте опечатка. Такое касание честнее не отправить и сказать почему,
-    чем отправить мусор.
+    чем отправить мусор. Ловим и пробельные/дефисные формы.
     """
-    return bool(re.search(r"\{\{\w+\}\}", text or ""))
+    return bool(_PLACEHOLDER.search(text or ""))
 
 
 def send_email(to: str, subject: str, body: str, cfg: EmailConfig,
@@ -198,9 +207,19 @@ def normalize_phone(raw: str) -> str:
 
 
 def is_us_number(digits: str) -> bool:
-    """Номер плана NANP (+1). TCPA: SMS без явного письменного согласия - иски
-    $500-1500 за сообщение, поэтому в US шлём только email и in-app."""
-    return len(digits) == 11 and digits.startswith("1")
+    """Номер плана NANP (US/Canada). TCPA: SMS без явного письменного согласия
+    - иски $500-1500 за сообщение, поэтому в US/CA шлём только email и in-app.
+
+    Ловим ОБА формата (аудит 2026-08-26): 11 цифр с кодом страны '1...' И
+    10 цифр национального формата (клиентские CRM часто хранят '2025550143'
+    без +1). Fail-closed: сомнительный NANP-паттерн лучше не слать по SMS.
+    """
+    if len(digits) == 11 and digits.startswith("1"):
+        return True
+    # 10 цифр, первая цифра кода зоны и префикса 2-9 (валидный NANP) - это US/CA
+    if len(digits) == 10 and digits[0] in "23456789" and digits[3] in "23456789":
+        return True
+    return False
 
 
 # Длина сообщения зависит от канала и алфавита: в SMS латиница даёт 160

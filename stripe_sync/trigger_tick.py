@@ -135,11 +135,17 @@ def fire(client, tenant: str) -> dict[str, int]:
 
         # кулдаун = reentry_days кампании: было зачисление в окне - молчим
         reentry = int(camp.get("reentry_days", 7))
+        # ПОСЛЕДНЕЕ зачисление, не первое: campaign_enrollments_current даёт
+        # enrolled_at = min() (первое за всю историю), и кулдаун по нему навсегда
+        # оставался бы открытым для персистентных когорт (NPS/кредиты) - человек
+        # перезачислялся бы каждый тик. Берём max(enrolled_at) прямо из базовой
+        # таблицы (аудит 2026-08-26).
         recent = {r[0] for r in client.query(
             """
-            SELECT identity_id FROM retention.campaign_enrollments_current
+            SELECT identity_id FROM retention.campaign_enrollments
             WHERE tenant_id = %(t)s AND campaign_id = %(c)s
-              AND enrolled_at >= now() - INTERVAL %(d)s DAY
+            GROUP BY identity_id
+            HAVING max(enrolled_at) >= now() - INTERVAL %(d)s DAY
             """, parameters={"t": tenant, "c": cid, "d": reentry}).result_rows}
         fresh = [i for i in hits if i not in recent]
         if not fresh:

@@ -167,7 +167,51 @@ def build_identities(
 
     identities = list({id(i): i for i in [*by_hash.values(), *by_customer.values(),
                                           *by_cuid.values()]}.values())
+    identities = _merge_shared_cuid(identities)
     return identities, unmatched
+
+
+def _merge_shared_cuid(identities: list["Identity"]) -> list["Identity"]:
+    """Один client_user_id - ровно одна identity (аудит 2026-08-26).
+
+    Событие с cuid+stripe (customer без email, R3) кладёт cuid в scus-identity,
+    а событие cuid+email (R2) - в email-identity: тот же человек оказывался в
+    двух. identity_aliases затем отдавал cuid в обе, и resolved-вьюха ФАНИЛА
+    каждое событие этого cuid в несколько identity - двойной счёт, расщеплённая
+    стадия, двойные касания. Схлопываем: identities, делящие любой cuid,
+    сливаем в одну. Победитель - у кого есть email_norm, затем stripe_customer:
+    к нему стягиваем все cuid и источники, проигравший выбывает."""
+    canon: dict[str, "Identity"] = {}          # cuid -> победившая identity
+    drop: set[int] = set()
+
+    def rank(i: "Identity") -> tuple:
+        return (bool(i.email_norm), bool(i.stripe_customer_id))
+
+    for ident in identities:
+        cuids = list(ident.client_user_ids) or (
+            [ident.client_user_id] if ident.client_user_id else [])
+        winner = ident
+        for c in cuids:
+            other = canon.get(c)
+            if other is not None and other is not winner and id(other) not in drop:
+                lo, hi = sorted((winner, other), key=rank)   # hi - лучше
+                # переносим всё из lo в hi
+                for cc in (list(lo.client_user_ids)
+                           or ([lo.client_user_id] if lo.client_user_id else [])):
+                    _add_cuid(hi, cc)
+                for s in lo.sources:
+                    _add_source(hi, s)
+                if not hi.email_norm and lo.email_norm:
+                    hi.email_norm = lo.email_norm
+                if not hi.stripe_customer_id and lo.stripe_customer_id:
+                    hi.stripe_customer_id = lo.stripe_customer_id
+                drop.add(id(lo))
+                winner = hi
+        for c in (list(winner.client_user_ids)
+                  or ([winner.client_user_id] if winner.client_user_id else [])):
+            canon[c] = winner
+
+    return [i for i in identities if id(i) not in drop]
 
 
 def resolve_first_seen(i: Identity, seen_before: dict,
