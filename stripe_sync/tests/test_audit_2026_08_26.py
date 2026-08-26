@@ -83,3 +83,37 @@ def test_distinct_cuids_not_merged():
     a = Identity("t", "A", client_user_ids=["U1"])
     b = Identity("t", "B", client_user_ids=["U2"])
     assert len(_merge_shared_cuid([a, b])) == 2
+
+
+# ── ROUND 2 ──────────────────────────────────────────────────────────────────
+
+# r2-1/2 HIGH: revenue dedup over ReplacingMergeTree
+def test_measured_revenue_dedups_invoices():
+    """Выручка берёт argMax по invoice_id, не плоский sum по всем строкам."""
+    import inspect
+    import product_sync
+    src = inspect.getsource(product_sync.measured_costs)
+    assert "argMax(amount_paid, updated_at)" in src
+    assert "GROUP BY invoice_id" in src
+    # плоского sum(amount_paid) без группировки быть не должно
+    assert "sum(amount_paid) FROM retention.stripe_invoices\n" not in src
+
+
+# r2-3 HIGH: manual enroll preserves holdout
+def test_manual_enroll_preserves_control():
+    # api/saas.py тянет flask (нет в юнит-окружении) - проверяем исходник grep'ом
+    from pathlib import Path
+    src = (Path(__file__).parent.parent.parent / "api" / "saas.py").read_text()
+    body = src[src.index("def saas_user_enroll"):]
+    body = body[:body.index("\n@bp.")] if "\n@bp." in body else body
+    assert "prior_control" in body                       # control сохраняется
+    assert "identity, 0, stage, 0, now, 'active'" not in body  # не хардкод 0
+
+
+# r2-4 MEDIUM: one bad export row doesn't abort the tenant tick
+def test_product_sync_mapping_is_per_row_guarded():
+    import inspect
+    import product_sync
+    src = inspect.getsource(product_sync.main)
+    # mapping и insert - ВНУТРИ try датасета
+    assert "for r in raw:" in src and "except Exception:  # noqa: BLE001 - один ряд" in src

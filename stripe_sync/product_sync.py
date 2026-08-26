@@ -211,9 +211,18 @@ def measured_costs(client, tenant: str) -> dict | None:
     if credits > 0:
         out["measured_unit_cost_usd"] = round(cost_usd / credits, 6)
 
+    # ДЕДУП ИНВОЙСОВ (аудит r2 2026-08-26): stripe_invoices - ReplacingMergeTree,
+    # один инвойс шлёт несколько invoice.* вебхуков (paid/payment_succeeded/
+    # updated), каждый = строка с полным amount_paid. Плоский sum БЕЗ FINAL/
+    # argMax считал их все и завышал выручку (а значит и маржу к 100%). Берём
+    # последнюю версию каждого invoice_id, как того требует схема (marts читают
+    # argMax/FINAL).
     rev = client.query(
-        "SELECT sum(amount_paid) FROM retention.stripe_invoices "
-        "WHERE tenant_id = %(t)s AND created_ts >= now() - INTERVAL %(d)s DAY",
+        "SELECT sum(paid) FROM ("
+        "  SELECT invoice_id, argMax(amount_paid, updated_at) AS paid,"
+        "         argMax(created_ts, updated_at) AS created"
+        "  FROM retention.stripe_invoices WHERE tenant_id = %(t)s"
+        "  GROUP BY invoice_id) WHERE created >= now() - INTERVAL %(d)s DAY",
         parameters={"t": tenant, "d": MARGIN_WINDOW_D}).result_rows
     revenue = float(rev[0][0] or 0) if rev and rev[0] else 0.0
     if revenue > 0:
@@ -247,16 +256,27 @@ def main() -> None:
 
     report = {}
     for dataset, mapper in DATASETS.items():
+        # ВЕСЬ датасет в try (аудит r2 2026-08-26): экспорт - данные КЛИЕНТА,
+        # один кривой ряд (битый ts, дикий JSON) в mapping или в all-or-nothing
+        # insert раньше ронял product_sync целиком - тенант терял ВСЕ
+        # продуктовые события за прогон. Кривой датасет пропускаем, остальные
+        # идут; внутри mapping кривой ряд отбрасываем поштучно.
         try:
             raw = export_rows(source["url"], source["key"], dataset,
                               since=last_ts(client, tenant, dataset))
+            events = []
+            for r in raw:
+                try:
+                    e = mapper(r, tenant)
+                except Exception:  # noqa: BLE001 - один ряд не валит датасет
+                    continue
+                if e:
+                    events.append(e)
+            if events:
+                client.insert("retention.saas_events", events, column_names=COLUMNS)
+            report[dataset] = f"{len(events)}/{len(raw)}"
         except Exception as exc:  # noqa: BLE001 - один датасет не валит остальные
             report[dataset] = f"err:{type(exc).__name__}"
-            continue
-        events = [e for e in (mapper(r, tenant) for r in raw) if e]
-        if events:
-            client.insert("retention.saas_events", events, column_names=COLUMNS)
-        report[dataset] = f"{len(events)}/{len(raw)}"
 
     measured = measured_costs(client, tenant)
     if measured:

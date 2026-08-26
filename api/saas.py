@@ -3418,11 +3418,17 @@ def saas_user_enroll():
 
     if cur and str(cur[0][0]) == 'active':
         return _bad('already_enrolled')
+    # ЧИСТОТА ЗАМЕРА (аудит r2 2026-08-26): человек, однажды попавший в holdout
+    # (control=1), обязан ОСТАТЬСЯ в контроле навсегда - иначе ручной
+    # перезаход владельца молча переносил бы отобранных им риск-юзеров из
+    # контроля в target, ровно тот selection-bias, ради устранения которого
+    # holdout и существует. Прежний control сохраняем.
+    prior_control = int(cur[0][1]) if cur else 0
     ch.insert('retention.campaign_enrollments',
-              [[tenant, cid, identity, 0, stage, 0, now, 'active', now, now]],
+              [[tenant, cid, identity, prior_control, stage, 0, now, 'active', now, now]],
               column_names=cols)
-    print(f'[user_card] {tenant}: {identity} enrolled into {cid} manually',
-          flush=True)
+    print(f'[user_card] {tenant}: {identity} enrolled into {cid} manually'
+          f'{" (holdout preserved)" if prior_control else ""}', flush=True)
     return api_json({'ok': True, 'status': 'active'})
 
 
