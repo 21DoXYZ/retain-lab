@@ -33,6 +33,9 @@ bp = Blueprint('api_tenants', __name__, url_prefix='/api/v1')
 
 PLATFORM_ROLES = ('super_admin',)
 TOKENS_FILE = os.environ.get('TOKENS_FILE', '/secrets/tokens.json')
+# Серверный токен (Server Events API, §3/§4a): секрет бэкенда клиента,
+# в HTML не попадает - только ему ingest разрешает открытый email.
+SERVER_TOKENS_FILE = os.environ.get('SERVER_TOKENS_FILE', '/secrets/server_tokens.json')
 
 
 def _bad(reason: str, code: int = 400):
@@ -59,6 +62,31 @@ def _save_token(tenant: str, token: str) -> None:
         with os.fdopen(fd, 'w') as fh:
             json.dump(data, fh, ensure_ascii=False, indent=2)
         os.replace(tmp, TOKENS_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _save_server_token(tenant: str, token: str) -> None:
+    """Атомарная запись серверного токена (файл той же формы, что tokens.json)."""
+    import tempfile
+    try:
+        with open(SERVER_TOKENS_FILE) as fh:
+            data = json.load(fh)
+        if not isinstance(data, dict):
+            data = {}
+    except Exception:
+        data = {}
+    data[tenant] = token
+    d = os.path.dirname(SERVER_TOKENS_FILE) or '.'
+    fd, tmp = tempfile.mkstemp(dir=d, prefix='.srvtokens-', suffix='.json')
+    try:
+        with os.fdopen(fd, 'w') as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=2)
+        os.replace(tmp, SERVER_TOKENS_FILE)
     except Exception:
         try:
             os.unlink(tmp)
@@ -172,6 +200,8 @@ def create_tenant():
 
     token = new_token()
     _save_token(tenant, token)
+    server_token = new_token()
+    _save_server_token(tenant, server_token)
     ca.update_tenant(tenant, {
         'product_name': product_name,
         'created_at': datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
@@ -192,6 +222,8 @@ def create_tenant():
         'owner_email': owner_email,
         'owner_password': password,   # показывается ОДИН раз
         'ingest_token': token,
+        # Секрет для Server Events API (бэкенд клиента; в HTML не вставлять):
+        'server_events_token': server_token,
         'snippet': snippet,
         'login_url': f'https://{host}/login' if host else '',
     })

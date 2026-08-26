@@ -23,6 +23,10 @@ REQUIRE_AUTH = os.environ.get('INGEST_REQUIRE_AUTH', '').strip().lower() in ('1'
 BROKER    = os.environ.get("KAFKA_BROKER", "redpanda:9092")
 TOPIC     = os.environ.get("KAFKA_TOPIC", "casino.events")
 TOKENS_FILE = os.environ.get("TOKENS_FILE", "/secrets/tokens.json")
+# Серверные токены (тенант -> секретный токен бэкенда клиента). В отличие от
+# публичного сниппет-токена НЕ лежат в HTML: только им разрешён открытый email
+# и source=api (§3/§4a INTEGRATION-SAAS). Файл той же формы, что tokens.json.
+SERVER_TOKENS_FILE = os.environ.get("SERVER_TOKENS_FILE", "/secrets/server_tokens.json")
 # фолбэк, если файла нет: INGEST_TOKEN (через запятую)
 ENV_TOKENS  = {t.strip() for t in os.environ.get("INGEST_TOKEN", "").split(",") if t.strip()}
 SASL_USER = os.environ.get("SASL_USER", "")
@@ -99,6 +103,29 @@ def _token_tenant():
     """Тенант предъявленного токена; '' - токен из env-фолбэка (любой тенант)."""
     tok = _presented_token()
     return _token_map().get(tok, "") if tok else ""
+
+
+_srv_cache = {"mtime": 0, "map": {}}
+
+
+def _server_token_map():
+    """{серверный токен: tenant_id} из server_tokens.json (hot-reload)."""
+    try:
+        mt = os.path.getmtime(SERVER_TOKENS_FILE)
+        if mt != _srv_cache["mtime"]:
+            with open(SERVER_TOKENS_FILE) as fh:
+                data = json.load(fh)
+            _srv_cache["map"] = {str(v): str(k) for k, v in data.items() if v}
+            _srv_cache["mtime"] = mt
+        return _srv_cache.get("map") or {}
+    except Exception:
+        return _srv_cache.get("map") or {}
+
+
+def _server_tenant():
+    """Тенант, если предъявлен СЕРВЕРНЫЙ токен; '' - если нет/не серверный."""
+    tok = _presented_token()
+    return _server_token_map().get(tok, "") if tok else ""
 SASL_PASS = os.environ.get("SASL_PASS", "")
 MAX_BATCH = int(os.environ.get("MAX_BATCH", "1000"))
 # Сниппет v2 шлёт богатый meta-JSON - зловредная страница могла бы слать
@@ -277,7 +304,10 @@ def ingest_saas():
         body = request.get_json(force=True)
     except Exception:
         body = None
-    if not _auth_ok():
+    # Серверный токен (секрет бэкенда клиента) - отдельный класс доступа:
+    # только он может слать открытый email и source=api (§3/§4a).
+    server_tenant = _server_tenant()
+    if not server_tenant and not _auth_ok():
         # Ключ не подошёл. Запоминаем факт: на сайте клиента мог остаться старый
         # код после перевыпуска токена, и без этой отметки он видит только
         # «событий нет» и ищет ошибку у себя.
@@ -298,7 +328,7 @@ def ingest_saas():
                            required=sorted(REQUIRED_SAAS)), 400
 
     # Токен привязан к тенанту: событие за чужое пространство не принимаем.
-    own = _token_tenant()
+    own = server_tenant or _token_tenant()
     if own:
         for i, e in enumerate(events):
             if str(e.get("tenant_id")) != own:
@@ -343,12 +373,22 @@ def ingest_saas():
 
     now_utc = datetime.now(tz=timezone.utc)
     for e in events:
-        # жёсткое присваивание, не setdefault: source из браузера - не факт
-        e["source"] = "snippet"
-        # Открытый email с ПУБЛИЧНОГО токена не принимаем: злоумышленник мог бы
-        # подменить адрес жертвы и увести её жизненные письма на свой ящик.
-        # Браузер шлёт только email_hash; настоящий адрес приходит из Stripe.
-        e.pop("email", None)
+        if server_tenant:
+            # Server Events API (§3): источник - бэкенд клиента, токен секретный.
+            # Открытый email разрешён (нормализуем), source фиксируем как api.
+            e["source"] = "api"
+            addr = str(e.get("email") or "").strip().lower()
+            if addr and "@" in addr and len(addr) <= 254:
+                e["email"] = addr
+            else:
+                e.pop("email", None)
+        else:
+            # жёсткое присваивание, не setdefault: source из браузера - не факт
+            e["source"] = "snippet"
+            # Открытый email с ПУБЛИЧНОГО токена не принимаем: злоумышленник мог бы
+            # подменить адрес жертвы и увести её жизненные письма на свой ящик.
+            # Браузер шлёт только email_hash; настоящий адрес приходит из Stripe.
+            e.pop("email", None)
         e["ts"] = sane_ts(e.get("ts"), now_utc)
         if geo or ua:
             try:

@@ -115,11 +115,14 @@ token, tenant}` до подключения скрипта.
 ## 3. Server Events API - продуктовые факты из бэкенда
 
 Для событий, где источник истины - ваш сервер (расход токенов, статус
-генерации). Тот же endpoint и токен, что у сниппета:
+генерации). Тот же endpoint, но СВОЙ токен - серверный (выдаётся вместе с ingest-токеном
+при создании пространства; секрет бэкенда, в HTML не вставлять). Публичный
+сниппет-токен здесь тоже работает, но с ним ingest вырежет открытый email
+и пометит source=snippet - для серверных фактов используйте серверный:
 
 ```
 POST https://<DOMAIN>/ingest/saas/events
-Authorization: Bearer <INGEST_TOKEN>
+Authorization: Bearer <SERVER_EVENTS_TOKEN>
 Content-Type: application/json
 ```
 
