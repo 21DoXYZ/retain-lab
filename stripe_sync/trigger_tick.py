@@ -88,6 +88,17 @@ TRIGGERS: dict[str, str] = {
           AND f.last_seen >= now() - INTERVAL 7 DAY
           AND ua.client_user_id != ''
     """,
+    # Replenishment Autopilot: расходник дозрел (replenishment.py посчитал
+    # цикл и записал событие в шину). Частотные лимиты (1/7д на план,
+    # max_per_customer_week на клиента) уже отработал сам джоб - здесь только
+    # свежие события; кулдаун кампании (reentry_days) - второй рубеж.
+    "K7_replenishment": """
+        SELECT identity_id
+        FROM retention.saas_events_resolved
+        WHERE tenant_id = %(t)s AND event_type = 'replenishment_due'
+          AND ts >= now() - INTERVAL 24 HOUR
+        GROUP BY identity_id
+    """,
     # Карта платящего истекает в ближайшие 14 дней - невольный отток,
     # который дешевле всего перехватить ДО фейла списания.
     "T3_card_expiring": """

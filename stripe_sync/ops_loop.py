@@ -83,6 +83,14 @@ STAGES: dict[str, dict] = {
         "when": lambda t: t.minute % 15 == 0,
         "deps": ["stitch"], "fresh_h": 26,
     },
+    "replenishment": {
+        # Replenishment Autopilot: планы из заказов + дозревание -> события
+        # replenishment_due (K7 подхватит триггером). enabled=false у тенанта -
+        # джоб сам no-op, поэтому стадия дешёвая для всех остальных.
+        "argv": ["python", "replenishment.py"],
+        "when": lambda t: t.minute == 25,
+        "deps": ["stitch"], "fresh_h": 26,
+    },
     "triggers": {
         # событийные триггеры: момент интента (чекаут, кредиты, карта) не
         # живёт 15-минутными циклами - проверяем каждую минуту, это дёшево
@@ -245,7 +253,8 @@ def name_argv(name: str) -> list[str]:
 # Порядок исполнения в один тик: топологический (зависимость раньше зависящей),
 # чтобы свежесть, поднятая stitch в этот же тик, сразу увидел scoring/campaign.
 _ORDER = ["stitch", "plans", "contacts", "users_sync", "product_sync",
-          "cancel_reasons", "scoring", "campaign_tick", "triggers",
+          "cancel_reasons", "scoring", "campaign_tick", "replenishment",
+          "triggers",
           "uplift_report", "ai_analyst", "product_insights", "weekly_digest"]
 
 

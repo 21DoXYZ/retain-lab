@@ -522,6 +522,28 @@ def tick(client, tenant: str) -> dict[str, int]:
         print(f"[tick] {tenant}: user facts unavailable: {type(exc).__name__}",
               flush=True)
 
+    # Плейсхолдеры K7_replenishment ({{product}}, {{reorder_url}}) из
+    # последнего события replenishment_due юзера: без них рендер честно
+    # отобьёт касание как unresolved_placeholder.
+    try:
+        for r in client.query(
+            """
+            SELECT identity_id, argMax(meta, ts)
+            FROM retention.saas_events_resolved
+            WHERE tenant_id = %(t)s AND event_type = 'replenishment_due'
+              AND ts >= now() - INTERVAL 14 DAY
+            GROUP BY identity_id
+            """, parameters={"t": tenant}).result_rows:
+            m = json.loads(r[1] or "{}")
+            facts = user_facts.setdefault(r[0], {})
+            if m.get("product"):
+                facts["product"] = str(m["product"])
+            if m.get("reorder_url"):
+                facts["reorder_url"] = str(m["reorder_url"])
+    except Exception as exc:  # noqa: BLE001 - реордер-факты опциональны
+        print(f"[tick] {tenant}: replenishment facts unavailable: "
+              f"{type(exc).__name__}", flush=True)
+
     def _user_ctx(cuid: str, identity: str = "") -> dict:
         """Плейсхолдеры, зависящие от КОНКРЕТНОГО человека. Ссылки подписки
         подписаны: голый id в ссылке позволял бы увести чужие уведомления."""

@@ -1004,6 +1004,97 @@ SELECT tenant_id, customer_id,
 FROM retention.stripe_cards
 GROUP BY tenant_id, customer_id;
 
+-- ============================================================================
+-- Replenishment Autopilot v1 (REPLENISHMENT-AUTOPILOT.md): предиктивный реордер
+-- расходников. Слой ПРОИЗВОДНЫЙ поверх saas_events (принцип 4 спеки):
+-- единственные живые сущности - план цикла и базлайн скорости потребления;
+-- продления/opt-out'ы выводятся из событий, ничего не гадаем (принцип 1).
+-- Пишет джоб stripe_sync/replenishment.py; JOIN'ы - ТОЛЬКО через *_current.
+-- ============================================================================
+
+-- Один купленный «пакет» расходника: цикл от заказа до «закончилось».
+CREATE TABLE IF NOT EXISTS retention.replenishment_plans
+(
+    `tenant_id`      LowCardinality(String),
+    `plan_id`        String,                   -- детерминированный: md5(tenant|identity|sku|order_ref)
+    `identity_id`    String,
+    `sku`            String,
+    `order_ref`      String,                   -- заказ-источник (дубль-защита)
+    `status`         LowCardinality(String),   -- ACTIVE | QUEUED | FINISHED
+    `started_at`     DateTime64(3),
+    `predicted_days` UInt16,                   -- базлайн пары | медиана SKU | default_days
+    `extension_days` UInt16,                   -- +7 за каждый ответ «ещё есть» (не учится)
+    `finished_at`    Nullable(DateTime64(3)),
+    `finish_reason`  LowCardinality(String),   -- USER_CONFIRMED | REORDERED | EXPIRED | CANCELLED
+    `updated_at`     DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, plan_id);
+
+CREATE OR REPLACE VIEW retention.replenishment_plans_current AS
+SELECT tenant_id, plan_id,
+       argMax(identity_id, updated_at)    AS identity_id,
+       argMax(sku, updated_at)            AS sku,
+       argMax(order_ref, updated_at)      AS order_ref,
+       argMax(status, updated_at)         AS status,
+       argMax(started_at, updated_at)     AS started_at,
+       argMax(predicted_days, updated_at) AS predicted_days,
+       argMax(extension_days, updated_at) AS extension_days,
+       argMax(finished_at, updated_at)    AS finished_at,
+       argMax(finish_reason, updated_at)  AS finish_reason,
+       max(updated_at)                    AS updated_at_max
+FROM retention.replenishment_plans
+GROUP BY tenant_id, plan_id;
+
+-- Скорость потребления пары «клиент × SKU». EWMA двигают ТОЛЬКО циклы,
+-- закрытые явным подтверждением юзера (USER_CONFIRMED) - принцип 2 спеки.
+CREATE TABLE IF NOT EXISTS retention.consumption_baselines
+(
+    `tenant_id`       LowCardinality(String),
+    `identity_id`     String,
+    `sku`             String,
+    `baseline_days`   Float64,
+    `last_cycle_days` Float64,
+    `cycles_count`    UInt32,
+    `updated_at`      DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, identity_id, sku);
+
+CREATE OR REPLACE VIEW retention.consumption_baselines_current AS
+SELECT tenant_id, identity_id, sku,
+       argMax(baseline_days, updated_at)   AS baseline_days,
+       argMax(last_cycle_days, updated_at) AS last_cycle_days,
+       argMax(cycles_count, updated_at)    AS cycles_count
+FROM retention.consumption_baselines
+GROUP BY tenant_id, identity_id, sku;
+
+-- Что делает SKU отслеживаемым: атрибуты заполняет мерчант в CRM или
+-- LLM-бэкфилл по названию товара; source='MANUAL' бэкфилл НЕ перезаписывает.
+CREATE TABLE IF NOT EXISTS retention.replenishment_sku_attrs
+(
+    `tenant_id`    LowCardinality(String),
+    `sku`          String,
+    `eligible`     UInt8,
+    `pack_size`    Float64,
+    `unit`         LowCardinality(String),
+    `default_days` UInt16,                    -- дефолт цикла до первого обучения
+    `source`       LowCardinality(String),    -- MANUAL | LLM
+    `updated_at`   DateTime64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, sku);
+
+CREATE OR REPLACE VIEW retention.replenishment_sku_attrs_current AS
+SELECT tenant_id, sku,
+       argMax(eligible, updated_at)     AS eligible,
+       argMax(pack_size, updated_at)    AS pack_size,
+       argMax(unit, updated_at)         AS unit,
+       argMax(default_days, updated_at) AS default_days,
+       argMax(source, updated_at)       AS source
+FROM retention.replenishment_sku_attrs
+GROUP BY tenant_id, sku;
+
 -- Карта истекает СКОРО у активной подписки = будущий невольный отток.
 -- Дней до конца месяца истечения; порог перехвата (<=45 дней) применяет код.
 CREATE OR REPLACE VIEW retention.card_expiry_current AS

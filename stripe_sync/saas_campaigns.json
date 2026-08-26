@@ -344,6 +344,31 @@
         "reentry_days": 90
       },
       {
+        "campaign_id": "K7_replenishment",
+        "title": "Trigger: consumable is about to run out",
+        "entry_stage": "TRIGGER",
+        "manual_audience": true,
+        "reentry_days": 7,
+        "goal": {
+          "event_type": "order_confirmed",
+          "window_days": 14
+        },
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "Running low on {{product}}?",
+            "body": "Judging by your last order, your {{product}} should be running out around now.\n\nReorder in one tap - same product, same address: {{reorder_url}}\n\nStill have enough? Just ignore this and we will check back later. If you would rather not get these reminders, reply and we will stop.",
+            "cta_label": "Order again",
+            "cta_url": "{{reorder_url}}",
+            "channels": [
+              "whatsapp",
+              "email"
+            ]
+          }
+        ]
+      },
+      {
         "campaign_id": "T1_checkout_rescue",
         "title": "Trigger: checkout started, not finished",
         "entry_stage": "TRIGGER",

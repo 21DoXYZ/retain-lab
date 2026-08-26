@@ -133,6 +133,77 @@ def parse_connect_text(tenant: str, text: str, secret: str = "") -> str:
     return uid
 
 
+# ── Reorder-код (Replenishment Autopilot): подписанная ссылка «Заказать снова» ─
+# Тот же HMAC-механизм, что у connect-кода: голый plan_id в ссылке позволял бы
+# дёргать чужие реордеры перебором. Код кладётся в {code} реордер-ссылки
+# тенанта (reorder_url_template) и в payload кнопок WhatsApp.
+
+def _reorder_sig(tenant: str, plan_id: str, secret: str = "") -> str:
+    key = (secret or UNSUB_SECRET).encode()
+    return hmac.new(key, f"reorder|{tenant}|{plan_id}".encode(),
+                    hashlib.sha256).hexdigest()[:10]
+
+
+def reorder_code(tenant: str, plan_id: str, secret: str = "") -> str:
+    """Подписанный код плана для реордер-ссылки. '' - плана нет."""
+    plan_id = str(plan_id or "").strip()
+    if not plan_id:
+        return ""
+    return f"RB_{_b64u(plan_id.encode())}_{_reorder_sig(tenant, plan_id, secret)}"
+
+
+def parse_reorder_code(tenant: str, text: str, secret: str = "") -> str:
+    """Текст с реордер-кодом -> plan_id. '' - кода нет или подпись битая."""
+    m = re.search(r"RB_([A-Za-z0-9_-]+)_([0-9a-f]{10})", str(text or ""))
+    if not m:
+        return ""
+    try:
+        plan_id = _b64u_decode(m.group(1)).decode()
+    except Exception:
+        return ""
+    if not hmac.compare_digest(m.group(2), _reorder_sig(tenant, plan_id, secret)):
+        return ""
+    return plan_id
+
+
+# ── Ответ клиента на реордер-напоминание ─────────────────────────────────────
+# Кнопка [Заказать снова] уходит ССЫЛКОЙ (подписанный RB_-код в чекауте), а
+# текстом приходят [Ещё есть] и [Больше не напоминать]. Классифицируем ТОЛЬКО
+# при высокой уверенности: валидный RB_-код либо точная кнопочная фраза
+# (регистронезависимо, trim). Свободный текст никогда не трогаем - он
+# остаётся оператору в инбоксе, а не превращается в событие догадкой.
+
+REPLY_CONFIRMED = "confirmed"       # явное «кончилось» - только по RB_-коду
+REPLY_STILL_HAVE = "still_have"     # [Ещё есть]: +N дней, не учится
+REPLY_OPTOUT = "optout"             # [Больше не напоминать]: пара с отслеживания
+
+_STILL_HAVE_PHRASES = frozenset({
+    "still have", "i still have", "masih ada", "ещё есть", "еще есть",
+})
+_OPTOUT_PHRASES = frozenset({
+    "stop", "berhenti", "не напоминать", "больше не напоминать",
+})
+
+
+def parse_reply_intent(tenant: str, text: str,
+                       secret: str = "") -> tuple[str, str]:
+    """Входящий текст -> (intent, plan_id). ('', '') - не кнопочный ответ.
+
+    'confirmed' возвращается ТОЛЬКО при валидном подписанном RB_-коде (он
+    двигает EWMA - догадками его портить нельзя); кнопочные фразы дают
+    still_have/optout без plan_id - план решает вызывающий по контексту пары.
+    """
+    plan_id = parse_reorder_code(tenant, text, secret)
+    if plan_id:
+        return REPLY_CONFIRMED, plan_id
+    norm = re.sub(r"\s+", " ", str(text or "")).strip().casefold()
+    if norm in _STILL_HAVE_PHRASES:
+        return REPLY_STILL_HAVE, ""
+    if norm in _OPTOUT_PHRASES:
+        return REPLY_OPTOUT, ""
+    return "", ""
+
+
 def connect_url(phone_display: str, tenant: str, uid: str,
                 secret: str = "") -> str:
     """Ссылка wa.me для конкретного юзера. '' - канал не настроен."""
