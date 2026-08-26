@@ -528,7 +528,40 @@
     p.style.cssText = "opacity:.85";
     text.appendChild(p);
     bar.appendChild(text);
-    var cta = safeUrl(msg.cta_url);
+    // Опрос (kind: "nps"): вместо кнопки - шкала 0-10. Ответ = событие
+    // survey_answer, по нему же баннер гаснет навсегда. Это вход продуктовой
+    // аналитики: оценка падает в скоринг и в гипотезы «что менять».
+    if (msg.kind === "nps") {
+      var scale = document.createElement("div");
+      scale.style.cssText = "flex:none;display:flex;gap:4px;flex-wrap:wrap";
+      for (var s = 0; s <= 10; s++) {
+        (function (score) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = String(score);
+          btn.style.cssText =
+            "width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.35);" +
+            "background:none;color:#fff;font:600 13px system-ui;cursor:pointer";
+          btn.addEventListener("click", function () {
+            send("survey_answer", { meta: JSON.stringify({
+              message_id: msg.message_id, survey: "nps", score: score }) });
+            hideId(msg.message_id);
+            var el = document.getElementById("ra-inapp");
+            if (el) {
+              el.textContent = "";
+              var thanks = document.createElement("span");
+              thanks.textContent = "Thank you!";
+              thanks.style.cssText = "flex:1;text-align:center;font-weight:600";
+              el.appendChild(thanks);
+              setTimeout(function () { el.remove(); }, 1200);
+            }
+          });
+          scale.appendChild(btn);
+        })(s);
+      }
+      bar.appendChild(scale);
+    }
+    var cta = msg.kind === "nps" ? "" : safeUrl(msg.cta_url);
     if (cta) {
       var a = document.createElement("a");
       a.href = cta;

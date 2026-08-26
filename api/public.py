@@ -125,7 +125,7 @@ def inbox():
 
     rows = q(
         """
-        SELECT message_id, title, body, cta_label, cta_url
+        SELECT message_id, title, body, cta_label, cta_url, kind
         FROM retention.inapp_inbox
         WHERE tenant_id = {t:String} AND client_user_id = {u:String}
           AND expires_at > now()
@@ -163,7 +163,8 @@ def inbox():
     return api_json({'tg_bot': tg_bot, 'tg_link': tg_link, 'wa_link': wa_link,
                      'messages': [
         {'message_id': r[0], 'title': r[1], 'body': r[2],
-         'cta_label': r[3], 'cta_url': r[4]} for r in rows]})
+         'cta_label': r[3], 'cta_url': r[4],
+         'kind': (r[5] if len(r) > 5 else 'banner') or 'banner'} for r in rows]})
 
 # ── Email: отписка и вебхуки доставки Resend ─────────────────────────────────
 

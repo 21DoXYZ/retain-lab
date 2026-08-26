@@ -100,6 +100,12 @@ STAGES: dict[str, dict] = {
         "when": lambda t: t.weekday() == 0 and t.hour == 8 and t.minute == 10,
         "deps": ["uplift_report"], "fresh_h": 24,
     },
+    "product_insights": {
+        # продуктовые гипотезы: аналитика виджета + голос юзеров -> что менять
+        "argv": ["python", "product_insights.py"],
+        "when": lambda t: t.weekday() == 1 and t.hour == 8 and t.minute == 0,
+        "deps": ["product_sync"], "fresh_h": 24 * 8,
+    },
     "weekly_digest": {
         # письмо владельцу после свежего uplift: ценность видна без входа в CRM
         "argv": ["python", "weekly_digest.py"],
@@ -240,7 +246,7 @@ def name_argv(name: str) -> list[str]:
 # чтобы свежесть, поднятая stitch в этот же тик, сразу увидел scoring/campaign.
 _ORDER = ["stitch", "plans", "contacts", "users_sync", "product_sync",
           "cancel_reasons", "scoring", "campaign_tick", "triggers",
-          "uplift_report", "ai_analyst", "weekly_digest"]
+          "uplift_report", "ai_analyst", "product_insights", "weekly_digest"]
 
 
 def main() -> None:

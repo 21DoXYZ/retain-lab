@@ -127,7 +127,7 @@ def exit_status(current_stage: str, entry_stage: str, step_idx: int,
 
 INAPP_COLUMNS = ["tenant_id", "message_id", "client_user_id", "identity_id",
                  "campaign_id", "step_idx", "title", "body", "cta_label",
-                 "cta_url", "entry_stage", "expires_at", "created_at"]
+                 "cta_url", "entry_stage", "kind", "expires_at", "created_at"]
 
 
 MAX_SEND_RETRIES = 3
@@ -314,7 +314,10 @@ def inapp_row(tenant: str, camp: dict, step: dict, step_idx: int, identity: str,
             strip(render(step["body"], ctx)),
             strip(render(step.get("cta_label", "Open"), ctx)) or "Open",
             _safe_cta(render(step.get("cta_url", "{{app_url}}"), ctx)),
-            camp["entry_stage"], now + ttl, now]
+            camp["entry_stage"],
+            # kind: 'nps' рисуется виджетом как шкала 0-10, не баннер с кнопкой
+            str(step.get("survey") or "banner"),
+            now + ttl, now]
 
 
 def resolve_autopilot(conf: dict, tenant_overrides: dict) -> bool:

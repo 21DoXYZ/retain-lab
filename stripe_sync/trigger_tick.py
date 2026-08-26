@@ -74,6 +74,20 @@ TRIGGERS: dict[str, str] = {
             GROUP BY identity_id
         ) WHERE bal <= 3 AND last_spend >= now() - INTERVAL 24 HOUR
     """,
+    # NPS-пульс: ВОВЛЕЧЁННЫМ (5+ ценных действий, месяц с нами, активен на
+    # неделе). Спрашивать оценку у того, кто не пользовался - мусорный сигнал.
+    # Кулдаун 90 дней держит reentry_days кампании.
+    "T4_nps": """
+        SELECT ua.identity_id
+        FROM retention.user_actions ua
+        JOIN retention.user_event_features f
+          ON f.tenant_id = ua.tenant_id AND f.identity_id = ua.identity_id
+        WHERE ua.tenant_id = %(t)s
+          AND f.generations_total >= 5
+          AND f.first_seen <= now() - INTERVAL 30 DAY
+          AND f.last_seen >= now() - INTERVAL 7 DAY
+          AND ua.client_user_id != ''
+    """,
     # Карта платящего истекает в ближайшие 14 дней - невольный отток,
     # который дешевле всего перехватить ДО фейла списания.
     "T3_card_expiring": """

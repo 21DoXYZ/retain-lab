@@ -394,6 +394,7 @@ SELECT tenant_id, identity_id, event_id,
        any(ts)           AS ts,
        any(event_type)   AS event_type,
        any(source)       AS source,
+       any(page)         AS page,
        any(tokens_spent) AS tokens_spent,
        any(meta)         AS meta
 FROM retention.saas_events_resolved
@@ -740,11 +741,15 @@ CREATE TABLE IF NOT EXISTS retention.inapp_inbox
     `cta_label`      String,
     `cta_url`        String,
     `entry_stage`    LowCardinality(String),
+    `kind`           LowCardinality(String) DEFAULT 'banner',  -- banner | nps
     `expires_at`     DateTime,
     `created_at`     DateTime64(3)
 )
 ENGINE = ReplacingMergeTree(created_at)
 ORDER BY (tenant_id, message_id);
+ALTER TABLE retention.inapp_inbox
+    ADD COLUMN IF NOT EXISTS `kind` LowCardinality(String) DEFAULT 'banner'
+    AFTER `entry_stage`;
 
 -- ============================================================================
 -- Phase 6 — Замер: недельный uplift-отчёт по кампаниям (target vs holdout).

@@ -61,6 +61,7 @@ export const saas: Partial<Messages> = {
   "saas.pipeline.stage.guard": "Infra guard",
   "saas.pipeline.stage.uplift": "Uplift measure",
   "saas.pipeline.stage.analyst": "AI analyst",
+  "saas.pipeline.stage.productai": "Product hypotheses",
 
   "saas.uplift.title": "Uplift report",
   "saas.uplift.lead": "We deliberately leave a small group untouched and compare them with everyone else. The difference is what the autopilot actually earned - not what it sent.",
@@ -410,6 +411,10 @@ export const saas: Partial<Messages> = {
   "saas.insights.dismiss": "Dismiss",
   "saas.insights.manual": "This one is your call - the platform never changes chain structure by itself.",
   "saas.insights.reasons": "Why they leave (in users' own words)",
+  "saas.insights.product": "Product hypotheses",
+  "saas.insights.product.lead": "Built weekly from widget analytics (friction pages, funnel), user feedback, tickets and NPS answers. Every hypothesis cites its evidence - nothing is invented.",
+  "saas.insights.product.change": "Suggested change",
+  "saas.insights.product.answers": "answers",
   "saas.insights.kind.drop_step": "drop the step",
   "saas.insights.kind.change_delay": "change timing",
   "saas.insights.kind.rewrite_copy": "rewrite copy",

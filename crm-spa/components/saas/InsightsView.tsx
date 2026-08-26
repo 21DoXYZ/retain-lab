@@ -31,9 +31,23 @@ interface ReasonRow {
   examples: string[];
 }
 
+interface ProductHypothesis {
+  theme: string;
+  hypothesis: string;
+  suggested_change: string;
+  evidence: string[];
+}
+
 interface Payload {
   insights: Insight[];
   cancel_reasons: ReasonRow[];
+  product?: {
+    hypotheses: ProductHypothesis[];
+    facts_summary?: {
+      funnel?: Record<string, number>;
+      nps?: { answers: number; nps: number | null; detractors: number };
+    };
+  } | null;
 }
 
 /** Виды, которые платформа умеет применить сама (остальное - руками). */
@@ -163,6 +177,39 @@ export function InsightsView() {
             </div>
           </Card>
         ))}
+
+      {/* Продуктовые гипотезы: аналитика виджета + голос юзеров -> что менять */}
+      {state === "data" && (data?.product?.hypotheses?.length ?? 0) > 0 && (
+        <Card className="flex flex-col gap-3 p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="text-[15px] font-semibold text-ink">{t("saas.insights.product")}</div>
+            {data?.product?.facts_summary?.nps?.nps != null ? (
+              <span className="font-mono text-[12.5px] text-steel">
+                NPS {data.product.facts_summary.nps.nps}
+                {" · "}{data.product.facts_summary.nps.answers} {t("saas.insights.product.answers")}
+              </span>
+            ) : null}
+          </div>
+          <p className="text-[12.5px] text-steel">{t("saas.insights.product.lead")}</p>
+          <div className="flex flex-col gap-3">
+            {data?.product?.hypotheses.map((h, i) => (
+              <div key={i} className="rounded-ctl border border-hair bg-surface p-3.5">
+                <div className="text-[13.5px] font-semibold text-ink">{h.theme}</div>
+                <p className="mt-1 text-[13px] leading-relaxed text-slate">{h.hypothesis}</p>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-ink">
+                  <span className="font-medium text-primary">{t("saas.insights.product.change")}:</span>{" "}
+                  {h.suggested_change}
+                </p>
+                {h.evidence.length ? (
+                  <p className="mt-1.5 text-[11.5px] italic text-steel">
+                    {h.evidence.slice(0, 3).join("  ·  ")}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {state === "data" && (data?.cancel_reasons.length ?? 0) > 0 && (
         <Card className="flex flex-col gap-3 p-5">

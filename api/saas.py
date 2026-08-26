@@ -1436,8 +1436,16 @@ def saas_insights():
         GROUP BY category ORDER BY count() DESC
         """, {'t': tenant})[1]]
 
+    # Продуктовые гипотезы (product_insights, Вт 08:00): что менять в продукте
+    product = None
+    try:
+        from stripe_sync.knowledge import load as _kb
+        product = _kb(_ch_direct(), tenant, 'product_insights') or None
+    except Exception:  # noqa: BLE001
+        pass
+
     return api_json({'tenant': tenant, 'insights': insights,
-                     'cancel_reasons': reasons})
+                     'cancel_reasons': reasons, 'product': product})
 
 
 @bp.post('/saas/insights/act')
@@ -3429,6 +3437,7 @@ _PIPELINE_STAGES = [
     ('scoring', 'scoring'), ('campaign_tick', 'campaigns'),
     ('triggers', 'triggers'),
     ('uplift_report', 'uplift'), ('ai_analyst', 'analyst'),
+    ('product_insights', 'productai'),
     ('ops_guard', 'guard'),
 ]
 
@@ -3436,7 +3445,7 @@ _PIPELINE_STAGES = [
 _STAGE_FRESH_H = {
     'stitch': 2, 'plans': 26, 'contacts': 26, 'users_sync': 26,
     'product_sync': 26, 'cancel_reasons': 26, 'scoring': 26, 'campaign_tick': 26,
-    'triggers': 1, 'ops_guard': 1,
+    'triggers': 1, 'ops_guard': 1, 'product_insights': 24 * 8,
     'uplift_report': 24, 'ai_analyst': 24,
 }
 

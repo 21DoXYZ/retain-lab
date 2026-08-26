@@ -60,6 +60,7 @@ export const saas = {
   "saas.pipeline.stage.guard": "Сторож инфраструктуры",
   "saas.pipeline.stage.uplift": "Замер uplift",
   "saas.pipeline.stage.analyst": "ИИ-аналитик",
+  "saas.pipeline.stage.productai": "Продуктовые гипотезы",
 
   "saas.uplift.title": "Uplift-отчёт",
   "saas.uplift.lead": "Небольшую группу мы намеренно не трогаем и сравниваем с остальными. Разница - это то, что автопилот реально заработал, а не то, что он разослал.",
@@ -409,6 +410,10 @@ export const saas = {
   "saas.insights.dismiss": "Отклонить",
   "saas.insights.manual": "Это решение принимаешь ты - платформа не меняет структуру цепочек сама.",
   "saas.insights.reasons": "Почему уходят (словами юзеров)",
+  "saas.insights.product": "Продуктовые гипотезы",
+  "saas.insights.product.lead": "Собираются еженедельно из аналитики виджета (страницы трения, воронка), отзывов, тикетов и ответов NPS. Каждая гипотеза цитирует свои доказательства - ничего не выдумано.",
+  "saas.insights.product.change": "Что менять",
+  "saas.insights.product.answers": "ответов",
   "saas.insights.kind.drop_step": "убрать шаг",
   "saas.insights.kind.change_delay": "поменять тайминг",
   "saas.insights.kind.rewrite_copy": "переписать текст",

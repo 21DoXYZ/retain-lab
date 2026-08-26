@@ -455,6 +455,27 @@
             "cta_url": "{{card_update_url}}"
           }
         ]
+      },
+      {
+        "campaign_id": "T4_nps",
+        "title": "Trigger: NPS pulse for engaged users",
+        "entry_stage": "TRIGGER",
+        "manual_audience": true,
+        "reentry_days": 90,
+        "goal": {
+          "event_type": "survey_answer",
+          "window_days": 14
+        },
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "inapp",
+            "survey": "nps",
+            "ttl_days": 7,
+            "subject": "Quick question",
+            "body": "How likely are you to recommend us to a colleague? 0 = not at all, 10 = absolutely."
+          }
+        ]
       }
     ]
   }
