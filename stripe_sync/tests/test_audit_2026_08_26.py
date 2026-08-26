@@ -138,3 +138,14 @@ def test_uplift_window_math():
     days, window = 7, 14
     lo, hi = days + window, window   # 21, 14
     assert lo > hi                    # интервал непустой (now-21 старше now-14)
+
+
+# ── LIVE FIX: stitch email overwrite by empty snippet email ──────────────────
+def test_stitch_uses_last_nonempty_email():
+    import inspect
+    import stitch
+    src = inspect.getsource(stitch.rebuild) if hasattr(stitch, "rebuild") else ""
+    # argMaxIf по непустому email, не голый argMax
+    full = open(stitch.__file__).read()
+    assert "argMaxIf(email, ts, email != '')" in full
+    assert "argMax(email, ts) AS email_open" not in full

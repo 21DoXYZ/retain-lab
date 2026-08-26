@@ -260,7 +260,11 @@ def run_stitch(client, tenant_id: str, now_ts: str) -> dict[str, int]:
         for r in client.query(
             """
             SELECT client_user_id, email_hash, stripe_customer_id, toString(max(ts)),
-                   argMax(email, ts) AS email_open
+                   -- последний НЕПУСТОЙ email (2026-08-26): снипет-события шлют
+                   -- email='' (браузер даёт только хэш) и они свежее импорта -
+                   -- голый argMax(email, ts) возвращал пустое и стирал реальный
+                   -- адрес, юзер становился недостижим письмом при живой почте
+                   argMaxIf(email, ts, email != '') AS email_open
             FROM retention.saas_events
             WHERE tenant_id = %(t)s
               AND (client_user_id != '' OR email_hash != '' OR stripe_customer_id != '')
