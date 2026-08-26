@@ -92,14 +92,20 @@ def campaign_report(client, tenant: str, camp: dict, days: int) -> dict | None:
                 WHERE tenant_id = %(t)s AND event_type = %(g)s
             ) ev ON ev.identity_id = e.identity_id
             WHERE e.tenant_id = %(t)s AND e.campaign_id = %(c)s
-              AND e.enrolled_at >= now() - INTERVAL %(d)s DAY
+              AND e.enrolled_at >= now() - INTERVAL %(dw)s DAY
               AND e.enrolled_at <= now() - INTERVAL %(w)s DAY
             GROUP BY e.identity_id
         )
         GROUP BY control
         """,
+        # КОГОРТА С ЗАКРЫТЫМ ОКНОМ (аудит r3 2026-08-26): окно закрывается через
+        # window_days после зачисления, и мы хотим тех, у кого оно закрылось за
+        # последние `days` дней. Значит enrolled_at в [now-(days+window), now-window].
+        # Было `>= now-days` - при window>=days интервал ПУСТОЙ, и uplift не
+        # считался НИКОГДА (n_target=n_control=0 для всех кампаний навсегда).
         parameters={"t": tenant, "c": camp["campaign_id"],
-                    "g": goal["event_type"], "w": window_days, "d": days},
+                    "g": goal["event_type"], "w": window_days,
+                    "dw": days + window_days},
     ).result_rows
 
     # сколько ещё «в полёте» - окно не закрылось, в расчёт не берём
@@ -133,9 +139,10 @@ def campaign_report(client, tenant: str, camp: dict, days: int) -> dict | None:
         JOIN retention.user_actions ua
           ON ua.tenant_id = e.tenant_id AND ua.identity_id = e.identity_id
         WHERE e.tenant_id = %(t)s AND e.campaign_id = %(c)s
-          AND e.enrolled_at >= now() - INTERVAL %(d)s DAY
+          AND e.enrolled_at >= now() - INTERVAL %(dw)s DAY
         """,
-        parameters={"t": tenant, "c": camp["campaign_id"], "d": days},
+        parameters={"t": tenant, "c": camp["campaign_id"],
+                    "dw": days + window_days},
     ).result_rows[0][0] or 0.0)
 
     m = uplift_math(n_t, n_c, cv_t, cv_c, avg_check, bool(goal.get("invert")))

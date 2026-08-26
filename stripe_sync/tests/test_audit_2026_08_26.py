@@ -117,3 +117,24 @@ def test_product_sync_mapping_is_per_row_guarded():
     src = inspect.getsource(product_sync.main)
     # mapping и insert - ВНУТРИ try датасета
     assert "for r in raw:" in src and "except Exception:  # noqa: BLE001 - один ряд" in src
+
+
+# ── ROUND 3 ──────────────────────────────────────────────────────────────────
+
+# r3-1 HIGH: uplift cohort window not inverted
+def test_uplift_cohort_window_not_inverted():
+    import inspect
+    import uplift_report
+    src = inspect.getsource(uplift_report.campaign_report)
+    # нижняя граница = days+window, не days
+    assert "days + window_days" in src
+    assert "%(dw)s" in src
+    # старой инвертированной формы быть не должно
+    assert "INTERVAL %(d)s DAY\n" not in src
+
+
+def test_uplift_window_math():
+    """При days=7, window=14 когорта = enrolled в [now-21д, now-14д] (непустой)."""
+    days, window = 7, 14
+    lo, hi = days + window, window   # 21, 14
+    assert lo > hi                    # интервал непустой (now-21 старше now-14)

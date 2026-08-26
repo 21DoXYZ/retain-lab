@@ -546,6 +546,10 @@
             send("survey_answer", { meta: JSON.stringify({
               message_id: msg.message_id, survey: "nps", score: score }) });
             hideId(msg.message_id);
+            // снимаем Escape-листенер: без этого он оставался жить и позже по
+            // Escape слал ложный inapp_dismissed на уже отвеченный опрос
+            // (аудит r3 2026-08-26)
+            document.removeEventListener("keydown", onKey);
             var el = document.getElementById("ra-inapp");
             if (el) {
               el.textContent = "";
@@ -938,7 +942,14 @@
       if (!a) return;
       var href = a.getAttribute("href") || "";
       if (a.hasAttribute("download") || FILE_RE.test(href)) {
-        send("download_click", metaProps({ href: href.slice(0, 200) }));
+        // только имя файла, БЕЗ query-строки: в ?token=/?sig= ссылок на
+        // скачивание бывают секреты, им не место в аналитике (аудит r3)
+        var fname = "";
+        try {
+          var u = new URL(href, location.href);
+          fname = u.pathname.split("/").pop() || u.pathname;
+        } catch (_) { fname = href.split("?")[0].split("#")[0].slice(-80); }
+        send("download_click", metaProps({ file: fname.slice(0, 120) }));
         return;
       }
       var host = "";

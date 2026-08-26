@@ -122,10 +122,15 @@ def leak_audit():
         WHERE s.tenant_id = {t:String} AND s.status = 'canceled'
           AND s.canceled_at >= now() - INTERVAL 30 DAY
           AND s.customer_id NOT IN (
-              SELECT stripe_customer_id FROM identities_current i
-              JOIN saas_events_resolved e ON e.identity_id = i.identity_id
+              -- окно 60д (аудит r3 2026-08-26): без границы по ts подзапрос
+              -- резолвил ВСЮ историю событий; отмена нас интересует за 30д,
+              -- флоу отмены раньше неё тем более в этом окне
+              SELECT i.stripe_customer_id FROM identities_current i
+              JOIN saas_events e ON e.tenant_id = i.tenant_id
+                AND e.client_user_id = i.client_user_id
               WHERE i.tenant_id = {t:String}
-                AND e.event_type = 'cancel_flow_started')
+                AND e.event_type = 'cancel_flow_started'
+                AND e.ts >= now() - INTERVAL 60 DAY)
         """,
         {'t': tenant})[1][0]
 
@@ -3092,10 +3097,13 @@ def saas_user_card():
         # События ДО ra.identify() уходят без client_user_id (session_start и
         # первый page_view почти всегда раньше логина). Пришиваем их через
         # сессию: события той же session_id, где человек позже опознался, - его.
+        # окно 30д на подзапрос сессий (аудит r3 2026-08-26): карточка
+        # показывает поведение за 14 дней, а session_id-подзапрос сканировал
+        # всю историю партиции тенанта - ограничиваем тем же горизонтом
         own = ("(client_user_id = {c:String} OR (session_id != '' AND session_id IN ("
                "SELECT DISTINCT session_id FROM saas_events "
                "WHERE tenant_id = {t:String} AND client_user_id = {c:String} "
-               "AND session_id != '')))")
+               "AND session_id != '' AND ts >= now() - INTERVAL 30 DAY)))")
         agg = q(
             f"""
             SELECT

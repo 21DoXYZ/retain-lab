@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Banner, DataTable, PageHeader, type Column, type TableState } from "@/components/ui";
@@ -62,6 +62,10 @@ export function UsersView() {
   const [debouncedQuery, setDebouncedQuery] = useState<string>("");
   const [state, setState] = useState<TableState>("loading");
   const [noTenant, setNoTenant] = useState(false);
+  // latest-wins: быстрый клик по фильтрам оставляет два запроса в полёте;
+  // без этого счётчика поздний ответ на старый фильтр перетирал бы свежий
+  // (аудит r3 2026-08-26)
+  const reqSeq = useRef(0);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query.trim()), 350);
@@ -70,6 +74,7 @@ export function UsersView() {
 
   const load = useCallback((s: string, online: boolean, sn: string, p: string, q2: string) => {
     setState("loading");
+    const mine = ++reqSeq.current;
     const params = new URLSearchParams();
     if (s) params.set("stage", s);
     if (online) params.set("online", "1");
@@ -79,10 +84,12 @@ export function UsersView() {
     const qs = params.toString();
     flaskFetch<UsersData>("/api/v1/saas/users" + (qs ? `?${qs}` : ""))
       .then((d) => {
+        if (mine !== reqSeq.current) return;   // пришёл ответ на устаревший фильтр
         setData(d);
         setState(d.users.length ? "data" : "empty");
       })
       .catch((e: unknown) => {
+        if (mine !== reqSeq.current) return;
         setNoTenant(isNoTenant(e));
         setState("error");
       });

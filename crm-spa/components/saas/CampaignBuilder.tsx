@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Button, Card } from "@/components/ui";
@@ -89,15 +89,19 @@ export function CampaignBuilder({ onLaunched }: { onLaunched: () => void }) {
     country: country.trim() || undefined,
   };
   const audienceKey = JSON.stringify(audience);
+  const previewSeq = useRef(0);
 
   useEffect(() => {
     const id = setTimeout(() => {
+      // latest-wins: поздний ответ на старый фильтр не должен показать/дать
+      // запустить не ту аудиторию (аудит r3 2026-08-26)
+      const mine = ++previewSeq.current;
       flaskFetch<Preview>("/api/v1/saas/segments/preview", {
         method: "POST",
         body: { audience: JSON.parse(audienceKey) },
       })
-        .then(setPreview)
-        .catch(() => setPreview(null));
+        .then((p) => { if (mine === previewSeq.current) setPreview(p); })
+        .catch(() => { if (mine === previewSeq.current) setPreview(null); });
     }, 400);
     return () => clearTimeout(id);
     // audienceKey - сериализованный фильтр целиком

@@ -71,9 +71,15 @@ TRIGGERS: dict[str, str] = {
                    max(ts) AS last_spend
             FROM retention.saas_events_resolved
             WHERE tenant_id = %(t)s AND event_type = 'credit_spend'
+              AND ts >= now() - INTERVAL 30 DAY
             GROUP BY identity_id
         ) WHERE bal <= 3 AND last_spend >= now() - INTERVAL 24 HOUR
     """,
+    # окно 30д (аудит r3 2026-08-26): credit_spend - самое частое событие; без
+    # границы триггер пересканировал всю историю каждую минуту. argMax внутри
+    # 30д даёт тот же последний баланс (свежие события есть), а last_spend>=24h
+    # фильтрует. T0 (signup) НЕ трогаем: там min(ts) защищает от историч.
+    # импортов и ограничение по ts его бы сломало.
     # NPS-пульс: ВОВЛЕЧЁННЫМ (5+ ценных действий, месяц с нами, активен на
     # неделе). Спрашивать оценку у того, кто не пользовался - мусорный сигнал.
     # Кулдаун 90 дней держит reentry_days кампании.
