@@ -30,6 +30,19 @@ from datetime import datetime, timezone
 # вернуть identity_id и (для журнала) stage-подобную пометку. Кулдаун здесь
 # НЕ проверяется - им владеет reentry_days кампании в движке.
 TRIGGERS: dict[str, str] = {
+    # Регистрация 30 минут - 24 часа назад: даём транзакционному письму
+    # продукта уйти первым, но ловим человека в самый горячий момент.
+    # Окно 24ч отсекает исторические импорты (у них ts = давняя дата
+    # регистрации); кулдаун кампании (reentry 3650д) = одно welcome навсегда.
+    "T0_welcome": """
+        SELECT identity_id FROM (
+            SELECT identity_id, min(ts) AS first_signup
+            FROM retention.saas_events_resolved
+            WHERE tenant_id = %(t)s AND event_type = 'signup'
+            GROUP BY identity_id
+        ) WHERE first_signup BETWEEN now() - INTERVAL 24 HOUR
+                                 AND now() - INTERVAL 30 MINUTE
+    """,
     # Чекаут открыт 30+ минут назад (и не старше 48ч), оплата после него не
     # пришла, человек не платящий. 30 минут - чтобы не влезть в живую оплату.
     "T1_checkout_rescue": """

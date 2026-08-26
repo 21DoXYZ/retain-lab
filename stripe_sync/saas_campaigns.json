@@ -4,6 +4,36 @@
     "autopilot": false,
     "campaigns": [
       {
+        "campaign_id": "T0_welcome",
+        "title": "Trigger: welcome right after signup",
+        "entry_stage": "TRIGGER",
+        "manual_audience": true,
+        "reentry_days": 3650,
+        "goal": {
+          "event_type": "generation_completed",
+          "window_days": 7
+        },
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "Welcome - here is the fastest first win",
+            "body": "Hi! I am glad you signed up - I am a real person on the team, not a bot.\n\nThe quickest way to see if this is for you: open the product and finish one small thing. It usually takes a couple of minutes: {{app_url}}\n\nIf anything is confusing, just reply to this email - I read every answer.",
+            "cta_label": "Get my first result",
+            "cta_url": "{{app_url}}"
+          },
+          {
+            "delay_h": 1,
+            "action": "inapp",
+            "ttl_days": 3,
+            "subject": "Welcome aboard",
+            "body": "Your first result is a couple of minutes away - pick up where you left off.",
+            "cta_label": "Continue",
+            "cta_url": "{{app_url}}"
+          }
+        ]
+      },
+      {
         "campaign_id": "K1_activation",
         "title": "Activation: signed up, no first result in 48h",
         "entry_stage": "ACTIVATE",
