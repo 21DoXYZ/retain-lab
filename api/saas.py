@@ -2383,6 +2383,12 @@ def channels_email_verify():
                                   'email_dns_records': ca.dns_rows(data)})
 
     ca.resend_verify_domain(dom_id, key)
+    # open/click tracking включаем сразу (2026-08-26): без него Resend не шлёт
+    # opened/clicked, и вся аналитика открытий тихо мертва
+    try:
+        ca.resend_enable_tracking(dom_id, key)
+    except Exception:  # noqa: BLE001 - трекинг не критичен для верификации
+        pass
     ok, status, data = ca.resend_get_domain(dom_id, key)
     if not ok:
         return _bad(f'resend_{status}', 502)

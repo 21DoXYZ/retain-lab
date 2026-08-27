@@ -149,3 +149,51 @@ def test_stitch_uses_last_nonempty_email():
     full = open(stitch.__file__).read()
     assert "argMaxIf(email, ts, email != '')" in full
     assert "argMax(email, ts) AS email_open" not in full
+
+
+# ── ROUND 4: silent data loss class ──────────────────────────────────────────
+def test_t2_credits_guards_missing_balance():
+    import inspect
+    from trigger_tick import TRIGGERS
+    sql = TRIGGERS["T2_credits_out"]
+    assert "argMaxIf(JSONExtractFloat(meta, 'balance_after'), ts" in sql
+    assert "JSONHas(meta, 'balance_after')" in sql
+    assert "bal_ts > 0" in sql              # без валидного баланса не срабатывает
+
+
+def test_credits_left_guards_missing_balance():
+    import inspect
+    import campaign_tick
+    src = inspect.getsource(campaign_tick.tick)
+    # обе ветки credit_spend/signup под JSONHas
+    assert src.count("JSONHas(meta, 'balance_after')") >= 1
+    assert "JSONHas(meta, 'credits_balance')" in src
+
+
+def test_last_seen_excludes_billing():
+    from pathlib import Path
+    sch = (Path(__file__).parent.parent.parent / "saas_schema.sql").read_text()
+    # last_seen теперь maxIf без billing.*
+    assert "maxIf(ts, event_type NOT LIKE 'billing.%')                           AS last_seen" in sch
+    assert "max(ts)                                                              AS last_seen" not in sch
+
+
+def test_mrr_excludes_trialing():
+    from pathlib import Path
+    sch = (Path(__file__).parent.parent.parent / "saas_schema.sql").read_text()
+    assert "sumIf(monthly, is_paying_row)" in sch
+    assert "status IN ('active', 'past_due')                             AS is_paying_row" in sch
+    assert "sumIf(monthly, alive_rank >= 2)" not in sch
+
+
+def test_datacenter_reads_nested_geo():
+    from pathlib import Path
+    sch = (Path(__file__).parent.parent.parent / "saas_schema.sql").read_text()
+    assert "JSONExtractInt(meta, 'geo', 'datacenter')" in sch
+
+
+def test_scoring_burn_uses_period_usage():
+    import inspect
+    import scoring
+    assert "user_period_usage u" in scoring.FEATURE_QUERY
+    assert "coalesce(u.tokens_spent_period, f.tokens_spent_month, 0)" in scoring.FEATURE_QUERY

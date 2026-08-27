@@ -505,10 +505,13 @@ def tick(client, tenant: str) -> dict[str, int]:
         for r in client.query(
             """
             SELECT identity_id, argMax(val, ts) FROM (
+                -- только строки С balance_after (2026-08-26): без гарда свежее
+                -- событие без ключа давало 0 и рендерило ложное «0 кредитов»
                 SELECT identity_id, ts,
                        JSONExtractFloat(meta, 'balance_after') AS val
                 FROM retention.saas_events_resolved
                 WHERE tenant_id = %(t)s AND event_type = 'credit_spend'
+                  AND JSONHas(meta, 'balance_after')
                 UNION ALL
                 SELECT identity_id, ts,
                        JSONExtractFloat(meta, 'credits_balance') AS val

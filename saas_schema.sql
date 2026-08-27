@@ -411,7 +411,12 @@ SELECT
     identity_id,
     -- ── использование и жизненный цикл ──
     min(ts)                                                              AS first_seen,
-    max(ts)                                                              AS last_seen,
+    -- last_seen = последняя ПРОДУКТОВАЯ активность, БЕЗ billing.* (2026-08-26):
+    -- голый max(ts) включал billing.invoice_paid, и у молчащего платящего
+    -- клиента каждое продление освежало last_seen - он выпадал из winback и
+    -- терял dormancy-штраф. Потребители (scoring days_since_seen, segment
+    -- seen/not_seen, online-бейдж) ждут именно продуктовую активность.
+    maxIf(ts, event_type NOT LIKE 'billing.%')                           AS last_seen,
     countIf(event_type IN ('generation_completed', 'value_moment'))                                  AS generations_total,
     countIf(event_type IN ('generation_completed', 'value_moment') AND ts >= now() - INTERVAL 7 DAY) AS generations_7d,
     countIf(event_type IN ('generation_completed', 'value_moment') AND ts >= now() - INTERVAL 14 DAY
@@ -484,7 +489,10 @@ SELECT
     argMaxIf(JSONExtractString(meta, 'model'), ts,
              JSONExtractString(meta, 'model') != '')                     AS device_model,
     maxIf(JSONExtractInt(meta, 'apple_pay'), event_type = 'session_start') AS apple_pay,
-    argMaxIf(JSONExtractInt(meta, 'datacenter'), ts,
+    -- вложенный путь meta.geo.datacenter (2026-08-26): ingest кладёт весь geo
+    -- под meta.geo (app.py setdefault('geo', geo)), а фича читала top-level
+    -- meta.datacenter и всегда получала 0 - датацентр-трафик не отсекался
+    argMaxIf(JSONExtractInt(meta, 'geo', 'datacenter'), ts,
              JSONExtractString(meta, 'geo', 'ip') != '')                 AS datacenter
 FROM retention.saas_events_deduped
 GROUP BY tenant_id, identity_id;
@@ -525,7 +533,11 @@ SELECT tenant_id,
        argMax(canceled_at, (alive_rank, monthly))          AS canceled_at,
        argMax(current_period_start, (alive_rank, monthly)) AS current_period_start,
        argMax(current_period_end, (alive_rank, monthly))   AS current_period_end,
-       round(sumIf(monthly, alive_rank >= 2), 2)           AS mrr_total,
+       -- MRR = только реально ПЛАТЯЩИЕ (active/past_due) (2026-08-26): триал
+       -- (alive_rank 3) ещё не заплатил ни разу, его нельзя класть в выручку.
+       -- Флаг is_paying_row из подзапроса, НЕ alias status (иначе CH видит
+       -- argMax(status) inside aggregate - ловушка 24.10)
+       round(sumIf(monthly, is_paying_row), 2)             AS mrr_total,
        count()                                             AS subs_count
 FROM (
     SELECT *,
@@ -534,7 +546,8 @@ FROM (
                    status = 'past_due', 2,
                    status IN ('paused', 'incomplete', 'unpaid'), 1,
                    0)                                                AS alive_rank,
-           if(bill_interval = 'year', toFloat64(amount) / 12, toFloat64(amount)) AS monthly
+           if(bill_interval = 'year', toFloat64(amount) / 12, toFloat64(amount)) AS monthly,
+           status IN ('active', 'past_due')                             AS is_paying_row
     FROM retention.stripe_subscriptions_latest
 )
 GROUP BY tenant_id, customer_id;

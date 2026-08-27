@@ -97,7 +97,11 @@ SELECT
     coalesce(f.paywall_views, 0)                    AS paywall_views,
     coalesce(f.checkout_starts, 0)                  AS checkout_starts,
     coalesce(f.cancel_flow_14d, 0)                  AS cancel_flow_14d,
-    coalesce(f.tokens_spent_month, 0)               AS tokens_spent_month,
+    -- burn считаем по ОПЛАЧЕННОМУ периоду, не календарному месяцу (2026-08-26):
+    -- у клиента с оплатой не 1-го числа календарный счётчик обнулялся посреди
+    -- периода и power_score/p_churn расходились со стадией UPGRADE, которая уже
+    -- использует user_period_usage. coalesce: нет периода - падаем на месяц
+    coalesce(u.tokens_spent_period, f.tokens_spent_month, 0)  AS tokens_spent_month,
     if(f.last_seen IS NULL OR toUnixTimestamp(f.last_seen) = 0,
        999, dateDiff('day', f.last_seen, now()))    AS days_since_seen,
     if(f.first_seen IS NULL OR toUnixTimestamp(f.first_seen) = 0,
@@ -121,6 +125,8 @@ LEFT JOIN retention.user_event_features f
     ON i.tenant_id = f.tenant_id AND i.identity_id = f.identity_id
 LEFT JOIN retention.tenant_plans_current p
     ON i.tenant_id = p.tenant_id AND s.plan_id = p.plan_id
+LEFT JOIN retention.user_period_usage u
+    ON i.tenant_id = u.tenant_id AND i.identity_id = u.identity_id
 WHERE i.tenant_id = %(t)s
 """
 

@@ -67,13 +67,19 @@ TRIGGERS: dict[str, str] = {
     "T2_credits_out": """
         SELECT identity_id FROM (
             SELECT identity_id,
-                   argMax(JSONExtractFloat(meta, 'balance_after'), ts) AS bal,
+                   -- argMaxIf по строкам, ГДЕ balance_after ЕСТЬ (2026-08-26):
+                   -- часть credit_spend приходит без balance_after (~9% дыра),
+                   -- голый argMax брал 0 у свежего пустого события и слал
+                   -- ложное «кредиты кончились» юзеру с полным балансом
+                   argMaxIf(JSONExtractFloat(meta, 'balance_after'), ts,
+                            JSONHas(meta, 'balance_after')) AS bal,
+                   maxIf(ts, JSONHas(meta, 'balance_after')) AS bal_ts,
                    max(ts) AS last_spend
             FROM retention.saas_events_resolved
             WHERE tenant_id = %(t)s AND event_type = 'credit_spend'
               AND ts >= now() - INTERVAL 30 DAY
             GROUP BY identity_id
-        ) WHERE bal <= 3 AND last_spend >= now() - INTERVAL 24 HOUR
+        ) WHERE bal_ts > 0 AND bal <= 3 AND last_spend >= now() - INTERVAL 24 HOUR
     """,
     # окно 30д (аудит r3 2026-08-26): credit_spend - самое частое событие; без
     # границы триггер пересканировал всю историю каждую минуту. argMax внутри

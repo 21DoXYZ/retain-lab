@@ -75,6 +75,18 @@ def resend_create_domain(domain: str, api_key: str) -> tuple[bool, str, dict]:
                     _resend_headers(api_key))
 
 
+def resend_enable_tracking(domain_id: str, api_key: str) -> tuple[bool, str, dict]:
+    """Включить open/click tracking на домене (2026-08-26).
+
+    БЕЗ этого Resend НЕ шлёт события opened/clicked, даже если вебхук на них
+    подписан - и вся аналитика открытий, A/B по кликам и догонялки «только
+    неоткрывшим» тихо мертвы. Вызывается при подключении/верификации домена.
+    """
+    return _request("PATCH", f"{RESEND_API}/domains/{domain_id}",
+                    {"open_tracking": True, "click_tracking": True},
+                    _resend_headers(api_key))
+
+
 def resend_find_domain(domain: str, api_key: str) -> dict:
     """Домен, УЖЕ заведённый в аккаунте клиента (часто он там есть и проверен).
 
