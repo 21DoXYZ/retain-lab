@@ -230,3 +230,20 @@ def test_payment_method_snapshots_card_expiry():
     # без карты/клиента - не снапшотим
     evt["data"]["object"]["card"] = None
     assert snapshot(evt, "t1") is None
+
+
+def test_phone_captured_from_checkout_and_customer():
+    from mapper import snapshot
+    # checkout.session.completed - customer_details.phone
+    t, row = snapshot(_evt("checkout.session.completed", {
+        "customer": "cus_9",
+        "customer_details": {"email": "b@x.co", "name": "B", "phone": "+971501234567"}}),
+        TENANT)
+    assert t == "stripe_customers" and row["phone"] == "+971501234567"
+    # customer.created - obj.phone
+    t2, row2 = snapshot(_evt("customer.created", {
+        "id": "cus_9", "email": "b@x.co", "phone": "+14155550100"}), TENANT)
+    assert row2["phone"] == "+14155550100"
+    # нет телефона - пустая строка, не падаем
+    t3, row3 = snapshot(_evt("customer.created", {"id": "cus_9", "email": "b@x.co"}), TENANT)
+    assert row3["phone"] == ""

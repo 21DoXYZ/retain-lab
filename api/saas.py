@@ -3033,6 +3033,23 @@ def saas_user_card():
                 by_channel[c[0]] = row
     contacts = list(by_channel.values())
 
+    # Телефон из Stripe Checkout (2026-08-28): показываем оператору в карточке.
+    # consent=0 - оплата даёт согласие на сервисные касания, но НЕ на промо
+    # SMS/WhatsApp (для этого нужно явное согласие; в US это ещё и TCPA). Так
+    # оператор видит номер и может написать вручную, а автопилот его не трогает.
+    stripe_phone = ''
+    scid = str(r[3] or '')
+    if scid:
+        pr = q("SELECT argMax(phone, updated_at) FROM stripe_customers "
+               "WHERE tenant_id = {t:String} AND customer_id = {c:String}",
+               {'t': tenant, 'c': scid})[1]
+        stripe_phone = str(pr[0][0]) if pr and pr[0] and pr[0][0] else ''
+    if stripe_phone and not any(c['channel'] in ('whatsapp', 'sms')
+                                for c in contacts):
+        contacts.append({'channel': 'whatsapp', 'address': stripe_phone,
+                         'consent': 0, 'consent_ts': '', 'source': 'stripe'})
+    user['stripe_phone'] = stripe_phone
+
     email_suppressed = bool(email) and bool(q(
         "SELECT count() FROM email_suppressions_current "
         "WHERE tenant_id = {t:String} AND address = {a:String}",

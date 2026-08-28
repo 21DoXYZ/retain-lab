@@ -262,6 +262,7 @@ def snapshot(evt: dict[str, Any], tenant_id: str) -> tuple[str, dict[str, Any]] 
             "email_norm": normalize_email(email),
             "email_hash": email_hash(email) if email else "",
             "name": obj.get("name") or "",
+            "phone": str(obj.get("phone") or ""),   # Stripe customer.phone
             "created_ts": ts_str(obj.get("created")),
             "meta": "{}",
             "updated_at": now,
@@ -282,6 +283,9 @@ def snapshot(evt: dict[str, Any], tenant_id: str) -> tuple[str, dict[str, Any]] 
             "email_norm": normalize_email(email),
             "email_hash": email_hash(email),
             "name": details.get("name") or "",
+            # Stripe Checkout customer_details.phone - собирается, если включён
+            # сбор телефона; раньше терялся, теперь -> контакт для WhatsApp/SMS
+            "phone": str(details.get("phone") or ""),
             "created_ts": ts_str(evt.get("created")),
             "meta": "{}",
             "updated_at": now,

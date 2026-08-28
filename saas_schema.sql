@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS retention.stripe_customers
     `email_norm`  String,
     `email_hash`  String,
     `name`        String,
+    `phone`       String DEFAULT '',   -- телефон из Stripe Checkout/customer
     `created_ts`  DateTime64(3),
     `meta`        String,
     `updated_at`  DateTime64(3)

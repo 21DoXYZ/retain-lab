@@ -142,7 +142,7 @@ def fetch_stripe(tenant: str) -> dict[str, list[list]]:
 
 COLUMNS = {
     "stripe_customers": ["tenant_id", "customer_id", "email", "email_norm", "email_hash",
-                         "name", "created_ts", "meta", "updated_at"],
+                         "name", "phone", "created_ts", "meta", "updated_at"],
     "stripe_subscriptions": ["tenant_id", "subscription_id", "customer_id", "status",
                              "plan_id", "price_id", "amount", "currency", "bill_interval",
                              "current_period_start", "current_period_end", "trial_start",
