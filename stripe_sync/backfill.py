@@ -52,7 +52,7 @@ def mock_world(tenant: str, n: int, seed: int) -> dict[str, list[list]]:
         email = f"user{i}@example.test"
         created = base + timedelta(days=rng.randint(0, 60), minutes=rng.randint(0, 1440))
         customers.append([tenant, cid, email, normalize_email(email), email_hash(email),
-                          f"Mock User {i}", ts_str(created.timestamp()), "{}", now])
+                          f"Mock User {i}", "", ts_str(created.timestamp()), "{}", now])
 
         plan, cents, interval = rng.choice(PLANS)
         status = rng.choice(SUB_STATUSES)
@@ -108,7 +108,7 @@ def fetch_stripe(tenant: str) -> dict[str, list[list]]:
     for c in stripe.Customer.list(limit=100).auto_paging_iter():
         out["stripe_customers"].append([
             tenant, c.id, c.email or "", normalize_email(c.email), email_hash(c.email),
-            c.name or "", ts_str(c.created), "{}", now])
+            c.name or "", str(c.phone or ""), ts_str(c.created), "{}", now])
 
     for s in stripe.Subscription.list(status="all", limit=100).auto_paging_iter():
         item = s["items"]["data"][0] if s["items"]["data"] else None
