@@ -134,3 +134,46 @@ def test_trigger_conditions_are_tenant_scoped():
     from trigger_tick import TRIGGERS
     for cid, sql in TRIGGERS.items():
         assert sql.count("%(t)s") >= 1, cid
+
+
+def test_contact_filter_single_and_or():
+    from segment import contact_conditions, CONTACT_TOKENS
+    assert set(CONTACT_TOKENS) >= {"email", "inapp", "whatsapp", "telegram", "phone"}
+    # один тип
+    conds, unk = contact_conditions(["telegram"])
+    assert unk == [] and len(conds) == 1
+    assert "channel = 'telegram'" in conds[0] and "ua.client_user_id" in conds[0]
+    # несколько - ИЛИ в одном условии (широкий фильтр)
+    conds2, _ = contact_conditions(["email", "phone"])
+    assert conds2[0].startswith("(") and " OR " in conds2[0]
+    assert "ua.email_norm != ''" in conds2[0] and "phone != ''" in conds2[0]
+
+
+def test_contact_filter_from_csv_and_consent():
+    from segment import contact_conditions
+    conds, unk = contact_conditions("whatsapp,telegram", consent=True)
+    assert unk == []
+    assert "consent = 1" in conds[0]
+
+
+def test_contact_filter_no_contact_and_alias():
+    from segment import contact_conditions
+    conds, _ = contact_conditions([], no_contact=True, alias="")
+    assert conds and conds[0].startswith("NOT (")
+    # пустой alias - без 'ua.' префикса (для FROM user_actions без псевдонима)
+    assert "ua." not in conds[0]
+    assert "email_norm != ''" in conds[0]
+
+
+def test_contact_filter_unknown_token_reported():
+    from segment import contact_conditions
+    conds, unk = contact_conditions(["email", "fax"])
+    assert unk == ["fax"] and "ua.email_norm != ''" in conds[0]
+
+
+def test_build_wires_contacts_and_describe():
+    conds, _p, unknown = build({"contacts": ["telegram"], "status": "paying"})
+    assert unknown == []
+    assert any("channel = 'telegram'" in c for c in conds)
+    assert "has telegram" in describe({"contacts": ["telegram"]})
+    assert "no contact" in describe({"no_contact": True})

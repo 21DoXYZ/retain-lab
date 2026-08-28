@@ -26,7 +26,20 @@ interface SaasUser {
   last_seen: string;
   stage_note: string;
   online: boolean;
+  contacts?: {
+    email: boolean; inapp: boolean; whatsapp: boolean;
+    telegram: boolean; sms: boolean; phone: boolean;
+  };
 }
+
+/** Компактные бейджи каналов связи (что реально можно написать юзеру). */
+const CONTACT_BADGES: { key: "email" | "phone" | "whatsapp" | "telegram" | "inapp"; icon: string; title: string }[] = [
+  { key: "email", icon: "@", title: "email" },
+  { key: "whatsapp", icon: "WA", title: "WhatsApp" },
+  { key: "telegram", icon: "TG", title: "Telegram" },
+  { key: "phone", icon: "☎", title: "phone" },
+  { key: "inapp", icon: "in-app", title: "in-app" },
+];
 
 interface UsersData {
   stages: Record<string, number>;
@@ -58,6 +71,7 @@ export function UsersView() {
   const [onlineOnly, setOnlineOnly] = useState(false);
   const [seen, setSeen] = useState<string>("");        // 1d | 7d | 30d | ""
   const [pay, setPay] = useState<string>("");          // paying | trial | free | ""
+  const [contact, setContact] = useState<string>("");  // email|phone|whatsapp|telegram|inapp|none|""
   const [query, setQuery] = useState<string>("");
   const [debouncedQuery, setDebouncedQuery] = useState<string>("");
   const [state, setState] = useState<TableState>("loading");
@@ -72,7 +86,7 @@ export function UsersView() {
     return () => clearTimeout(id);
   }, [query]);
 
-  const load = useCallback((s: string, online: boolean, sn: string, p: string, q2: string) => {
+  const load = useCallback((s: string, online: boolean, sn: string, p: string, q2: string, c: string) => {
     setState("loading");
     const mine = ++reqSeq.current;
     const params = new URLSearchParams();
@@ -81,6 +95,9 @@ export function UsersView() {
     if (sn) params.set("seen", sn);
     if (p) params.set("status", p);
     if (q2) params.set("q", q2);
+    // "none" - недостижимые; остальные значения - типы контакта (движок сегментов)
+    if (c === "none") params.set("no_contact", "1");
+    else if (c) params.set("contact", c);
     const qs = params.toString();
     flaskFetch<UsersData>("/api/v1/saas/users" + (qs ? `?${qs}` : ""))
       .then((d) => {
@@ -95,8 +112,8 @@ export function UsersView() {
       });
   }, []);
 
-  useEffect(() => load(stage, onlineOnly, seen, pay, debouncedQuery),
-            [load, stage, onlineOnly, seen, pay, debouncedQuery]);
+  useEffect(() => load(stage, onlineOnly, seen, pay, debouncedQuery, contact),
+            [load, stage, onlineOnly, seen, pay, debouncedQuery, contact]);
 
   const columns: Column<SaasUser>[] = [
     {
@@ -109,7 +126,15 @@ export function UsersView() {
             ) : null}
             <span className="truncate">{r.email || r.client_user_id || r.identity_id.slice(0, 8)}</span>
           </div>
-          {r.client_user_id ? <div className="text-[11px] text-steel">{r.client_user_id}</div> : null}
+          <div className="flex items-center gap-1 mt-0.5">
+            {r.contacts ? CONTACT_BADGES.filter((b) => r.contacts![b.key]).map((b) => (
+              <span key={b.key} title={b.title}
+                    className="inline-flex items-center rounded px-1 py-px text-[9.5px] font-semibold uppercase leading-none bg-surface text-steel border border-hair">
+                {b.icon}
+              </span>
+            )) : null}
+            {r.client_user_id ? <span className="text-[11px] text-steel truncate">{r.client_user_id}</span> : null}
+          </div>
         </div>
       ),
     },
@@ -191,9 +216,22 @@ export function UsersView() {
             <option value="trial">{t("saas.users.pay.trial")}</option>
             <option value="free">{t("saas.users.pay.free")}</option>
           </select>
-          {(stage || onlineOnly || seen || pay || query) ? (
+          <select
+            value={contact}
+            onChange={(e) => setContact(e.target.value)}
+            className="rounded-full border border-hair2 bg-canvas px-3 py-1.5 text-[12.5px] font-semibold text-slate outline-none transition-colors focus:border-primary"
+          >
+            <option value="">{t("saas.users.contact.any")}</option>
+            <option value="email">{t("saas.users.contact.email")}</option>
+            <option value="phone">{t("saas.users.contact.phone")}</option>
+            <option value="whatsapp">{t("saas.users.contact.whatsapp")}</option>
+            <option value="telegram">{t("saas.users.contact.telegram")}</option>
+            <option value="inapp">{t("saas.users.contact.inapp")}</option>
+            <option value="none">{t("saas.users.contact.none")}</option>
+          </select>
+          {(stage || onlineOnly || seen || pay || contact || query) ? (
             <button
-              onClick={() => { setStage(""); setOnlineOnly(false); setSeen(""); setPay(""); setQuery(""); }}
+              onClick={() => { setStage(""); setOnlineOnly(false); setSeen(""); setPay(""); setContact(""); setQuery(""); }}
               className="text-[12px] font-medium text-steel transition-colors hover:text-primary"
             >
               {t("saas.users.clearFilters")}
@@ -230,7 +268,7 @@ export function UsersView() {
         getRowKey={(r) => r.identity_id}
         getRowHref={(r) => `/users/${encodeURIComponent(r.identity_id)}`}
         state={state}
-        onRetry={() => load(stage, onlineOnly, seen, pay, debouncedQuery)}
+        onRetry={() => load(stage, onlineOnly, seen, pay, debouncedQuery, contact)}
         emptyTitle={t("saas.users.empty.title")}
         emptyDescription={t("saas.users.empty.desc")}
       />

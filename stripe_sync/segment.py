@@ -42,6 +42,59 @@ def _num(raw, lo: float, hi: float) -> float | None:
     return v if lo <= v <= hi else None
 
 
+# ── Фильтр по типу контакта ──────────────────────────────────────────────────
+# Один источник правды для «есть ли у юзера такой контакт»: питает и движок
+# сегментов (кампании), и список юзеров, и превью достижимости. Требует в scope
+# биндинг {t:String} и колонки user_actions (email_norm, client_user_id,
+# stripe_customer_id) - alias задаётся вызывающим ("ua" в сегменте, "" в списке).
+CONTACT_TOKENS = ("email", "inapp", "whatsapp", "telegram", "sms", "phone")
+
+
+def contact_expr(token: str, alias: str = "ua", consent: bool = False) -> str | None:
+    """SQL «у юзера есть контакт типа token». None - незнакомый токен."""
+    p = f"{alias}." if alias else ""
+    cc = " AND consent = 1" if consent else ""
+    if token == "email":
+        return f"{p}email_norm != ''"
+    if token == "inapp":
+        return f"{p}client_user_id != ''"
+    if token in ("whatsapp", "telegram", "sms", "viber"):
+        return (f"{p}client_user_id != '' AND {p}client_user_id IN "
+                f"(SELECT client_user_id FROM contacts_current "
+                f"WHERE tenant_id = {{t:String}} AND channel = '{token}'{cc})")
+    if token == "phone":
+        # любой телефон: whatsapp/sms контакт с согласием ИЛИ номер из Stripe
+        return (f"({p}client_user_id IN (SELECT client_user_id FROM contacts_current "
+                f"WHERE tenant_id = {{t:String}} AND channel IN ('whatsapp', 'sms'){cc}) "
+                f"OR {p}stripe_customer_id IN (SELECT customer_id FROM stripe_customers "
+                f"WHERE tenant_id = {{t:String}} AND phone != ''))")
+    return None
+
+
+def any_contact_expr(alias: str = "ua") -> str:
+    """Достижим хоть каким-то каналом (для фильтра «нет контакта» = NOT этого)."""
+    exprs = [contact_expr(t, alias, False)
+             for t in ("email", "inapp", "phone", "telegram")]
+    return "(" + " OR ".join(e for e in exprs if e) + ")"
+
+
+def contact_conditions(tokens, no_contact: bool = False,
+                       consent: bool = False, alias: str = "ua"):
+    """(conds, unknown_tokens). Выбранные типы объединяются ИЛИ (широко: есть
+    ЛЮБОЙ из отмеченных); no_contact добавляет «недостижим ничем»."""
+    conds: list[str] = []
+    toks = tokens if isinstance(tokens, (list, tuple)) else (
+        [t for t in str(tokens or "").split(",") if t] if tokens else [])
+    valid = [t for t in toks if t in CONTACT_TOKENS]
+    unknown = [t for t in toks if t not in CONTACT_TOKENS]
+    if valid:
+        exprs = [contact_expr(t, alias, consent) for t in valid]
+        conds.append("(" + " OR ".join(e for e in exprs if e) + ")")
+    if no_contact:
+        conds.append("NOT " + any_contact_expr(alias))
+    return conds, unknown
+
+
 def build(flt: dict) -> tuple[list[str], dict, list[str]]:
     """(условия SQL, строковые параметры, что не поняли).
 
@@ -127,6 +180,14 @@ def build(flt: dict) -> tuple[list[str], dict, list[str]]:
         else:
             unknown.append("country")
 
+    # тип контакта: широкий фильтр «кому вообще можно написать и как»
+    c_conds, c_unknown = contact_conditions(
+        flt.get("contacts"), bool(flt.get("no_contact")),
+        bool(flt.get("contact_consent")))
+    conds += c_conds
+    if c_unknown:
+        unknown.append("contacts")
+
     return conds, params, unknown
 
 
@@ -207,4 +268,15 @@ def describe(flt: dict) -> str:
             parts.append(f"{k}={flt[k]}")
     if flt.get("country"):
         parts.append(str(flt["country"]).upper())
+    toks = flt.get("contacts")
+    toks = toks if isinstance(toks, (list, tuple)) else (
+        [t for t in str(toks or "").split(",") if t] if toks else [])
+    valid = [t for t in toks if t in CONTACT_TOKENS]
+    if valid:
+        tag = "has " + "/".join(valid)
+        if flt.get("contact_consent"):
+            tag += " (consented)"
+        parts.append(tag)
+    if flt.get("no_contact"):
+        parts.append("no contact")
     return ", ".join(parts) or "all users"

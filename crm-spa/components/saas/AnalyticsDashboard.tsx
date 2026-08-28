@@ -24,6 +24,10 @@ export interface AnalyticsData {
     new_signups_30d: number; new_paying_30d: number; churned_30d: number;
     paying_rate: number;
   } | null;
+  cash?: {
+    d30: { invoices: number; collected: number; recurring: number; onetime: number; onetime_count: number };
+    all: { invoices: number; collected: number; recurring: number; onetime: number; onetime_count: number };
+  } | null;
   growth?: {
     days: string[]; signups: number[]; active: number[]; generations: number[];
     new_paying: number[]; cumulative_users: number[];
@@ -97,6 +101,17 @@ const L: Record<string, Record<Loc, string>> = {
   },
   last30: { ru: "за 30 дней", en: "last 30 days", tr: "son 30 gün" },
   poweredBy: { ru: "Аналитика", en: "Analytics", tr: "Analitik" },
+  cash: { ru: "Собрано кэша", en: "Cash collected", tr: "Toplanan nakit" },
+  collected: { ru: "Всего собрано", en: "Total collected", tr: "Toplam" },
+  recurring: { ru: "Подписки (recurring)", en: "Recurring", tr: "Yinelenen" },
+  onetime: { ru: "Разовые платежи", en: "One-time", tr: "Tek seferlik" },
+  invoicesPaid: { ru: "оплаченных инвойсов", en: "paid invoices", tr: "ödenmiş fatura" },
+  cashHint: {
+    ru: "MRR - только повторяющаяся выручка подписок; разовые платежи (офферы, паки) сюда не входят, поэтому собрано больше MRR.",
+    en: "MRR counts recurring subscription revenue only; one-time payments (offers, packs) are separate, so collected exceeds MRR.",
+    tr: "MRR yalnızca yinelenen abonelik gelirini sayar; tek seferlik ödemeler ayrıdır, bu yüzden toplanan MRR'yi aşar.",
+  },
+  allTime: { ru: "за всё время", en: "all time", tr: "tüm zamanlar" },
 };
 
 // ── Форматтеры ────────────────────────────────────────────────────────────────
@@ -204,6 +219,7 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
   const t = (k: string) => (L[k]?.[lc] ?? L[k]?.en ?? k);
 
   const ov = data.overview;
+  const cash = data.cash;
   const g = data.growth;
   const geo = data.geography;
   const fn = data.funnel;
@@ -243,6 +259,35 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
         <SCard label={t("newSignups")} value={num(ov?.new_signups_30d)} sub={`+${num(ov?.new_paying_30d)} ${t("paying").toLowerCase()}`} icon="🚀" />
         <SCard label={t("churned")} value={num(ov?.churned_30d)} sub={t("last30")} icon="📉" valueTone={ov && ov.churned_30d > 0 ? "neg" : "default"} />
       </SCardGrid>
+
+      {/* Собранный кэш: recurring vs разовые - то, что MRR не показывает */}
+      {cash && cash.d30.collected > 0 && (
+        <Section title={t("cash")} right={<span className="text-[12px] text-steel">{t("last30")}</span>}>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="bg-cream border border-beige rounded-md p-4">
+              <div className="text-[11px] text-steel uppercase tracking-wide">{t("collected")}</div>
+              <div className="text-[26px] font-semibold text-ink">{usd(cash.d30.collected)}</div>
+              <div className="text-[11px] text-steel">{cash.d30.invoices} {t("invoicesPaid")}</div>
+            </div>
+            <div className="bg-surface rounded-md p-4">
+              <div className="text-[11px] text-steel uppercase tracking-wide">{t("recurring")}</div>
+              <div className="text-[26px] font-semibold text-ink">{usd(cash.d30.recurring)}</div>
+              <div className="text-[11px] text-steel">MRR {usd(ov?.mrr)}</div>
+            </div>
+            <div className="bg-surface rounded-md p-4">
+              <div className="text-[11px] text-steel uppercase tracking-wide">{t("onetime")}</div>
+              <div className="text-[26px] font-semibold text-primary">{usd(cash.d30.onetime)}</div>
+              <div className="text-[11px] text-steel">{cash.d30.onetime_count} · {t("last30")}</div>
+            </div>
+          </div>
+          <div className="text-[12px] text-steel mt-3">{t("cashHint")}</div>
+          {cash.all.collected > cash.d30.collected && (
+            <div className="text-[12px] text-steel mt-1">
+              {t("allTime")}: <span className="text-ink font-medium">{usd(cash.all.collected)}</span> · {cash.all.invoices} {t("invoicesPaid")}
+            </div>
+          )}
+        </Section>
+      )}
 
       {/* Рост */}
       {g && g.days.length > 0 && (

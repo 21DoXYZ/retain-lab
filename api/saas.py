@@ -985,6 +985,18 @@ def saas_users():
     elif pay == 'free':
         where += " AND sub_status NOT IN ('active', 'past_due', 'trialing')"
 
+    # Фильтр по типу контакта (?contact=email,telegram&no_contact=1&contact_consent=1).
+    # Тот же движок, что у сегментов кампаний - alias пустой (FROM user_actions
+    # без псевдонима). {t:String} уже в params.
+    from stripe_sync import segment as _seg
+    c_tokens = str(request.args.get('contact') or '').strip()
+    c_no = str(request.args.get('no_contact') or '') in ('1', 'true')
+    c_consent = str(request.args.get('contact_consent') or '') in ('1', 'true')
+    if c_tokens or c_no:
+        c_conds, _cu = _seg.contact_conditions(c_tokens, c_no, c_consent, alias='')
+        for c in c_conds:
+            where += f" AND {c}"
+
     rows = q(
         f"""
         SELECT identity_id, email_norm, client_user_id, stripe_customer_id,
@@ -1010,6 +1022,29 @@ def saas_users():
         'stage_note': r[14],
         'online': len(r) > 15 and _flt(r[15]) < ONLINE_THRESHOLD_S,
     } for r in rows]
+
+    # Пометки контактов: один проход по contacts_current + телефоны Stripe,
+    # аннотируем срез в Python (дёшево, срез <= 500). email/inapp - из строки.
+    chan_by_cuid: dict[str, set] = {}
+    for cuid, chan in q(
+            "SELECT client_user_id, channel FROM contacts_current "
+            "WHERE tenant_id = {t:String} AND client_user_id != ''",
+            {'t': tenant})[1]:
+        chan_by_cuid.setdefault(str(cuid), set()).add(str(chan))
+    phone_cids = {str(r[0]) for r in q(
+        "SELECT DISTINCT customer_id FROM stripe_customers "
+        "WHERE tenant_id = {t:String} AND phone != ''", {'t': tenant})[1]}
+    for u in users:
+        chans = chan_by_cuid.get(u['client_user_id'], set()) if u['client_user_id'] else set()
+        has_phone = bool(chans & {'whatsapp', 'sms'}) or u['stripe_customer_id'] in phone_cids
+        u['contacts'] = {
+            'email': bool(u['email']),
+            'inapp': bool(u['client_user_id']),
+            'whatsapp': 'whatsapp' in chans,
+            'telegram': 'telegram' in chans,
+            'sms': 'sms' in chans,
+            'phone': has_phone,
+        }
 
     stages = {r[0]: int(r[1]) for r in q(
         "SELECT stage, count() FROM user_actions WHERE tenant_id = {t:String} GROUP BY stage",
@@ -1805,9 +1840,25 @@ def saas_segment_preview():
     with_email = sum(1 for r in rows if r[2])
     with_cuid = sum(1 for r in rows if r[3])
     from stripe_sync.segment import describe
+
+    # Достижимость по каналам: тот же сегмент + условие «есть контакт X».
+    # email/inapp уже посчитаны по строкам; для мессенджеров/телефона - count.
+    from stripe_sync import segment as _seg
+    conds, sparams, _ = _seg.build(audience)
+    reach = {'email': with_email, 'inapp': with_cuid}
+    try:
+        where = " AND ".join(["ua.tenant_id = {t:String}"] + conds)
+        for tok in ('phone', 'whatsapp', 'telegram'):
+            sql = (f"SELECT count() {_seg.AUDIENCE_FROM} "
+                   f"WHERE {where} AND {_seg.contact_expr(tok, 'ua', False)}")
+            reach[tok] = int(q(sql, {'t': tenant, **sparams})[1][0][0])
+    except Exception as exc:  # noqa: BLE001 - счётчики не роняют превью
+        print(f'[segment] {tenant}: reach failed: {exc}', flush=True)
+
     return api_json({
         'tenant': tenant, 'count': len(rows),
         'reachable_email': with_email, 'reachable_inapp': with_cuid,
+        'reach': reach,
         'description': describe(audience), 'ignored_filters': unknown,
         'sample': [{'identity_id': r[0], 'stage': r[1], 'email': r[2]}
                    for r in rows[:8]],

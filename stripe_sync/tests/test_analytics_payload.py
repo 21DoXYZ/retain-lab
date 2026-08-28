@@ -51,3 +51,18 @@ def test_funnel_percentages():
     assert steps['signup']['pct'] == 100.0
     assert steps['activated']['count'] == 120 and steps['activated']['pct'] == 60.0
     assert steps['paid']['pct'] == 10.0
+
+
+def test_cash_splits_recurring_and_onetime():
+    """Собранный кэш = recurring (есть sub) + разовые (sub пустой)."""
+    def q(_sql, _p=None):
+        # count, sum(amt), sumIf(has_sub), sumIf(NOT has_sub), countIf(NOT has_sub)
+        return (None, [[34, 3276.0, 819.0, 2457.0, 13]])
+    c = ap._cash(q, {'t': 't'})
+    assert c['d30']['collected'] == 3276.0
+    assert c['d30']['recurring'] == 819.0
+    assert c['d30']['onetime'] == 2457.0
+    assert c['d30']['onetime_count'] == 13
+    assert c['d30']['invoices'] == 34
+    # all-time окно тоже собирается (та же заглушка)
+    assert c['all']['collected'] == 3276.0

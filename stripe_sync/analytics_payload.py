@@ -62,6 +62,7 @@ def build(q, tenant: str, public: bool = False) -> dict:
     out: dict = {
         'tenant': tenant,
         'overview': _overview(q, p),
+        'cash': _cash(q, p),
         'growth': _growth(q, p),
         'geography': _geography(q, p),
         'funnel': _funnel(q, p),
@@ -112,6 +113,52 @@ def _overview(q, p) -> dict | None:
         }
     except Exception as exc:  # noqa: BLE001
         print(f'[analytics] overview failed: {exc}', flush=True)
+        return None
+
+
+def _cash(q, p) -> dict | None:
+    """Реально собранный кэш из оплаченных инвойсов - НЕ то же, что MRR. MRR
+    считает только повторяющуюся выручку подписок; разовые платежи (оффер
+    вебинара, паки кредитов) в MRR не попадают вовсе, и без этого блока владелец
+    их не видит.
+
+    recurring/разовый разделяем по СУММЕ: свежий Stripe убрал subscription_id с
+    верхнего уровня инвойса (тот же трап, что в backfill._sub_period) - поле
+    пустое почти везде, полагаться на него нельзя. Зато сумма инвойса, совпавшая
+    с ценой активной подписки, - это платёж по подписке; остальное разовое.
+    Дедуп по invoice_id (argMax), иначе пересинк задваивает суммы."""
+    try:
+        prices = sorted({round(_flt(r[0]), 2) for r in q(
+            "SELECT DISTINCT argMax(amount, updated_at) FROM stripe_subscriptions "
+            "WHERE tenant_id = {t:String} GROUP BY subscription_id", p)[1]
+            if _flt(r[0]) > 0})
+        in_list = ", ".join(str(x) for x in prices) or "0"
+
+        def _win(days: int) -> dict:
+            r = q(f"""
+                SELECT count(),
+                       round(sum(amt), 2),
+                       round(sumIf(amt, is_rec), 2),
+                       round(sumIf(amt, NOT is_rec), 2),
+                       countIf(NOT is_rec)
+                FROM (
+                  SELECT invoice_id,
+                         argMax(amount_paid, updated_at) AS amt,
+                         (argMax(subscription_id, updated_at) != ''
+                          OR round(argMax(amount_paid, updated_at), 2) IN ({in_list})) AS is_rec,
+                         argMax(status, updated_at) AS st,
+                         argMax(created_ts, updated_at) AS c
+                  FROM stripe_invoices
+                  WHERE tenant_id = {{t:String}} GROUP BY invoice_id
+                ) WHERE st = 'paid'""" + (
+                    f" AND c >= now() - INTERVAL {int(days)} DAY" if days else ""),
+                p)[1][0]
+            return {'invoices': int(r[0]), 'collected': _flt(r[1]),
+                    'recurring': _flt(r[2]), 'onetime': _flt(r[3]),
+                    'onetime_count': int(r[4])}
+        return {'d30': _win(30), 'all': _win(0)}
+    except Exception as exc:  # noqa: BLE001
+        print(f'[analytics] cash failed: {exc}', flush=True)
         return None
 
 

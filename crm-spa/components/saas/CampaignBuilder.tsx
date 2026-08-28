@@ -18,9 +18,19 @@ interface Preview {
   count: number;
   reachable_email: number;
   reachable_inapp: number;
+  reach?: { email?: number; inapp?: number; phone?: number; whatsapp?: number; telegram?: number };
   description: string;
   ignored_filters: string[];
 }
+
+// Типы контакта для сегмента (совпадают с CONTACT_TOKENS движка сегментов).
+const CONTACT_TYPES: { key: string; label: MessageKey }[] = [
+  { key: "email", label: "saas.users.contact.email" },
+  { key: "phone", label: "saas.users.contact.phone" },
+  { key: "whatsapp", label: "saas.users.contact.whatsapp" },
+  { key: "telegram", label: "saas.users.contact.telegram" },
+  { key: "inapp", label: "saas.users.contact.inapp" },
+];
 
 interface BuilderStep {
   action: "email" | "inapp";
@@ -60,6 +70,9 @@ export function CampaignBuilder({ onLaunched }: { onLaunched: () => void }) {
   const [ticketsMin, setTicketsMin] = useState("");
   const [bugsMin, setBugsMin] = useState("");
   const [country, setCountry] = useState("");
+  const [contacts, setContacts] = useState<string[]>([]);
+  const [noContact, setNoContact] = useState(false);
+  const [contactConsent, setContactConsent] = useState(false);
   const [controlPct, setControlPct] = useState("10");
   const [steps, setSteps] = useState<BuilderStep[]>([{ ...EMPTY_STEP }]);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -87,6 +100,9 @@ export function CampaignBuilder({ onLaunched }: { onLaunched: () => void }) {
     tickets_min: num(ticketsMin),
     bugs_min: num(bugsMin),
     country: country.trim() || undefined,
+    contacts: contacts.length ? contacts : undefined,
+    no_contact: noContact || undefined,
+    contact_consent: contactConsent || undefined,
   };
   const audienceKey = JSON.stringify(audience);
   const previewSeq = useRef(0);
@@ -216,6 +232,31 @@ export function CampaignBuilder({ onLaunched }: { onLaunched: () => void }) {
                  onChange={(e) => setCountry(e.target.value.toUpperCase())}
                  placeholder={t("saas.builder.f.country")} />
         </div>
+        {/* тип контакта: кому и как можно написать (широкий фильтр, ИЛИ) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={labelCls}>{t("saas.builder.f.contact")}</span>
+          {CONTACT_TYPES.map((c) => (
+            <button key={c.key} type="button"
+              onClick={() => { setNoContact(false); setContacts(contacts.includes(c.key) ? contacts.filter((x) => x !== c.key) : [...contacts, c.key]); }}
+              className={"border rounded-full px-3 py-1 text-[12px] font-semibold transition-colors " +
+                (contacts.includes(c.key) && !noContact ? "bg-primary text-white border-primary" : "bg-canvas text-slate border-hair2 hover:border-primary")}>
+              {t(c.label)}
+            </button>
+          ))}
+          <button type="button"
+            onClick={() => { setContacts([]); setNoContact(!noContact); }}
+            className={"border rounded-full px-3 py-1 text-[12px] font-semibold transition-colors " +
+              (noContact ? "bg-neg text-white border-neg" : "bg-canvas text-slate border-hair2 hover:border-neg")}>
+            {t("saas.users.contact.none")}
+          </button>
+          {contacts.length && !noContact ? (
+            <label className="flex items-center gap-1.5 text-[12px] text-slate">
+              <input type="checkbox" checked={contactConsent}
+                     onChange={(e) => setContactConsent(e.target.checked)} />
+              {t("saas.builder.f.consentOnly")}
+            </label>
+          ) : null}
+        </div>
         <div className="rounded-ctl border border-hair bg-surface px-4 py-3 text-[13px]">
           {preview ? (
             <>
@@ -223,6 +264,11 @@ export function CampaignBuilder({ onLaunched }: { onLaunched: () => void }) {
               <span className="text-steel">
                 {t("saas.builder.previewReach", { e: preview.reachable_email, i: preview.reachable_inapp })}
               </span>
+              {preview.reach && (preview.reach.phone || preview.reach.telegram) ? (
+                <span className="text-steel">
+                  {" · "}phone {preview.reach.phone ?? 0} · TG {preview.reach.telegram ?? 0}
+                </span>
+              ) : null}
               {preview.ignored_filters.length ? (
                 <div className="mt-1 text-[12px] text-amber-600">
                   {t("saas.builder.ignored")}: {preview.ignored_filters.join(", ")}
