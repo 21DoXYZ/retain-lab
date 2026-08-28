@@ -3594,3 +3594,100 @@ def _llm_runs(tenant: str) -> list:
             """, {'t': tenant})[1]]
     except Exception:  # noqa: BLE001
         return []
+
+
+# ── Вкладка «Аналитика» + внешний шаринг ─────────────────────────────────────
+# Профессиональный дашборд «что происходит»: рост, гео, воронка, деньги,
+# устройства. Один вызов - весь экран. Плюс read-only внешняя ссылка (без PII),
+# которую владелец даёт инвестору/партнёру, не открывая им кабинет.
+
+def _analytics_write_client():
+    import clickhouse_connect as _cc
+    import os as _os5
+    return _cc.get_client(host=_os5.environ.get('CH_HOST', 'clickhouse'),
+                          port=int(_os5.environ.get('CH_PORT', '8123')),
+                          username=_os5.environ.get('CH_USER', 'default'),
+                          password=_os5.environ.get('CH_PASSWORD', ''),
+                          database=_os5.environ.get('CH_DB', 'retention'))
+
+
+def _share_state(tenant: str) -> dict:
+    """Текущее состояние внешней ссылки тенанта: {enabled, token}."""
+    try:
+        r = q("SELECT token, enabled FROM analytics_shares_current "
+              "WHERE tenant_id = {t:String}", {'t': tenant})[1]
+        if r and int(r[0][1]) == 1 and str(r[0][0]):
+            return {'enabled': True, 'token': str(r[0][0])}
+    except Exception as exc:  # noqa: BLE001
+        print(f'[analytics] share_state {tenant}: {exc}', flush=True)
+    return {'enabled': False, 'token': ''}
+
+
+def _share_url(token: str) -> str:
+    host = _host()
+    base = host if host.startswith('http') else (f'https://{host}' if host else '')
+    return f'{base}/a/{token}' if token else ''
+
+
+@bp.get('/saas/analytics')
+@require_auth(roles=LEAK_ROLES)
+def saas_analytics():
+    """Весь дашборд аналитики + состояние внешней ссылки."""
+    from stripe_sync import analytics_payload as ap
+    tenant = _tenant_arg()
+    data = ap.build(q, tenant, public=False)
+    st = _share_state(tenant)
+    data['share'] = {'enabled': st['enabled'], 'url': _share_url(st['token'])}
+    return api_json(data)
+
+
+@bp.post('/saas/analytics/share')
+@require_auth(roles=CHANNEL_WRITE_ROLES)
+def saas_analytics_share():
+    """Управление внешней ссылкой: enable | rotate | disable.
+    enable - создаёт токен, если ссылки ещё нет (иначе отдаёт текущую);
+    rotate - выдаёт новый токен (старая ссылка мгновенно битая);
+    disable - гасит (enabled=0), не удаляя историю."""
+    tenant = _tenant_arg_write()
+    body = request.get_json(silent=True) or {}
+    action = str(body.get('action') or 'enable').strip()
+    if action not in ('enable', 'rotate', 'disable'):
+        return _bad(f'bad_action:{action}')
+
+    cur = _share_state(tenant)
+    if action == 'enable' and cur['enabled']:
+        token, enabled = cur['token'], 1
+    elif action == 'disable':
+        token, enabled = cur['token'] or _secrets.token_urlsafe(16), 0
+    else:  # enable-без-ссылки или rotate
+        token, enabled = _secrets.token_urlsafe(16), 1
+
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(tz=_tz.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    cl = _analytics_write_client()
+    cl.insert('retention.analytics_shares',
+              [[tenant, token, enabled, now, now]],
+              column_names=['tenant_id', 'token', 'enabled', 'created_at', 'updated_at'])
+    print(f'[analytics] {tenant}: share {action} -> enabled={enabled}', flush=True)
+    return api_json({'enabled': bool(enabled),
+                     'url': _share_url(token) if enabled else ''})
+
+
+@bp.get('/public/analytics/<token>')
+def public_analytics(token: str):
+    """Публичный read-only дашборд по токену. БЕЗ авторизации - но без PII:
+    только агрегаты (гео/воронка/деньги в сумме), ни одного email/имени."""
+    from stripe_sync import analytics_payload as ap
+    token = (token or '').strip()
+    row = q("SELECT tenant_id FROM analytics_shares_current "
+            "WHERE token = {tok:String} AND enabled = 1 LIMIT 1",
+            {'tok': token})[1]
+    if not row:
+        return api_json(error='link not found', code=404)
+    tenant = str(row[0][0])
+    data = ap.build(q, tenant, public=True)
+    # наружу не отдаём даже tenant_id (внутренний идентификатор)
+    data.pop('tenant', None)
+    tch = ca.load_tenants().get(tenant, {}) or {}
+    data['brand'] = {'company': str(tch.get('company') or tch.get('name') or 'Revenue Autopilot')}
+    return api_json(data)

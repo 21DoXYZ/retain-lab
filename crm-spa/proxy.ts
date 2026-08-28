@@ -19,7 +19,10 @@ import {
  */
 
 /** Path prefixes reachable without a session. */
-const PUBLIC_PATHS = ["/login"];
+// /a/<token> — внешняя read-only ссылка на дашборд аналитики (app/(public)/a):
+// её открывают без входа, гнать на /login нельзя. Данные и так без PII, а
+// невалидный токен отдаёт 404 на бэке.
+const PUBLIC_PATHS = ["/login", "/a"];
 
 function isPublic(pathname: string): boolean {
   // /dev (component showcase) is dev-only anyway — its layout 404s in

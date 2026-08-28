@@ -1123,3 +1123,27 @@ SELECT c.tenant_id                                             AS tenant_id,
                 toLastDayOfMonth(makeDate(c.exp_year, c.exp_month, 1))) AS days_to_expiry
 FROM retention.stripe_cards_current c
 WHERE c.exp_year > 0 AND c.exp_month BETWEEN 1 AND 12;
+
+-- ── Публичный шаринг аналитики ───────────────────────────────────────────────
+-- Владелец включает внешнюю ссылку на дашборд аналитики (read-only, без PII).
+-- Токен -> тенант; revoked=1 гасит ссылку, не удаляя строку (ссылка становится
+-- битой сразу). ReplacingMergeTree по updated_at: ротация = новая строка.
+CREATE TABLE IF NOT EXISTS retention.analytics_shares
+(
+    tenant_id   String,
+    token       String,
+    enabled     UInt8   DEFAULT 1,
+    created_at  DateTime64(3, 'UTC') DEFAULT now64(3),
+    updated_at  DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id);
+
+-- Обратный индекс токен->тенант: последнее состояние на тенант.
+CREATE OR REPLACE VIEW retention.analytics_shares_current AS
+SELECT tenant_id,
+       argMax(token, updated_at)   AS token,
+       argMax(enabled, updated_at) AS enabled,
+       min(created_at)             AS created_at
+FROM retention.analytics_shares
+GROUP BY tenant_id;

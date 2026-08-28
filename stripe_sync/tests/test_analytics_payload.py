@@ -1,0 +1,53 @@
+"""Тесты аналитического payload: чистые хелперы + устойчивость build()."""
+
+from stripe_sync import analytics_payload as ap
+
+
+def test_country_name_and_flag():
+    assert ap._country_name('US') == 'United States'
+    assert ap._country_name('us') == 'United States'
+    assert ap._country_name('') == 'Unknown'
+    assert ap._country_name('ZZ') == 'ZZ'  # неизвестный код - как есть
+    # флаг из ISO2: regional indicators; мусор -> глобус
+    assert ap._flag('US') == '\U0001F1FA\U0001F1F8'
+    assert ap._flag('') == '🌐'
+    assert ap._flag('X') == '🌐'
+
+
+def test_build_has_all_blocks_and_survives_bad_query():
+    """Каждый блок в своём try/except: падение q не роняет весь payload."""
+    def q_boom(_sql, _p=None):
+        raise RuntimeError('ch down')
+    d = ap.build(q_boom, 't1')
+    for key in ('overview', 'growth', 'geography', 'funnel',
+                'revenue', 'engagement', 'devices', 'events'):
+        assert key in d and d[key] is None
+    assert d['tenant'] == 't1'
+
+
+def test_overview_shapes_numbers():
+    """Стаб q по подстроке запроса: проверяем арифметику overview."""
+    def q(sql, _p=None):
+        if 'FROM user_actions' in sql:
+            return (None, [[100, 20, 10, 40, 80]])         # total,paying,trial,a7,a30
+        if 'coalesce(sum(mrr)' in sql:
+            return (None, [[1000.0]])
+        if 'saas_events_deduped' in sql:
+            return (None, [[30, 5, 2]])                    # signups,paid,churn
+        return (None, [[0]])
+    ov = ap._overview(q, {'t': 't'})
+    assert ov['users_total'] == 100 and ov['paying'] == 20
+    assert ov['free'] == 70 and ov['mrr'] == 1000.0
+    assert ov['arr'] == 12000.0 and ov['arpu'] == 50.0
+    assert ov['paying_rate'] == 20.0
+    assert ov['new_signups_30d'] == 30 and ov['churned_30d'] == 2
+
+
+def test_funnel_percentages():
+    def q(_sql, _p=None):
+        return (None, [[200, 120, 60, 20]])
+    fn = ap._funnel(q, {'t': 't'})
+    steps = {s['key']: s for s in fn['steps']}
+    assert steps['signup']['pct'] == 100.0
+    assert steps['activated']['count'] == 120 and steps['activated']['pct'] == 60.0
+    assert steps['paid']['pct'] == 10.0

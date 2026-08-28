@@ -44,7 +44,6 @@ const STATIC_DISABLED: readonly string[] = [
   // casino_player_id) - на SaaS-данных каталог полей пуст, экраны мёртвые.
   "segments",
   "chains",
-  "analytics",
   "funnel",
   "ltv",
   "dist",
