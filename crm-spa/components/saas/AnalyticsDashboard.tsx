@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useLocale } from "@/lib/i18n";
 import { SCard, SCardGrid } from "@/components/ui";
 
@@ -157,10 +158,52 @@ function ago(mins: number, t: (k: string) => string): string {
   return `${Math.round(mins / 1440)} ${t("dAgo")}`;
 }
 
-// ── Мини-графики (чистый SVG) ─────────────────────────────────────────────────
+// ── Движение (уважает prefers-reduced-motion) ────────────────────────────────
 
-function AreaLine({ data, height = 90 }: { data: number[]; height?: number }) {
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+}
+
+/** Флаг «смонтировано» на следующий кадр - для CSS-роста баров от 0 к цели. */
+function useMounted(): boolean {
+  const [m, setM] = useState(false);
+  useEffect(() => { const id = requestAnimationFrame(() => setM(true)); return () => cancelAnimationFrame(id); }, []);
+  return m;
+}
+
+/** Число «набегает» 0 -> target за ~800ms; reduced-motion -> сразу target. */
+function useCountUp(target: number): number {
+  const [v, setV] = useState(() => (prefersReducedMotion() ? target : 0));
+  useEffect(() => {
+    if (prefersReducedMotion()) { setV(target); return; }
+    let raf = 0; const t0 = performance.now(); const dur = 800; const from = 0;
+    const tick = (now: number) => {
+      const p = Math.min((now - t0) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3);          // easeOutCubic
+      setV(from + (target - from) * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  return v;
+}
+
+/** Большое число с count-up: держит формат (usd/num) через fmt. */
+function CountUp({ value, fmt }: { value: number; fmt: (n: number) => string }) {
+  const v = useCountUp(value);
+  return <>{fmt(Math.round(v))}</>;
+}
+
+// ── Мини-графики (чистый SVG, hover-слой по умолчанию - правило dataviz) ──────
+
+function AreaLine({ data, labels, fmt, height = 90 }: {
+  data: number[]; labels?: string[]; fmt?: (n: number) => string; height?: number;
+}) {
   const w = 640, h = height, pad = 4;
+  const [hi, setHi] = useState<number | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
   if (!data.length) return null;
   const max = Math.max(...data, 1);
   const min = Math.min(...data, 0);
@@ -169,31 +212,79 @@ function AreaLine({ data, height = 90 }: { data: number[]; height?: number }) {
   const y = (v: number) => h - pad - ((v - min) / span) * (h - pad * 2);
   const line = data.map((v, i) => `${x(i)},${y(v)}`).join(" ");
   const area = `0,${h} ${line} ${w},${h}`;
+  const move = (e: React.PointerEvent) => {
+    const el = wrap.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const idx = Math.round(((e.clientX - r.left) / r.width) * (data.length - 1));
+    setHi(Math.max(0, Math.min(data.length - 1, idx)));
+  };
+  const f = fmt ?? ((n: number) => String(n));
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} preserveAspectRatio="none"
-         className="block" aria-hidden>
-      <polygon points={area} className="fill-primary" opacity={0.08} />
-      <polyline points={line} fill="none" className="stroke-primary" strokeWidth="2"
-                strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div ref={wrap} className="relative" onPointerMove={move} onPointerLeave={() => setHi(null)}>
+      <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} preserveAspectRatio="none" className="block">
+        <polygon points={area} className="fill-primary" opacity={0.08} />
+        <polyline points={line} fill="none" className="stroke-primary" strokeWidth="2"
+                  strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"
+                  style={{ transition: "opacity .4s", opacity: 1 }} />
+        {hi !== null && (
+          <>
+            <line x1={x(hi)} y1={0} x2={x(hi)} y2={h} className="stroke-steel" strokeWidth="1"
+                  vectorEffect="non-scaling-stroke" opacity={0.4} />
+            <circle cx={x(hi)} cy={y(data[hi])} r={3.5} className="fill-primary stroke-canvas"
+                    strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+          </>
+        )}
+      </svg>
+      {hi !== null && (
+        <div className="pointer-events-none absolute -top-1 z-10 -translate-x-1/2 -translate-y-full rounded-md border border-hair bg-canvas px-2 py-1 text-[11px] shadow-sm whitespace-nowrap"
+             style={{ left: `${(hi / Math.max(data.length - 1, 1)) * 100}%` }}>
+          {labels?.[hi] ? <span className="text-steel">{labels[hi]} · </span> : null}
+          <span className="font-semibold text-ink tabular-nums">{f(data[hi])}</span>
+        </div>
+      )}
+    </div>
   );
 }
 
-function Bars({ data, height = 90, tone = "primary" }: { data: number[]; height?: number; tone?: "primary" | "pos" }) {
+function Bars({ data, labels, fmt, height = 90, tone = "primary" }: {
+  data: number[]; labels?: string[]; fmt?: (n: number) => string; height?: number; tone?: "primary" | "pos";
+}) {
   const w = 640, h = height;
+  const [hi, setHi] = useState<number | null>(null);
+  const mounted = useMounted();
+  const wrap = useRef<HTMLDivElement>(null);
   if (!data.length) return null;
   const max = Math.max(...data, 1);
   const bw = w / data.length;
   const cls = tone === "pos" ? "fill-pos" : "fill-primary";
+  const f = fmt ?? ((n: number) => String(n));
+  const move = (e: React.PointerEvent) => {
+    const el = wrap.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    setHi(Math.max(0, Math.min(data.length - 1, Math.floor(((e.clientX - r.left) / r.width) * data.length))));
+  };
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} preserveAspectRatio="none"
-         className="block" aria-hidden>
-      {data.map((v, i) => {
-        const bh = (v / max) * (h - 4);
-        return <rect key={i} x={i * bw + bw * 0.15} y={h - bh} width={bw * 0.7} height={bh}
-                     rx={1} className={cls} opacity={0.85} />;
-      })}
-    </svg>
+    <div ref={wrap} className="relative" onPointerMove={move} onPointerLeave={() => setHi(null)}>
+      <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} preserveAspectRatio="none" className="block">
+        {data.map((v, i) => {
+          const bh = (v / max) * (h - 4);
+          return <rect key={i} x={i * bw + bw * 0.15} y={h - bh} width={bw * 0.7} height={bh}
+                       rx={1} className={cls} opacity={hi === null || hi === i ? 0.9 : 0.4}
+                       style={{
+                         transformBox: "fill-box", transformOrigin: "bottom",
+                         transform: mounted ? "scaleY(1)" : "scaleY(0)",
+                         transition: "transform .6s cubic-bezier(.22,1,.36,1), opacity .15s",
+                       }} />;
+        })}
+      </svg>
+      {hi !== null && (
+        <div className="pointer-events-none absolute -top-1 z-10 -translate-x-1/2 -translate-y-full rounded-md border border-hair bg-canvas px-2 py-1 text-[11px] shadow-sm whitespace-nowrap"
+             style={{ left: `${((hi + 0.5) / data.length) * 100}%` }}>
+          {labels?.[hi] ? <span className="text-steel">{labels[hi]} · </span> : null}
+          <span className="font-semibold text-ink tabular-nums">{f(data[hi])}</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -271,6 +362,15 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
   const devTotal = (dev?.mobile ?? 0) + (dev?.desktop ?? 0);
   const evMax = Math.max(...(evs?.top.map((e) => e.count) ?? [1]), 1);
   const cov = data.coverage;
+  const shown = useMounted();
+  // горизонтальные бары вырастают на монтировании через transform (композитор,
+  // не layout-thrash): ширина = цель, scaleX 0->1 от левого края
+  const grow = (wpct: number, extra?: React.CSSProperties): React.CSSProperties => ({
+    width: `${wpct}%`,
+    transform: shown ? "scaleX(1)" : "scaleX(0)",
+    transformOrigin: "left",
+    transition: "transform .7s cubic-bezier(.22,1,.36,1)", ...extra,
+  });
 
   return (
     <div className="viz-root flex flex-col gap-5">
@@ -334,21 +434,21 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="bg-cream border border-beige rounded-md p-4">
               <div className="text-[11px] text-steel uppercase tracking-wide">{t("collected")}</div>
-              <div className="text-[26px] font-semibold text-ink">{usd(cash.d30.collected)}</div>
+              <div className="text-[26px] font-semibold text-ink tabular-nums"><CountUp value={cash.d30.collected} fmt={usd} /></div>
               <div className="text-[11px] text-steel">{cash.d30.invoices} {t("invoicesPaid")}</div>
             </div>
             <div className="bg-surface rounded-md p-4">
               <div className="flex items-center gap-1.5 text-[11px] text-steel uppercase tracking-wide">
                 <span className="h-2 w-2 rounded-full" style={{ background: "var(--viz-1)" }} />{t("recurring")}
               </div>
-              <div className="text-[26px] font-semibold text-ink">{usd(cash.d30.recurring)}</div>
+              <div className="text-[26px] font-semibold text-ink tabular-nums"><CountUp value={cash.d30.recurring} fmt={usd} /></div>
               <div className="text-[11px] text-steel">MRR {usd(ov?.mrr)}</div>
             </div>
             <div className="bg-surface rounded-md p-4">
               <div className="flex items-center gap-1.5 text-[11px] text-steel uppercase tracking-wide">
                 <span className="h-2 w-2 rounded-full" style={{ background: "var(--viz-2)" }} />{t("onetime")}
               </div>
-              <div className="text-[26px] font-semibold text-ink">{usd(cash.d30.onetime)}</div>
+              <div className="text-[26px] font-semibold text-ink tabular-nums"><CountUp value={cash.d30.onetime} fmt={usd} /></div>
               <div className="text-[11px] text-steel">{cash.d30.onetime_count} · {t("last30")}</div>
             </div>
           </div>
@@ -356,8 +456,8 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
           {cash.d30.collected > 0 && (
             <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-surface" role="img"
                  aria-label={`recurring ${usd(cash.d30.recurring)}, one-time ${usd(cash.d30.onetime)}`}>
-              <div style={{ width: `${(cash.d30.recurring / cash.d30.collected) * 100}%`, background: "var(--viz-1)" }} />
-              <div style={{ width: `${(cash.d30.onetime / cash.d30.collected) * 100}%`, background: "var(--viz-2)", marginLeft: 2 }} />
+              <div style={grow((cash.d30.recurring / cash.d30.collected) * 100, { background: "var(--viz-1)" })} />
+              <div style={grow((cash.d30.onetime / cash.d30.collected) * 100, { background: "var(--viz-2)", marginLeft: 2 })} />
             </div>
           )}
           <div className="text-[12px] text-steel mt-3">{t("cashHint")}</div>
@@ -375,23 +475,23 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <div className="text-[12px] text-steel mb-1">{t("baseGrowth")}</div>
-              <div className="text-[22px] font-semibold text-ink mb-2">{num(g.cumulative_users.at(-1))}</div>
-              <AreaLine data={g.cumulative_users} />
+              <div className="text-[22px] font-semibold text-ink mb-2 tabular-nums"><CountUp value={g.cumulative_users.at(-1) ?? 0} fmt={num} /></div>
+              <AreaLine data={g.cumulative_users} labels={g.days} fmt={num} />
             </div>
             <div>
               <div className="text-[12px] text-steel mb-1">{t("signupsPerDay")}</div>
-              <div className="text-[22px] font-semibold text-ink mb-2">{num(g.signups.reduce((a, b) => a + b, 0))}</div>
-              <Bars data={g.signups} tone="pos" />
+              <div className="text-[22px] font-semibold text-ink mb-2 tabular-nums"><CountUp value={g.signups.reduce((a, b) => a + b, 0)} fmt={num} /></div>
+              <Bars data={g.signups} labels={g.days} fmt={num} tone="pos" />
             </div>
             <div>
               <div className="text-[12px] text-steel mb-1">{t("activePerDay")}</div>
-              <div className="text-[22px] font-semibold text-ink mb-2">{num(Math.max(...g.active))}</div>
-              <AreaLine data={g.active} />
+              <div className="text-[22px] font-semibold text-ink mb-2 tabular-nums"><CountUp value={Math.max(...g.active)} fmt={num} /></div>
+              <AreaLine data={g.active} labels={g.days} fmt={num} />
             </div>
             <div>
               <div className="text-[12px] text-steel mb-1">{t("generations")}</div>
-              <div className="text-[22px] font-semibold text-ink mb-2">{num(g.generations.reduce((a, b) => a + b, 0))}</div>
-              <Bars data={g.generations} />
+              <div className="text-[22px] font-semibold text-ink mb-2 tabular-nums"><CountUp value={g.generations.reduce((a, b) => a + b, 0)} fmt={num} /></div>
+              <Bars data={g.generations} labels={g.days} fmt={num} />
             </div>
           </div>
         </Section>
@@ -406,9 +506,9 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
                 <div key={c.code} className="flex items-center gap-3"
                      title={`${c.name}: ${num(c.users)} users · ${c.paying} paying${c.mrr > 0 ? ` · ${usd(c.mrr)} MRR` : ""}`}>
                   <span className="text-[16px] w-6 text-center flex-none">{c.flag}</span>
-                  <span className="text-[13px] text-ink w-32 flex-none truncate">{c.name}</span>
+                  <span className="text-[13px] text-ink w-24 sm:w-32 flex-none truncate">{c.name}</span>
                   <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${(c.users / geoMax) * 100}%` }} />
+                    <div className="h-full rounded-full bg-primary" style={grow((c.users / geoMax) * 100)} />
                   </div>
                   <span className="text-[12px] text-ink w-10 text-right flex-none tabular-nums">{num(c.users)}</span>
                   <span className="text-[11px] text-steel w-16 text-right flex-none tabular-nums">
@@ -432,7 +532,7 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
                   </div>
                   <div className="h-6 rounded-md bg-surface overflow-hidden">
                     <div className={`h-full rounded-md ${i === fn.steps.length - 1 ? "bg-pos" : "bg-primary"}`}
-                         style={{ width: `${Math.max(s.pct, 1.5)}%`, opacity: 0.85 }} />
+                         style={grow(Math.max(s.pct, 1.5), { opacity: 0.85 })} />
                   </div>
                 </div>
               ))}
@@ -447,9 +547,9 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
               {rev.plans.map((pl) => (
                 <div key={pl.plan} className="flex items-center gap-3"
                      title={`${pl.plan}: ${usd(pl.mrr)} MRR · ${pl.count} subs · ${pct(pl.share)}`}>
-                  <span className="text-[13px] text-ink w-40 flex-none truncate">{pl.plan}</span>
+                  <span className="text-[13px] text-ink w-28 sm:w-40 flex-none truncate">{pl.plan}</span>
                   <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${pl.share}%` }} />
+                    <div className="h-full rounded-full bg-primary" style={grow(pl.share)} />
                   </div>
                   <span className="text-[12px] text-ink w-16 text-right flex-none tabular-nums">{usd(pl.mrr)}</span>
                   <span className="text-[11px] text-steel w-8 text-right flex-none tabular-nums">{pl.count}</span>
@@ -482,8 +582,8 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
               {dev && devTotal > 0 && (
                 <div title={`${t("mobile")} ${dev.mobile} · ${t("desktop")} ${dev.desktop}`}>
                   <div className="flex h-2.5 rounded-full overflow-hidden bg-surface mb-1.5">
-                    <div className="h-full" style={{ width: `${(dev.mobile / devTotal) * 100}%`, background: "var(--viz-1)" }} />
-                    <div className="h-full" style={{ width: `${(dev.desktop / devTotal) * 100}%`, background: "var(--viz-2)", marginLeft: 2 }} />
+                    <div className="h-full" style={grow((dev.mobile / devTotal) * 100, { background: "var(--viz-1)" })} />
+                    <div className="h-full" style={grow((dev.desktop / devTotal) * 100, { background: "var(--viz-2)", marginLeft: 2 })} />
                   </div>
                   <div className="flex justify-between text-[11px] text-steel">
                     <span className="inline-flex items-center gap-1">
@@ -506,9 +606,9 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
           <div className="grid gap-2.5 sm:grid-cols-2">
             {evs.top.map((e) => (
               <div key={e.type} className="flex items-center gap-3" title={`${e.type}: ${num(e.count)}`}>
-                <span className="text-[13px] text-ink w-44 flex-none truncate">{e.type}</span>
+                <span className="text-[13px] text-ink w-32 sm:w-44 flex-none truncate">{e.type}</span>
                 <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${(e.count / evMax) * 100}%`, opacity: 0.7 }} />
+                  <div className="h-full rounded-full bg-primary" style={grow((e.count / evMax) * 100, { opacity: 0.7 })} />
                 </div>
                 <span className="text-[12px] text-steel w-16 text-right flex-none tabular-nums">{num(e.count)}</span>
               </div>
