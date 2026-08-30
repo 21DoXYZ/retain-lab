@@ -66,3 +66,21 @@ def test_cash_splits_recurring_and_onetime():
     assert c['d30']['invoices'] == 34
     # all-time окно тоже собирается (та же заглушка)
     assert c['all']['collected'] == 3276.0
+
+
+def test_coverage_freshness_and_geo():
+    def q(sql, _p=None):
+        if 'max(ts)' in sql:
+            return (None, [['2026-08-28 10:00:00', 30]])   # 30 мин назад
+        return (None, [[400, 268]])                         # total, located
+    c = ap._coverage(q, {'t': 't'})
+    assert c['minutes_since'] == 30 and c['stale'] is False
+    assert c['geo_pct'] == 67.0 and c['geo_located'] == 268
+
+def test_coverage_stale_over_6h():
+    def q(sql, _p=None):
+        if 'max(ts)' in sql:
+            return (None, [['2026-08-28 00:00:00', 500]])   # >6ч
+        return (None, [[10, 0]])
+    c = ap._coverage(q, {'t': 't'})
+    assert c['stale'] is True and c['geo_pct'] == 0.0

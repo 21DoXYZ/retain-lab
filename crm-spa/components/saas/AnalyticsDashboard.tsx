@@ -18,6 +18,10 @@ import { SCard, SCardGrid } from "@/components/ui";
 // ── Данные ───────────────────────────────────────────────────────────────────
 
 export interface AnalyticsData {
+  coverage?: {
+    last_event: string; minutes_since: number; stale: boolean;
+    geo_pct: number; geo_located: number; geo_total: number;
+  } | null;
   overview?: {
     users_total: number; paying: number; trialing: number; free: number;
     active_7d: number; active_30d: number; mrr: number; arr: number; arpu: number;
@@ -101,6 +105,18 @@ const L: Record<string, Record<Loc, string>> = {
   },
   last30: { ru: "за 30 дней", en: "last 30 days", tr: "son 30 gün" },
   poweredBy: { ru: "Аналитика", en: "Analytics", tr: "Analitik" },
+  updated: { ru: "Обновлено", en: "Updated", tr: "Güncellendi" },
+  justNow: { ru: "только что", en: "just now", tr: "az önce" },
+  minAgo: { ru: "мин назад", en: "min ago", tr: "dk önce" },
+  hAgo: { ru: "ч назад", en: "h ago", tr: "sa önce" },
+  dAgo: { ru: "дн назад", en: "d ago", tr: "gün önce" },
+  geoCov: { ru: "гео размечено", en: "geo-located", tr: "konum tespit" },
+  staleTitle: { ru: "Поток данных отстал", en: "Data feed is behind", tr: "Veri akışı geride" },
+  staleBody: {
+    ru: "Новые события не приходили более 6 часов - цифры могут быть неполными. Проверьте приём (экспорт-ключ / вебхуки).",
+    en: "No new events for over 6 hours - figures may be incomplete. Check ingestion (export key / webhooks).",
+    tr: "6 saattir yeni olay yok - veriler eksik olabilir. Alımı kontrol edin (dışa aktarma anahtarı / webhook).",
+  },
   cash: { ru: "Собрано кэша", en: "Cash collected", tr: "Toplanan nakit" },
   collected: { ru: "Всего собрано", en: "Total collected", tr: "Toplam" },
   recurring: { ru: "Подписки (recurring)", en: "Recurring", tr: "Yinelenen" },
@@ -120,6 +136,26 @@ const usd = (n: number | undefined) =>
   "$" + (n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
 const num = (n: number | undefined) => (n ?? 0).toLocaleString("en-US");
 const pct = (n: number | undefined) => `${(n ?? 0).toFixed(1)}%`;
+
+// dataviz: категориальные хью применяются ТОЛЬКО там, где цвет = сущность
+// (recurring vs разовые, mobile vs desktop). Валидировано validate_palette.js
+// (light+dark, все проверки PASS). Магнитудные бары остаются одним hue - длина
+// уже кодирует величину, радуга там запрещена.
+const VIZ_STYLE = `
+.viz-root { --viz-1:#2a78d6; --viz-2:#eb6834; --viz-3:#1baf7a; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .viz-root { --viz-1:#3987e5; --viz-2:#d95926; --viz-3:#199e70; }
+}
+:root[data-theme="dark"] .viz-root { --viz-1:#3987e5; --viz-2:#d95926; --viz-3:#199e70; }
+`;
+
+/** «Обновлено N назад» - человеческая свежесть из minutes_since. */
+function ago(mins: number, t: (k: string) => string): string {
+  if (mins < 2) return t("justNow");
+  if (mins < 60) return `${mins} ${t("minAgo")}`;
+  if (mins < 1440) return `${Math.round(mins / 60)} ${t("hAgo")}`;
+  return `${Math.round(mins / 1440)} ${t("dAgo")}`;
+}
 
 // ── Мини-графики (чистый SVG) ─────────────────────────────────────────────────
 
@@ -234,15 +270,47 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
   const geoMax = Math.max(...(geo?.countries.map((c) => c.users) ?? [1]), 1);
   const devTotal = (dev?.mobile ?? 0) + (dev?.desktop ?? 0);
   const evMax = Math.max(...(evs?.top.map((e) => e.count) ?? [1]), 1);
+  const cov = data.coverage;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="viz-root flex flex-col gap-5">
+      <style>{VIZ_STYLE}</style>
       {publicMode && (
         <div className="flex items-center justify-between border-b border-hair pb-4">
-          <div className="text-[18px] font-semibold text-ink">{data.brand?.company}</div>
-          <div className="text-[12px] text-steel">{t("poweredBy")} · Revenue Autopilot</div>
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-white text-[15px] font-bold">
+              {(data.brand?.company ?? "R").slice(0, 1).toUpperCase()}
+            </span>
+            <span className="text-[18px] font-semibold text-ink">{data.brand?.company}</span>
+          </div>
+          <div className="text-right">
+            <div className="text-[12px] text-steel">{t("poweredBy")} · Revenue Autopilot</div>
+            {cov?.last_event ? <div className="text-[11px] text-steel">{t("updated")} {ago(cov.minutes_since, t)}</div> : null}
+          </div>
         </div>
       )}
+
+      {/* Доверие к данным: поток отстал - явное предупреждение сверху */}
+      {cov?.stale && (
+        <div className="flex items-start gap-3 rounded-card px-4 py-3"
+             style={{
+               border: "1px solid color-mix(in srgb, var(--viz-2) 45%, transparent)",
+               background: "color-mix(in srgb, var(--viz-2) 7%, transparent)",
+             }}>
+          <span className="text-[16px] leading-none mt-0.5">⚠️</span>
+          <div>
+            <div className="text-[13px] font-semibold text-ink">{t("staleTitle")}</div>
+            <div className="text-[12px] text-steel">{t("staleBody")}</div>
+          </div>
+        </div>
+      )}
+
+      {!publicMode && cov && !cov.stale && cov.last_event ? (
+        <div className="flex items-center gap-1.5 text-[11.5px] text-steel">
+          <span className="h-1.5 w-1.5 rounded-full bg-pos" />
+          {t("updated")} {ago(cov.minutes_since, t)} · {cov.geo_pct}% {t("geoCov")}
+        </div>
+      ) : null}
 
       {!publicMode && data.share && onShare && (
         <Section title={t("share")}>
@@ -270,16 +338,28 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
               <div className="text-[11px] text-steel">{cash.d30.invoices} {t("invoicesPaid")}</div>
             </div>
             <div className="bg-surface rounded-md p-4">
-              <div className="text-[11px] text-steel uppercase tracking-wide">{t("recurring")}</div>
+              <div className="flex items-center gap-1.5 text-[11px] text-steel uppercase tracking-wide">
+                <span className="h-2 w-2 rounded-full" style={{ background: "var(--viz-1)" }} />{t("recurring")}
+              </div>
               <div className="text-[26px] font-semibold text-ink">{usd(cash.d30.recurring)}</div>
               <div className="text-[11px] text-steel">MRR {usd(ov?.mrr)}</div>
             </div>
             <div className="bg-surface rounded-md p-4">
-              <div className="text-[11px] text-steel uppercase tracking-wide">{t("onetime")}</div>
-              <div className="text-[26px] font-semibold text-primary">{usd(cash.d30.onetime)}</div>
+              <div className="flex items-center gap-1.5 text-[11px] text-steel uppercase tracking-wide">
+                <span className="h-2 w-2 rounded-full" style={{ background: "var(--viz-2)" }} />{t("onetime")}
+              </div>
+              <div className="text-[26px] font-semibold text-ink">{usd(cash.d30.onetime)}</div>
               <div className="text-[11px] text-steel">{cash.d30.onetime_count} · {t("last30")}</div>
             </div>
           </div>
+          {/* Композиция кэша: recurring vs разовые одной полосой */}
+          {cash.d30.collected > 0 && (
+            <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-surface" role="img"
+                 aria-label={`recurring ${usd(cash.d30.recurring)}, one-time ${usd(cash.d30.onetime)}`}>
+              <div style={{ width: `${(cash.d30.recurring / cash.d30.collected) * 100}%`, background: "var(--viz-1)" }} />
+              <div style={{ width: `${(cash.d30.onetime / cash.d30.collected) * 100}%`, background: "var(--viz-2)", marginLeft: 2 }} />
+            </div>
+          )}
           <div className="text-[12px] text-steel mt-3">{t("cashHint")}</div>
           {cash.all.collected > cash.d30.collected && (
             <div className="text-[12px] text-steel mt-1">
@@ -323,7 +403,8 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
           {geo && geo.countries.length > 0 ? (
             <div className="flex flex-col gap-2.5">
               {geo.countries.slice(0, 10).map((c) => (
-                <div key={c.code} className="flex items-center gap-3">
+                <div key={c.code} className="flex items-center gap-3"
+                     title={`${c.name}: ${num(c.users)} users · ${c.paying} paying${c.mrr > 0 ? ` · ${usd(c.mrr)} MRR` : ""}`}>
                   <span className="text-[16px] w-6 text-center flex-none">{c.flag}</span>
                   <span className="text-[13px] text-ink w-32 flex-none truncate">{c.name}</span>
                   <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
@@ -344,7 +425,7 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
           {fn && fn.steps.length > 0 ? (
             <div className="flex flex-col gap-3">
               {fn.steps.map((s, i) => (
-                <div key={s.key}>
+                <div key={s.key} title={`${funnelLabel[s.key] ?? s.key}: ${num(s.count)} (${pct(s.pct)})`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[13px] text-ink">{funnelLabel[s.key] ?? s.key}</span>
                     <span className="text-[12px] text-steel tabular-nums">{num(s.count)} · {pct(s.pct)}</span>
@@ -364,7 +445,8 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
           {rev && rev.plans.length > 0 ? (
             <div className="flex flex-col gap-2.5">
               {rev.plans.map((pl) => (
-                <div key={pl.plan} className="flex items-center gap-3">
+                <div key={pl.plan} className="flex items-center gap-3"
+                     title={`${pl.plan}: ${usd(pl.mrr)} MRR · ${pl.count} subs · ${pct(pl.share)}`}>
                   <span className="text-[13px] text-ink w-40 flex-none truncate">{pl.plan}</span>
                   <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
                     <div className="h-full rounded-full bg-primary" style={{ width: `${pl.share}%` }} />
@@ -398,14 +480,18 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
                 <span className="text-ink font-medium tabular-nums">{eng.gens_per_active_30d}</span>
               </div>
               {dev && devTotal > 0 && (
-                <div>
+                <div title={`${t("mobile")} ${dev.mobile} · ${t("desktop")} ${dev.desktop}`}>
                   <div className="flex h-2.5 rounded-full overflow-hidden bg-surface mb-1.5">
-                    <div className="bg-primary h-full" style={{ width: `${(dev.mobile / devTotal) * 100}%` }} />
-                    <div className="bg-pos h-full" style={{ width: `${(dev.desktop / devTotal) * 100}%` }} />
+                    <div className="h-full" style={{ width: `${(dev.mobile / devTotal) * 100}%`, background: "var(--viz-1)" }} />
+                    <div className="h-full" style={{ width: `${(dev.desktop / devTotal) * 100}%`, background: "var(--viz-2)", marginLeft: 2 }} />
                   </div>
                   <div className="flex justify-between text-[11px] text-steel">
-                    <span>📱 {t("mobile")} {pct((dev.mobile / devTotal) * 100)}</span>
-                    <span>{t("desktop")} {pct((dev.desktop / devTotal) * 100)} 🖥</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full" style={{ background: "var(--viz-1)" }} />📱 {t("mobile")} {pct((dev.mobile / devTotal) * 100)}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      {t("desktop")} {pct((dev.desktop / devTotal) * 100)} 🖥 <span className="h-2 w-2 rounded-full" style={{ background: "var(--viz-2)" }} />
+                    </span>
                   </div>
                 </div>
               )}
@@ -419,7 +505,7 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
         <Section title={t("events")} right={<span className="text-[12px] text-steel">{t("last30")}</span>}>
           <div className="grid gap-2.5 sm:grid-cols-2">
             {evs.top.map((e) => (
-              <div key={e.type} className="flex items-center gap-3">
+              <div key={e.type} className="flex items-center gap-3" title={`${e.type}: ${num(e.count)}`}>
                 <span className="text-[13px] text-ink w-44 flex-none truncate">{e.type}</span>
                 <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${(e.count / evMax) * 100}%`, opacity: 0.7 }} />
@@ -429,6 +515,13 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
             ))}
           </div>
         </Section>
+      )}
+
+      {publicMode && (
+        <div className="mt-2 flex items-center justify-between border-t border-hair pt-4 text-[11px] text-steel">
+          <span>{data.brand?.company}</span>
+          <span>Powered by Revenue Autopilot · retivo.digital</span>
+        </div>
       )}
     </div>
   );

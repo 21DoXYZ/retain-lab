@@ -61,6 +61,7 @@ def build(q, tenant: str, public: bool = False) -> dict:
     p = {'t': tenant}
     out: dict = {
         'tenant': tenant,
+        'coverage': _coverage(q, p),
         'overview': _overview(q, p),
         'cash': _cash(q, p),
         'growth': _growth(q, p),
@@ -72,6 +73,34 @@ def build(q, tenant: str, public: bool = False) -> dict:
         'events': _events(q, p),
     }
     return out
+
+
+def _coverage(q, p) -> dict | None:
+    """Доверие к данным: свежесть потока + доля размеченной гео. Дашборд не
+    должен молча показывать цифры, если приём отстал или оборван - иначе
+    259 читаются как «весь трафик», хотя это часть. Честный сигнал сверху."""
+    try:
+        r = q("""
+            SELECT max(ts) AS last_ts,
+                   dateDiff('minute', max(ts), now()) AS mins
+            FROM saas_events_deduped WHERE tenant_id = {t:String}
+            """, p)[1][0]
+        mins = int(r[1] or 0)
+        g = q("""
+            SELECT count(), countIf(geo_country != '')
+            FROM user_event_features WHERE tenant_id = {t:String}
+            """, p)[1][0]
+        total, located = int(g[0]), int(g[1])
+        return {
+            'last_event': str(r[0]) if r[0] else '',
+            'minutes_since': mins,
+            'stale': mins > 360,                      # > 6 ч без событий = поток отстал
+            'geo_pct': round(located / total * 100, 1) if total else 0.0,
+            'geo_located': located, 'geo_total': total,
+        }
+    except Exception as exc:  # noqa: BLE001
+        print(f'[analytics] coverage failed: {exc}', flush=True)
+        return None
 
 
 def _overview(q, p) -> dict | None:
