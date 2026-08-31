@@ -32,8 +32,10 @@ def test_overview_shapes_numbers():
             return (None, [[100, 20, 10, 40, 80]])         # total,paying,trial,a7,a30
         if 'coalesce(sum(mrr)' in sql:
             return (None, [[1000.0]])
+        if 'first_seen' in sql:
+            return (None, [[30]])                          # signups из features
         if 'saas_events_deduped' in sql:
-            return (None, [[30, 5, 2]])                    # signups,paid,churn
+            return (None, [[0, 5, 2]])                     # -,paid,churn
         return (None, [[0]])
     ov = ap._overview(q, {'t': 't'})
     assert ov['users_total'] == 100 and ov['paying'] == 20
@@ -84,3 +86,42 @@ def test_coverage_stale_over_6h():
         return (None, [[10, 0]])
     c = ap._coverage(q, {'t': 't'})
     assert c['stale'] is True and c['geo_pct'] == 0.0
+
+
+def test_recurring_amounts_coupon_rule():
+    """Купонные суммы признаются подписочными, только если та же скидка
+    видна минимум на двух прайсах (аудит 31.08: 33.15/84.15 улетали в разовые,
+    а 170.55 не должен пролезать)."""
+    def q(sql, _p=None):
+        if 'stripe_subscriptions' in sql:
+            return (None, [[9.0], [39.0], [99.0]])
+        return (None, [[9.0], [39.0], [99.0], [33.15], [84.15], [4.05],
+                       [17.55], [189.0], [170.55], [95.0]])
+    rec = ap._recurring_amounts(q, {'t': 't'})
+    assert {9.0, 39.0, 99.0} <= rec
+    assert 33.15 in rec and 84.15 in rec      # -15%: виден на 39 и 99
+    assert 4.05 in rec and 17.55 in rec       # -55%: виден на 9 и 39
+    # одиночные суммы, не кратные прайсу со известной скидкой, - не подписка
+    assert 189.0 not in rec and 170.55 not in rec and 95.0 not in rec
+
+
+def test_recurring_single_price_discount_rejected():
+    """Скидка, замеченная лишь на ОДНОМ прайсе, не признаётся купоном -
+    это может быть совпадение с разовым оффером."""
+    def q(sql, _p=None):
+        if 'stripe_subscriptions' in sql:
+            return (None, [[9.0], [39.0], [99.0]])
+        return (None, [[9.0], [4.05], [189.0]])
+    rec = ap._recurring_amounts(q, {'t': 't'})
+    assert 4.05 not in rec
+
+
+def test_invoice_subscription_from_parent():
+    import mapper
+    assert mapper._invoice_subscription({'subscription': 'sub_1'}) == 'sub_1'
+    assert mapper._invoice_subscription(
+        {'parent': {'subscription_details': {'subscription': 'sub_2'}}}) == 'sub_2'
+    assert mapper._invoice_subscription(
+        {'lines': {'data': [{'parent': {'subscription_item_details':
+                                        {'subscription': 'sub_3'}}}]}}) == 'sub_3'
+    assert mapper._invoice_subscription({}) == ''

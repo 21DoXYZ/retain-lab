@@ -203,6 +203,27 @@ def map_event(evt: dict[str, Any], tenant_id: str) -> dict[str, Any] | None:
 
 # ── Снапшоты объектов для stripe_* (вебхук держит raw-таблицы свежими) ────────
 
+def _invoice_subscription(obj: dict[str, Any]) -> str:
+    """Подписка инвойса. Свежий Stripe убрал поле subscription с верхнего
+    уровня (как current_period_* у подписок) - оно живёт в parent.
+    subscription_details и в parent строк. Без этого recurring/разовое
+    неразличимы (аудит 31.08: все 105 инвойсов с пустым subscription_id)."""
+    sub = obj.get("subscription")
+    if sub:
+        return str(sub)
+    parent = obj.get("parent") or {}
+    sub = (parent.get("subscription_details") or {}).get("subscription")
+    if sub:
+        return str(sub)
+    for line in ((obj.get("lines") or {}).get("data") or []):
+        lp = (line.get("parent") or {})
+        sub = ((lp.get("subscription_item_details") or {}).get("subscription")
+               or (lp.get("subscription_details") or {}).get("subscription"))
+        if sub:
+            return str(sub)
+    return ""
+
+
 def snapshot(evt: dict[str, Any], tenant_id: str) -> tuple[str, dict[str, Any]] | None:
     """Stripe Event → (таблица, строка) для ReplacingMergeTree, или None."""
     stripe_type = evt.get("type", "")
@@ -240,7 +261,7 @@ def snapshot(evt: dict[str, Any], tenant_id: str) -> tuple[str, dict[str, Any]] 
             "tenant_id": tenant_id,
             "invoice_id": obj.get("id", "") or "",
             "customer_id": _customer_id(obj),
-            "subscription_id": obj.get("subscription") or "",
+            "subscription_id": _invoice_subscription(obj),
             "status": obj.get("status") or "",
             "amount_due": _amount(obj.get("amount_due")),
             "amount_paid": _amount(obj.get("amount_paid")),

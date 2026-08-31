@@ -128,7 +128,7 @@ def _overview(q, p) -> dict | None:
         mrr = _flt(q("SELECT coalesce(sum(mrr), 0) FROM mrr_facts WHERE tenant_id = {t:String}", p)[1][0][0])
         # приход/отток за 30 дней (по событиям, deduped)
         mv = q("""
-            SELECT uniqExactIf(identity_id, event_type = 'signup'),
+            SELECT 0,
                    uniqExactIf(identity_id, event_type = 'billing.invoice_paid'),
                    uniqExactIf(identity_id, event_type IN
                      ('billing.subscription_cancelled', 'billing.subscription_cancel_scheduled'))
@@ -146,7 +146,11 @@ def _overview(q, p) -> dict | None:
             'mrr': round(mrr, 2),
             'arr': round(mrr * 12, 2),
             'arpu': round(mrr / paying, 2) if paying else 0.0,
-            'new_signups_30d': int(mv[0]),
+            # из user_event_features (first_seen) - тот же источник, что график
+            # роста и когорты: KPI 1011 vs график 1028 расходились (аудит)
+            'new_signups_30d': int(q(
+                "SELECT countIf(toDate(first_seen) >= today() - 29) "   # 30 точек, как график
+                "FROM user_event_features WHERE tenant_id = {t:String}", p)[1][0][0]),
             'new_paying_30d': int(mv[1]),
             'churned_30d': int(mv[2]),
             'paying_rate': round(paying / total * 100, 1) if total else 0.0,
@@ -156,23 +160,50 @@ def _overview(q, p) -> dict | None:
         return None
 
 
+def _recurring_amounts(q, p) -> set:
+    """Суммы инвойсов, которые считаем подписочными: точный прайс подписки
+    ЛИБО прайс со скидкой, подтверждённой на >=2 разных прайсах."""
+    prices = sorted({round(_flt(r[0]), 2) for r in q(
+        "SELECT DISTINCT argMax(amount, updated_at) FROM stripe_subscriptions "
+        "WHERE tenant_id = {t:String} GROUP BY subscription_id", p)[1]
+        if _flt(r[0]) > 0})
+    amounts = {round(_flt(r[0]), 2) for r in q(
+        "SELECT DISTINCT argMax(amount_paid, updated_at) FROM stripe_invoices "
+        "WHERE tenant_id = {t:String} GROUP BY invoice_id", p)[1]
+        if _flt(r[0]) > 0}
+    disc_prices: dict[float, set] = {}
+    for a in amounts:
+        for pr in prices:
+            if a <= pr + 0.01:
+                d = round(1 - a / pr, 2)
+                if 0.01 <= d <= 0.95 and abs(pr * (1 - d) - a) < 0.02:
+                    disc_prices.setdefault(d, set()).add(pr)
+    good_disc = {d for d, ps in disc_prices.items() if len(ps) >= 2}
+    rec = set(prices)
+    for a in amounts:
+        for pr in prices:
+            for d in good_disc:
+                if abs(pr * (1 - d) - a) < 0.02:
+                    rec.add(a)
+    return rec
+
+
 def _cash(q, p) -> dict | None:
     """Реально собранный кэш из оплаченных инвойсов - НЕ то же, что MRR. MRR
     считает только повторяющуюся выручку подписок; разовые платежи (оффер
     вебинара, паки кредитов) в MRR не попадают вовсе, и без этого блока владелец
     их не видит.
 
-    recurring/разовый разделяем по СУММЕ: свежий Stripe убрал subscription_id с
-    верхнего уровня инвойса (тот же трап, что в backfill._sub_period) - поле
-    пустое почти везде, полагаться на него нельзя. Зато сумма инвойса, совпавшая
-    с ценой активной подписки, - это платёж по подписке; остальное разовое.
+    recurring/разовый разделяем по СУММЕ: Stripe убрал subscription_id с
+    верхнего уровня инвойса, поле пустое везде. Голое сравнение с прайсом
+    ломали купоны (аудит 31.08: 39×0.85=33.15 и 99×0.85=84.15 улетали в
+    «разовые») - поэтому скидки выводим ИЗ САМИХ данных: процент скидки
+    признаём, только если он встретился минимум на двух разных прайсах
+    (один и тот же купон на Starter и Pro - это купон, а не совпадение).
     Дедуп по invoice_id (argMax), иначе пересинк задваивает суммы."""
     try:
-        prices = sorted({round(_flt(r[0]), 2) for r in q(
-            "SELECT DISTINCT argMax(amount, updated_at) FROM stripe_subscriptions "
-            "WHERE tenant_id = {t:String} GROUP BY subscription_id", p)[1]
-            if _flt(r[0]) > 0})
-        in_list = ", ".join(str(x) for x in prices) or "0"
+        rec_amounts = _recurring_amounts(q, p)
+        in_list = ", ".join(str(x) for x in sorted(rec_amounts)) or "0"
 
         def _win(days: int) -> dict:
             r = q(f"""
@@ -273,8 +304,10 @@ def _geography(q, p) -> dict | None:
             'paying': int(r[2]),
             'mrr': round(_flt(r[3]), 2),
         } for r in rows]
-        known = sum(c['users'] for c in countries)
-        total = int(q("SELECT count() FROM user_event_features WHERE tenant_id = {t:String}", p)[1][0][0])
+        # known - ВСЕ юзеры с гео, не сумма топ-20 (аудит 31.08: 570 vs 662)
+        kt = q("SELECT countIf(geo_country != ''), count() "
+               "FROM user_event_features WHERE tenant_id = {t:String}", p)[1][0]
+        known, total = int(kt[0]), int(kt[1])
         return {'countries': countries, 'known': known, 'total': total,
                 'unknown': max(total - known, 0)}
     except Exception as exc:  # noqa: BLE001
@@ -360,20 +393,25 @@ def _engagement(q, p) -> dict | None:
 def _devices(q, p) -> dict | None:
     """Устройства: мобайл/десктоп + топ платформ (из meta сниппета)."""
     try:
+        # по ЛЮДЯМ (argMax на identity), не по событиям: десктопные юзеры шлют
+        # в разы больше событий, и per-event доля занижала мобайл втрое (аудит)
         r = q("""
-            SELECT countIf(JSONExtractInt(meta, 'mobile') = 1),
-                   countIf(JSONHas(meta, 'mobile') AND JSONExtractInt(meta, 'mobile') = 0)
-            FROM saas_events_deduped
-            WHERE tenant_id = {t:String} AND source = 'snippet'
-              AND ts >= now() - INTERVAL 30 DAY
+            SELECT countIf(m = 1), countIf(m = 0) FROM (
+              SELECT identity_id, argMax(JSONExtractInt(meta, 'mobile'), ts) AS m
+              FROM saas_events_deduped
+              WHERE tenant_id = {t:String} AND source = 'snippet'
+                AND JSONHas(meta, 'mobile') AND ts >= now() - INTERVAL 30 DAY
+              GROUP BY identity_id)
             """, p)[1][0]
         mobile, desktop = int(r[0]), int(r[1])
         plats = [{'name': str(pr[0]), 'count': int(pr[1])} for pr in q("""
-            SELECT JSONExtractString(meta, 'platform') AS pl, count()
-            FROM saas_events_deduped
-            WHERE tenant_id = {t:String} AND source = 'snippet'
-              AND JSONExtractString(meta, 'platform') != ''
-              AND ts >= now() - INTERVAL 30 DAY
+            SELECT pl, count() FROM (
+              SELECT identity_id, argMax(JSONExtractString(meta, 'platform'), ts) AS pl
+              FROM saas_events_deduped
+              WHERE tenant_id = {t:String} AND source = 'snippet'
+                AND JSONExtractString(meta, 'platform') != ''
+                AND ts >= now() - INTERVAL 30 DAY
+              GROUP BY identity_id)
             GROUP BY pl ORDER BY count() DESC LIMIT 6
             """, p)[1]]
         return {'mobile': mobile, 'desktop': desktop, 'platforms': plats}

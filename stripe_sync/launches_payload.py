@@ -107,11 +107,8 @@ def home_yesterday(q, tenant: str) -> dict | None:
     recurring/разовое - по совпадению суммы с ценой подписки (см. _cash)."""
     try:
         p = {'t': tenant}
-        prices = sorted({round(_flt(r[0]), 2) for r in q(
-            "SELECT DISTINCT argMax(amount, updated_at) FROM stripe_subscriptions "
-            "WHERE tenant_id = {t:String} GROUP BY subscription_id", p)[1]
-            if _flt(r[0]) > 0})
-        in_list = ", ".join(str(x) for x in prices) or "0"
+        from stripe_sync.analytics_payload import _recurring_amounts
+        in_list = ", ".join(str(x) for x in sorted(_recurring_amounts(q, p))) or "0"
         r = q(f"""
             SELECT round(sumIf(amt, toDate(c) = yesterday()), 2),
                    countIf(toDate(c) = yesterday()),
