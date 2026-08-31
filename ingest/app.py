@@ -156,6 +156,11 @@ def _saas_cors(resp):
         resp.headers["Access-Control-Allow-Origin"] = allow if allow != "*" else (origin or "*")
         resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
         resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        # sendBeacon always ships with credentials mode "include" (spec), so
+        # the browser blocks beacon events without this header (2026-08-30).
+        if origin:
+            resp.headers["Access-Control-Allow-Credentials"] = "true"
+            resp.headers["Access-Control-Allow-Origin"] = origin
         resp.headers["Vary"] = "Origin"
     return resp
 

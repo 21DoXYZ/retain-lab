@@ -15,11 +15,6 @@ redpanda:
           port: 19092
           name: external
           authentication_method: sasl
-    kafka_api_tls:
-        - name: external
-          key_file: /caddy-certs/caddy/certificates/acme-v02.api.letsencrypt.org-directory/cas.21do.xyz/cas.21do.xyz.key
-          cert_file: /caddy-certs/caddy/certificates/acme-v02.api.letsencrypt.org-directory/cas.21do.xyz/cas.21do.xyz.crt
-          enabled: true
     admin:
         - address: 0.0.0.0
           port: 9644
