@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { flaskFetch } from "@/lib/api";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { Button, Card } from "@/components/ui";
@@ -74,6 +75,16 @@ export function CampaignBuilder({ onLaunched }: { onLaunched: () => void }) {
   const [noContact, setNoContact] = useState(false);
   const [contactConsent, setContactConsent] = useState(false);
   const [controlPct, setControlPct] = useState("10");
+  // Пресет с экрана «Запуски»: ?preset=<key>&audience=<json>. Фильтр уходит в
+  // превью и зачисление КАК ЕСТЬ - обещанное там равно зачисленному здесь.
+  const searchParams = useSearchParams();
+  const [preset, setPreset] = useState<{ key: string; extra: Record<string, unknown> } | null>(() => {
+    const key = searchParams.get("preset");
+    const raw = searchParams.get("audience");
+    if (!key || !raw) return null;
+    try { return { key, extra: JSON.parse(raw) as Record<string, unknown> }; }
+    catch { return null; }
+  });
   const [steps, setSteps] = useState<BuilderStep[]>([{ ...EMPTY_STEP }]);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -103,6 +114,7 @@ export function CampaignBuilder({ onLaunched }: { onLaunched: () => void }) {
     contacts: contacts.length ? contacts : undefined,
     no_contact: noContact || undefined,
     contact_consent: contactConsent || undefined,
+    ...(preset?.extra ?? {}),
   };
   const audienceKey = JSON.stringify(audience);
   const previewSeq = useRef(0);
@@ -183,6 +195,15 @@ export function CampaignBuilder({ onLaunched }: { onLaunched: () => void }) {
       {/* ── аудитория ── */}
       <div className="flex flex-col gap-3">
         <div className={labelCls}>{t("saas.builder.audience")}</div>
+        {preset ? (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary bg-primary/5 px-3 py-1 text-[12.5px] font-semibold text-primary">
+              {t("saas.builder.preset")}: {t(`saas.launch2.seg.${preset.key}` as MessageKey)}
+              <button type="button" onClick={() => setPreset(null)}
+                      className="text-primary/70 hover:text-primary" aria-label="remove">×</button>
+            </span>
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           {STAGES.map((s) => (
             <button key={s}

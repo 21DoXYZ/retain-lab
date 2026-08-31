@@ -126,7 +126,12 @@ export const NAV_GROUPS: NavGroup[] = [
     // SaaS-пресет: визард подключения - первый пункт меню (онбординг владельца).
     title: "nav.group.start",
     items: [
-      { key: "onboarding", href: "/onboarding", emoji: "🚀", label: "nav.onboarding",
+      // Дашборд - первый пункт: владелец не должен искать главную (JTBD-фидбек).
+      { key: "dashboard", href: "/home", emoji: "🏠", label: "nav.dashboard",
+        roles: ["super_admin", "head_retention", "director", "analyst", "finance", "marketing_manager"] },
+      { key: "launches", href: "/launches", emoji: "🚀", label: "nav.launches",
+        roles: ["super_admin", "head_retention", "director", "analyst", "finance", "marketing_manager"] },
+      { key: "onboarding", href: "/onboarding", emoji: "🔌", label: "nav.onboarding",
         roles: ["super_admin", "director", "head_retention"] },
     ],
   },

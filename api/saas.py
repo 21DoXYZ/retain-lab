@@ -296,6 +296,7 @@ def home():
     return api_json({
         # каждый блок собран в своём try/except (_home_*): упавший кусок
         # отдаёт None, а не роняет весь дашборд - урок инцидента 08-13
+        'yesterday': _home_yesterday_block(tenant),
         'digest': _home_digest(tenant),
         'series': _home_series(tenant),
         'funnel': _home_funnel(tenant),
@@ -330,6 +331,16 @@ def home():
 # ── Блоки дашборда владельца: история, тренды, решения ───────────────────────
 # Дашборд отвечает на четыре вопроса собственника: что случилось пока меня не
 # было, куда движется, что машина сделала за меня и что требует МЕНЯ.
+
+def _home_yesterday_block(tenant: str) -> dict | None:
+    """«Заработал или потерял за ночь»: вчерашний кэш + отмены/рефанды (JTBD-1)."""
+    try:
+        from stripe_sync import launches_payload as lp
+        return lp.home_yesterday(q, tenant)
+    except Exception as exc:  # noqa: BLE001
+        print(f'[home] {tenant}: yesterday failed: {exc}', flush=True)
+        return None
+
 
 def _home_digest(tenant: str) -> dict | None:
     """«Пока вас не было»: человеческий дайджест за 24 часа."""
@@ -3645,6 +3656,20 @@ def _llm_runs(tenant: str) -> list:
             """, {'t': tenant})[1]]
     except Exception:  # noqa: BLE001
         return []
+
+
+@bp.get('/saas/launches')
+@require_auth(roles=LEAK_ROLES)
+def saas_launches():
+    """Экран «Запуски»: когорты по дням + сегменты застревания с кнопкой
+    «кампания на них» (audience уходит в конструктор как есть)."""
+    from stripe_sync import launches_payload as lp
+    tenant = _tenant_arg()
+    return api_json({
+        'tenant': tenant,
+        'cohorts': lp.cohorts(q, tenant, days=21),
+        'segments': lp.stuck_segments(q, tenant),
+    })
 
 
 # ── Вкладка «Аналитика» + внешний шаринг ─────────────────────────────────────

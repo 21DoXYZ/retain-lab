@@ -180,6 +180,17 @@ def build(flt: dict) -> tuple[list[str], dict, list[str]]:
         else:
             unknown.append("country")
 
+    # Сегменты застревания (экран «Запуски»): где человек встал в воронке.
+    pmin = _num(flt.get("projects_min"), 0, 1e6)
+    if pmin is not None:
+        conds.append(f"coalesce(f.projects_total, 0) >= {int(pmin)}")
+    if flt.get("saw_pricing"):
+        # упёрся в пейвол или смотрел цены - покупка была в голове
+        conds.append("(coalesce(f.paywall_views, 0) > 0 OR coalesce(f.pricing_visits, 0) > 0)")
+    if flt.get("no_download"):
+        # получил результат, но не забрал его (окно фичи - 14 дней)
+        conds.append("coalesce(f.downloads_14d, 0) = 0")
+
     # тип контакта: широкий фильтр «кому вообще можно написать и как»
     c_conds, c_unknown = contact_conditions(
         flt.get("contacts"), bool(flt.get("no_contact")),
@@ -268,6 +279,12 @@ def describe(flt: dict) -> str:
             parts.append(f"{k}={flt[k]}")
     if flt.get("country"):
         parts.append(str(flt["country"]).upper())
+    if flt.get("projects_min") is not None:
+        parts.append(f"projects>={int(float(flt['projects_min']))}")
+    if flt.get("saw_pricing"):
+        parts.append("saw pricing/paywall")
+    if flt.get("no_download"):
+        parts.append("no download")
     toks = flt.get("contacts")
     toks = toks if isinstance(toks, (list, tuple)) else (
         [t for t in str(toks or "").split(",") if t] if toks else [])

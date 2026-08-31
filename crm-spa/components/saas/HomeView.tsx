@@ -21,6 +21,11 @@ import { Card } from "@/components/ui";
  */
 
 interface HomeData extends HomeExtras {
+  yesterday?: {
+    collected: number; payments: number; onetime: number;
+    today_collected: number; today_payments: number;
+    cancels_24h: number; refund_talks_24h: number;
+  } | null;
   mrr: number;
   users_total: number;
   stages: Record<string, number>;
@@ -136,36 +141,48 @@ export function HomeView() {
   return (
     <div className="flex flex-col gap-5">
 
-      {/* 1 ── ДЕНЬГИ. Одна карточка, MRR доминирует, остальное подчинено. */}
+      {/* 1 ── ДЕНЬГИ ЗА НОЧЬ. «Заработал или потерял?» - собрано вчера
+          доминирует; отмены и разговоры о возврате рядом, красным если есть. */}
       <Card className="p-6">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
           <div>
-            <div className="text-[12px] font-medium text-steel">{t("saas.home.kpi.mrr")}</div>
+            <div className="text-[12px] font-medium text-steel">{t("saas.home.yest.title")}</div>
             <div className="mt-1 text-[32px] leading-none font-bold tracking-[-0.5px] text-ink tabular-nums">
+              {noData ? "-" : usd(data?.yesterday?.collected ?? 0)}
+            </div>
+            <div className="mt-1.5 text-[13px] text-steel tabular-nums">
+              {t("saas.home.yest.payments", { n: data?.yesterday?.payments ?? 0 })}
+              {(data?.yesterday?.today_collected ?? 0) > 0 ? (
+                <> · {t("saas.home.yest.today")} <b className="font-semibold text-pos">{usd(data?.yesterday?.today_collected)}</b></>
+              ) : null}
+            </div>
+          </div>
+          <div className="pt-[3px]">
+            <div className="text-[12px] font-medium text-steel">{t("saas.home.yest.cancels")}</div>
+            <div className={"mt-1 text-[22px] leading-none font-semibold tabular-nums " + ((data?.yesterday?.cancels_24h ?? 0) > 0 ? "text-neg" : "text-ink")}>
+              {data?.yesterday?.cancels_24h ?? 0}
+            </div>
+          </div>
+          <div className="pt-[3px]">
+            <div className="text-[12px] font-medium text-steel">{t("saas.home.yest.refunds")}</div>
+            <div className={"mt-1 text-[22px] leading-none font-semibold tabular-nums " + ((data?.yesterday?.refund_talks_24h ?? 0) > 0 ? "text-neg" : "text-ink")}>
+              {data?.yesterday?.refund_talks_24h ?? 0}
+            </div>
+          </div>
+          <div className="pt-[3px]">
+            <div className="text-[12px] font-medium text-steel">{t("saas.home.kpi.mrr")}</div>
+            <div className="mt-1 text-[22px] leading-none font-semibold text-ink tabular-nums">
               {noData ? "-" : usd(data?.mrr)}
             </div>
-          </div>
-          <div className="md:pt-[3px]">
-            <div className="text-[12px] font-medium text-steel">{t("saas.home.kpi.leak")}</div>
-            <div className={"mt-1 text-[22px] leading-none font-semibold tabular-nums " + (noData || !leak ? "text-ink" : "text-neg")}>
-              {noData ? "-" : usd(leak ?? 0)}
+            <div className="mt-1 text-[12px] text-steel tabular-nums">
+              {t("saas.home.hero.paying")}: {data?.pulse?.paying ?? 0} / {data?.users_total ?? 0}
             </div>
           </div>
-          <div className="md:pt-[3px]">
-            <div className="text-[12px] font-medium text-steel">{t("saas.home.hero.paying")}</div>
-            <div className="mt-1 text-[22px] leading-none font-semibold text-ink tabular-nums">
-              {data?.pulse?.paying ?? 0}
-              <span className="ml-2 text-[13px] font-normal text-steel">/ {data?.users_total ?? 0}</span>
-            </div>
-          </div>
-          <Link href="/users" className="group md:pt-[3px]">
+          <Link href="/users" className="group pt-[3px]">
             <div className="text-[12px] font-medium text-steel">{t("saas.home.pulse.online")}</div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="inline-flex items-center gap-2 text-[22px] leading-none font-semibold text-ink tabular-nums group-hover:text-primary transition-colors">
-                <span className="h-2 w-2 rounded-full bg-pos animate-pulse" />
-                {data?.pulse?.online_now ?? 0}
-              </span>
-              <span className="text-[13px] text-steel">{t("saas.home.pulse.active7d", { n: data?.pulse?.active_7d ?? 0 })}</span>
+            <div className="mt-1 flex items-center gap-2 text-[22px] leading-none font-semibold text-ink tabular-nums group-hover:text-primary transition-colors">
+              <span className="h-2 w-2 rounded-full bg-pos animate-pulse" />
+              {data?.pulse?.online_now ?? 0}
             </div>
           </Link>
         </div>
