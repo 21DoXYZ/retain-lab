@@ -129,6 +129,10 @@ const L: Record<string, Record<Loc, string>> = {
     tr: "MRR yalnızca yinelenen abonelik gelirini sayar; tek seferlik ödemeler ayrıdır, bu yüzden toplanan MRR'yi aşar.",
   },
   allTime: { ru: "за всё время", en: "all time", tr: "tüm zamanlar" },
+  verdict1: { ru: "За 30 дней собрано", en: "Last 30 days: collected", tr: "Son 30 gün: toplanan" },
+  verdict2: { ru: ", пришло", en: ", gained", tr: ", kazanılan" },
+  verdict3: { ru: " новых регистраций, конверсия в оплату", en: " new signups, paid conversion", tr: " yeni kayıt, ücretli dönüşüm" },
+  verdict4: { ru: ".", en: ".", tr: "." },
 };
 
 // ── Форматтеры ────────────────────────────────────────────────────────────────
@@ -418,14 +422,27 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
         </Section>
       )}
 
-      {/* KPI */}
+      {/* Итог месяца одним предложением - потом цифры */}
+      {ov && cash && (
+        <p className="text-[15px] leading-relaxed text-steel">
+          {t("verdict1")}{" "}
+          <b className="font-semibold text-ink tabular-nums">{usd(cash.d30.collected)}</b>
+          {t("verdict2")}{" "}
+          <b className="font-semibold text-ink tabular-nums">{num(ov.new_signups_30d)}</b>
+          {t("verdict3")}{" "}
+          <b className="font-semibold text-ink tabular-nums">{pct(ov.paying_rate)}</b>
+          {t("verdict4")}
+        </p>
+      )}
+
+      {/* KPI - один визуальный вес, MRR единственный акцент */}
       <SCardGrid>
-        <SCard label={t("mrr")} value={usd(ov?.mrr)} sub={`${t("arr")} ${usd(ov?.arr)}`} icon="💰" variant="cream" />
-        <SCard label={t("users")} value={num(ov?.users_total)} sub={`${num(ov?.active_30d)} · ${t("active30")}`} icon="👥" />
-        <SCard label={t("payingRate")} value={pct(ov?.paying_rate)} sub={`${num(ov?.paying)} ${t("paying")}`} icon="✅" valueTone="pos" />
-        <SCard label={t("arpu")} value={usd(ov?.arpu)} sub={`${num(ov?.trialing)} ${t("trialing")}`} icon="📈" />
-        <SCard label={t("newSignups")} value={num(ov?.new_signups_30d)} sub={`+${num(ov?.new_paying_30d)} ${t("paying").toLowerCase()}`} icon="🚀" />
-        <SCard label={t("churned")} value={num(ov?.churned_30d)} sub={t("last30")} icon="📉" valueTone={ov && ov.churned_30d > 0 ? "neg" : "default"} />
+        <SCard label={t("mrr")} value={usd(ov?.mrr)} sub={`${t("arr")} ${usd(ov?.arr)}`} variant="cream" />
+        <SCard label={t("users")} value={num(ov?.users_total)} sub={`${num(ov?.active_30d)} · ${t("active30")}`} />
+        <SCard label={t("payingRate")} value={pct(ov?.paying_rate)} sub={`${num(ov?.paying)} ${t("paying")}`} />
+        <SCard label={t("arpu")} value={usd(ov?.arpu)} sub={`${num(ov?.trialing)} ${t("trialing")}`} />
+        <SCard label={t("newSignups")} value={num(ov?.new_signups_30d)} sub={`+${num(ov?.new_paying_30d)} ${t("paying").toLowerCase()}`} />
+        <SCard label={t("churned")} value={num(ov?.churned_30d)} sub={t("last30")} valueTone={ov && ov.churned_30d > 0 ? "neg" : "default"} />
       </SCardGrid>
 
       {/* Собранный кэш: recurring vs разовые - то, что MRR не показывает */}

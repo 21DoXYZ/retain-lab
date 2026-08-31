@@ -81,6 +81,7 @@ export const saas = {
   "saas.home.kpi.leak": "Утекает денег / мес",
   "saas.home.kpi.users": "Людей под наблюдением",
   "saas.home.kpi.atRisk": "Под риском прямо сейчас",
+  "saas.home.hero.paying": "Платящих",
   "saas.home.kpi.atRiskSub": "несписания и затихшие",
   "saas.home.start": "Куда смотреть, когда пойдут данные",
   "saas.home.start.leak.title": "Где утекают деньги",

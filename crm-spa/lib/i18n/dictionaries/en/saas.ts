@@ -82,6 +82,7 @@ export const saas: Partial<Messages> = {
   "saas.home.kpi.leak": "Money leaking / mo",
   "saas.home.kpi.users": "People we watch",
   "saas.home.kpi.atRisk": "At risk right now",
+  "saas.home.hero.paying": "Paying",
   "saas.home.kpi.atRiskSub": "failed payments and going quiet",
   "saas.home.start": "Where to look once data arrives",
   "saas.home.start.leak.title": "Where money leaks",
