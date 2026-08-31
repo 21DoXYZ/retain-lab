@@ -3672,6 +3672,36 @@ def saas_launches():
     })
 
 
+@bp.get('/saas/retention')
+@require_auth(roles=LEAK_ROLES)
+def saas_retention():
+    """«Удержание»: риск-лист с причинами + недельный возврат + спасённое."""
+    from stripe_sync import retention_payload as rp
+    tenant = _tenant_arg()
+    return api_json({
+        'tenant': tenant,
+        'risk': rp.risk_list(q, tenant),
+        'weekly': rp.weekly_return(q, tenant),
+        'saved': rp.saved(q, tenant),
+    })
+
+
+@bp.get('/saas/money')
+@require_auth(roles=LEAK_ROLES)
+def saas_money():
+    """«Деньги»: разложение изменения выручки + отмены с причинами."""
+    from stripe_sync import money_payload as mp
+    from stripe_sync import analytics_payload as ap
+    tenant = _tenant_arg()
+    return api_json({
+        'tenant': tenant,
+        'decomposition': mp.decomposition(q, tenant),
+        'cancel_reasons': mp.cancel_reasons(q, tenant),
+        'cash': ap._cash(q, {'t': tenant}),
+        'revenue': ap._revenue(q, {'t': tenant}),
+    })
+
+
 # ── Вкладка «Аналитика» + внешний шаринг ─────────────────────────────────────
 # Профессиональный дашборд «что происходит»: рост, гео, воронка, деньги,
 # устройства. Один вызов - весь экран. Плюс read-only внешняя ссылка (без PII),

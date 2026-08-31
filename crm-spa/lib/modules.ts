@@ -44,6 +44,9 @@ const STATIC_DISABLED: readonly string[] = [
   // casino_player_id) - на SaaS-данных каталог полей пуст, экраны мёртвые.
   "segments",
   "chains",
+  // JTBD-слияние: причины утечки живут в «Удержании/Деньгах», uplift - в кампаниях
+  "leak-audit",
+  "uplift",
   "funnel",
   "ltv",
   "dist",
