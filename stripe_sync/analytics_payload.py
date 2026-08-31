@@ -41,6 +41,17 @@ _COUNTRY = {
     'CZ': 'Czechia', 'RO': 'Romania', 'GR': 'Greece', 'IL': 'Israel', 'HK': 'Hong Kong',
     'TW': 'Taiwan', 'MY': 'Malaysia', 'TH': 'Thailand', 'VN': 'Vietnam', 'NZ': 'New Zealand',
     'SA': 'Saudi Arabia', 'EG': 'Egypt', 'PK': 'Pakistan', 'BD': 'Bangladesh',
+    'UZ': 'Uzbekistan', 'KZ': 'Kazakhstan', 'AM': 'Armenia', 'AZ': 'Azerbaijan',
+    'GE': 'Georgia', 'KG': 'Kyrgyzstan', 'TJ': 'Tajikistan', 'TM': 'Turkmenistan',
+    'BY': 'Belarus', 'MD': 'Moldova', 'RS': 'Serbia', 'HR': 'Croatia',
+    'BG': 'Bulgaria', 'SK': 'Slovakia', 'SI': 'Slovenia', 'LT': 'Lithuania',
+    'LV': 'Latvia', 'EE': 'Estonia', 'HU': 'Hungary', 'JO': 'Jordan',
+    'KW': 'Kuwait', 'QA': 'Qatar', 'BH': 'Bahrain', 'OM': 'Oman',
+    'LB': 'Lebanon', 'IQ': 'Iraq', 'MA': 'Morocco', 'DZ': 'Algeria',
+    'TN': 'Tunisia', 'GH': 'Ghana', 'KE': 'Kenya', 'ET': 'Ethiopia',
+    'TZ': 'Tanzania', 'UG': 'Uganda', 'CM': 'Cameroon', 'CI': 'Ivory Coast',
+    'SN': 'Senegal', 'LK': 'Sri Lanka', 'NP': 'Nepal', 'KH': 'Cambodia',
+    'MM': 'Myanmar', 'PE': 'Peru', 'EC': 'Ecuador', 'UY': 'Uruguay',
 }
 
 

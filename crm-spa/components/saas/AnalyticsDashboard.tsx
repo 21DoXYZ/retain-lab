@@ -71,25 +71,22 @@ const L: Record<string, Record<Loc, string>> = {
   trialing: { ru: "На триале", en: "On trial", tr: "Deneme" },
   active30: { ru: "Активны за 30 дней", en: "Active in 30d", tr: "30 günde aktif" },
   active7: { ru: "Активны за 7 дней", en: "Active in 7d", tr: "7 günde aktif" },
-  stickiness: { ru: "Липкость DAU/MAU", en: "Stickiness DAU/MAU", tr: "Yapışkanlık DAU/MAU" },
+  stickiness: { ru: "Возвращаемость (DAU/MAU)", en: "Return rate (DAU/MAU)", tr: "Geri dönüş (DAU/MAU)" },
   newSignups: { ru: "Регистраций за 30 дней", en: "Signups in 30d", tr: "30 günde kayıt" },
   newPaying: { ru: "Новых платящих за 30 дней", en: "New paying in 30d", tr: "30 günde yeni ödeme" },
   churned: { ru: "Ушло за 30 дней", en: "Churned in 30d", tr: "30 günde kayıp" },
   baseGrowth: { ru: "База пользователей", en: "User base", tr: "Kullanıcı tabanı" },
-  signupsPerDay: { ru: "Регистрации в день", en: "Signups per day", tr: "Günlük kayıt" },
-  activePerDay: { ru: "Активные в день", en: "Daily active", tr: "Günlük aktif" },
-  generations: { ru: "Генерации", en: "Generations", tr: "Üretimler" },
-  dau: { ru: "DAU", en: "DAU", tr: "DAU" },
-  wau: { ru: "WAU", en: "WAU", tr: "WAU" },
-  mau: { ru: "MAU", en: "MAU", tr: "MAU" },
+  signupsPerDay: { ru: "Регистраций за 30 дней", en: "Signups in 30 days", tr: "30 günde kayıt" },
+  activePerDay: { ru: "Активных сегодня", en: "Active today", tr: "Bugün aktif" },
+  generations: { ru: "Генераций за 30 дней", en: "Generations in 30 days", tr: "30 günde üretim" },
   gensPerActive: { ru: "Генераций на активного", en: "Generations per active user", tr: "Aktif başına üretim" },
   mobile: { ru: "Мобильные", en: "Mobile", tr: "Mobil" },
   desktop: { ru: "Десктоп", en: "Desktop", tr: "Masaüstü" },
   ofUsers: { ru: "от пользователей", en: "of users", tr: "kullanıcıların" },
-  knownGeo: { ru: "стран определено", en: "countries located", tr: "ülke tespit edildi" },
+  knownGeo: { ru: "юзеров с географией", en: "users geo-located", tr: "konumu bilinen" },
   fSignup: { ru: "Регистрация", en: "Signup", tr: "Kayıt" },
   fActivated: { ru: "Первый проект", en: "First project", tr: "İlk proje" },
-  fValue: { ru: "Первая ценность", en: "First value", tr: "İlk değer" },
+  fValue: { ru: "Первый результат", en: "First result", tr: "İlk sonuç" },
   fPaid: { ru: "Оплата", en: "Paid", tr: "Ödeme" },
   noData: { ru: "Пока нет данных", en: "No data yet", tr: "Henüz veri yok" },
   share: { ru: "Поделиться", en: "Share", tr: "Paylaş" },
@@ -106,6 +103,15 @@ const L: Record<string, Record<Loc, string>> = {
   },
   last30: { ru: "за 30 дней", en: "last 30 days", tr: "son 30 gün" },
   poweredBy: { ru: "Аналитика", en: "Analytics", tr: "Analitik" },
+  arpuSub: { ru: "на одного платящего", en: "per paying user", tr: "ödeyen başına" },
+  churnedSub: { ru: "отменили подписку", en: "cancelled subscription", tr: "aboneliği iptal etti" },
+  recurringSub: { ru: "платежи по подпискам", en: "subscription payments", tr: "abonelik ödemeleri" },
+  payments: { ru: "платежей", en: "payments", tr: "ödeme" },
+  planAt: { ru: "План за", en: "Plan at", tr: "Plan" },
+  mo: { ru: "мес", en: "mo", tr: "ay" },
+  dau: { ru: "в день", en: "per day", tr: "günlük" },
+  wau: { ru: "в неделю", en: "per week", tr: "haftalık" },
+  mau: { ru: "в месяц", en: "per month", tr: "aylık" },
   updated: { ru: "Обновлено", en: "Updated", tr: "Güncellendi" },
   justNow: { ru: "только что", en: "just now", tr: "az önce" },
   minAgo: { ru: "мин назад", en: "min ago", tr: "dk önce" },
@@ -133,6 +139,31 @@ const L: Record<string, Record<Loc, string>> = {
   verdict2: { ru: ", пришло", en: ", gained", tr: ", kazanılan" },
   verdict3: { ru: " новых регистраций, конверсия в оплату", en: " new signups, paid conversion", tr: " yeni kayıt, ücretli dönüşüm" },
   verdict4: { ru: ".", en: ".", tr: "." },
+};
+
+// Человеческие имена продуктовых событий: владелец не обязан знать наши
+// технические типы. Неизвестный тип показываем как есть.
+const EVENT_HUMAN: Record<string, Record<Loc, string>> = {
+  page_view: { ru: "Просмотры страниц", en: "Page views", tr: "Sayfa görüntüleme" },
+  media_play: { ru: "Просмотры видео", en: "Video plays", tr: "Video oynatma" },
+  media_complete: { ru: "Досмотрели видео", en: "Videos watched to end", tr: "Sonuna kadar izlenen" },
+  generation_completed: { ru: "Генерации", en: "Generations", tr: "Üretimler" },
+  project_created: { ru: "Созданы проекты", en: "Projects created", tr: "Oluşturulan projeler" },
+  signup: { ru: "Регистрации", en: "Signups", tr: "Kayıtlar" },
+  login: { ru: "Входы", en: "Logins", tr: "Girişler" },
+  form_submit: { ru: "Отправлены формы", en: "Forms submitted", tr: "Gönderilen formlar" },
+  field_focus: { ru: "Заполнение полей", en: "Field interactions", tr: "Alan etkileşimi" },
+  credit_spend: { ru: "Потрачены кредиты", en: "Credits spent", tr: "Harcanan kredi" },
+  credit_grant: { ru: "Начислены кредиты", en: "Credits granted", tr: "Verilen kredi" },
+  checkout_started: { ru: "Открыт чекаут", en: "Checkouts started", tr: "Başlayan ödeme" },
+  copy_event: { ru: "Скопировали результат", en: "Copied output", tr: "Kopyalanan sonuç" },
+  download_click: { ru: "Скачивания", en: "Downloads", tr: "İndirmeler" },
+  page_leave: { ru: "Уходы со страниц", en: "Page exits", tr: "Sayfa çıkışları" },
+  rage_click: { ru: "Злые клики (что-то не работает)", en: "Rage clicks (something is broken)", tr: "Öfke tıklamaları" },
+  js_error: { ru: "Ошибки в браузере", en: "Browser errors", tr: "Tarayıcı hataları" },
+  net_offline: { ru: "Обрывы сети", en: "Network drops", tr: "Ağ kopmaları" },
+  paywall_view: { ru: "Увидели пейвол", en: "Paywall views", tr: "Ödeme duvarı görüntüleme" },
+  pricing_view: { ru: "Смотрели цены", en: "Pricing views", tr: "Fiyat görüntüleme" },
 };
 
 // ── Форматтеры ────────────────────────────────────────────────────────────────
@@ -440,9 +471,9 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
         <SCard label={t("mrr")} value={usd(ov?.mrr)} sub={`${t("arr")} ${usd(ov?.arr)}`} variant="cream" />
         <SCard label={t("users")} value={num(ov?.users_total)} sub={`${num(ov?.active_30d)} · ${t("active30")}`} />
         <SCard label={t("payingRate")} value={pct(ov?.paying_rate)} sub={`${num(ov?.paying)} ${t("paying")}`} />
-        <SCard label={t("arpu")} value={usd(ov?.arpu)} sub={`${num(ov?.trialing)} ${t("trialing")}`} />
+        <SCard label={t("arpu")} value={usd(ov?.arpu)} sub={t("arpuSub")} />
         <SCard label={t("newSignups")} value={num(ov?.new_signups_30d)} sub={`+${num(ov?.new_paying_30d)} ${t("paying").toLowerCase()}`} />
-        <SCard label={t("churned")} value={num(ov?.churned_30d)} sub={t("last30")} valueTone={ov && ov.churned_30d > 0 ? "neg" : "default"} />
+        <SCard label={t("churned")} value={num(ov?.churned_30d)} sub={t("churnedSub")} valueTone={ov && ov.churned_30d > 0 ? "neg" : "default"} />
       </SCardGrid>
 
       {/* Собранный кэш: recurring vs разовые - то, что MRR не показывает */}
@@ -459,14 +490,14 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
                 <span className="h-2 w-2 rounded-full" style={{ background: "var(--viz-1)" }} />{t("recurring")}
               </div>
               <div className="text-[26px] font-semibold text-ink tabular-nums"><CountUp value={cash.d30.recurring} fmt={usd} /></div>
-              <div className="text-[11px] text-steel">MRR {usd(ov?.mrr)}</div>
+              <div className="text-[11px] text-steel">{t("recurringSub")}</div>
             </div>
             <div className="bg-surface rounded-md p-4">
               <div className="flex items-center gap-1.5 text-[11px] text-steel uppercase tracking-wide">
                 <span className="h-2 w-2 rounded-full" style={{ background: "var(--viz-2)" }} />{t("onetime")}
               </div>
               <div className="text-[26px] font-semibold text-ink tabular-nums"><CountUp value={cash.d30.onetime} fmt={usd} /></div>
-              <div className="text-[11px] text-steel">{cash.d30.onetime_count} · {t("last30")}</div>
+              <div className="text-[11px] text-steel">{cash.d30.onetime_count} {t("payments")}</div>
             </div>
           </div>
           {/* Композиция кэша: recurring vs разовые одной полосой */}
@@ -502,7 +533,7 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
             </div>
             <div>
               <div className="text-[12px] text-steel mb-1">{t("activePerDay")}</div>
-              <div className="text-[22px] font-semibold text-ink mb-2 tabular-nums"><CountUp value={Math.max(...g.active)} fmt={num} /></div>
+              <div className="text-[22px] font-semibold text-ink mb-2 tabular-nums"><CountUp value={g.active.at(-1) ?? 0} fmt={num} /></div>
               <AreaLine data={g.active} labels={g.days} fmt={num} />
             </div>
             <div>
@@ -529,7 +560,7 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
                   </div>
                   <span className="text-[12px] text-ink w-10 text-right flex-none tabular-nums">{num(c.users)}</span>
                   <span className="text-[11px] text-steel w-16 text-right flex-none tabular-nums">
-                    {c.mrr > 0 ? usd(c.mrr) : `${c.paying}✓`}
+                    {c.mrr > 0 ? usd(c.mrr) : c.paying > 0 ? `${c.paying} ${t("paying").toLowerCase()}` : "-"}
                   </span>
                 </div>
               ))}
@@ -564,7 +595,11 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
               {rev.plans.map((pl) => (
                 <div key={pl.plan} className="flex items-center gap-3"
                      title={`${pl.plan}: ${usd(pl.mrr)} MRR · ${pl.count} subs · ${pct(pl.share)}`}>
-                  <span className="text-[13px] text-ink w-28 sm:w-40 flex-none truncate">{pl.plan}</span>
+                  <span className="text-[13px] text-ink w-28 sm:w-40 flex-none truncate">
+                    {pl.plan.startsWith("price_") && pl.count > 0
+                      ? `${t("planAt")} ${usd(Math.round(pl.mrr / pl.count))}/${t("mo")}`
+                      : pl.plan}
+                  </span>
                   <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
                     <div className="h-full rounded-full bg-primary" style={grow(pl.share)} />
                   </div>
@@ -584,7 +619,7 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
                 {[["dau", eng.dau], ["wau", eng.wau], ["mau", eng.mau]].map(([k, v]) => (
                   <div key={k as string} className="bg-surface rounded-md py-3">
                     <div className="text-[20px] font-semibold text-ink tabular-nums">{num(v as number)}</div>
-                    <div className="text-[11px] text-steel uppercase">{t(k as string)}</div>
+                    <div className="text-[11px] text-steel">{(k as string).toUpperCase()} · {t(k as string)}</div>
                   </div>
                 ))}
               </div>
@@ -623,7 +658,9 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
           <div className="grid gap-2.5 sm:grid-cols-2">
             {evs.top.map((e) => (
               <div key={e.type} className="flex items-center gap-3" title={`${e.type}: ${num(e.count)}`}>
-                <span className="text-[13px] text-ink w-32 sm:w-44 flex-none truncate">{e.type}</span>
+                <span className="text-[13px] text-ink w-32 sm:w-44 flex-none truncate">
+                  {EVENT_HUMAN[e.type]?.[lc] ?? e.type}
+                </span>
                 <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
                   <div className="h-full rounded-full bg-primary" style={grow((e.count / evMax) * 100, { opacity: 0.7 })} />
                 </div>
