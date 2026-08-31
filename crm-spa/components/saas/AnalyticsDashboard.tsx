@@ -45,7 +45,10 @@ export interface AnalyticsData {
   revenue?: { plans: { plan: string; count: number; mrr: number; share: number }[]; mrr_total: number } | null;
   engagement?: { dau: number; wau: number; mau: number; stickiness: number; gens_per_active_30d: number } | null;
   devices?: { mobile: number; desktop: number; platforms: { name: string; count: number }[] } | null;
-  events?: { top: { type: string; count: number }[] } | null;
+  events?: {
+    usage: { type: string; count: number; users: number }[];
+    problems: { type: string; count: number; users: number }[];
+  } | null;
   share?: { enabled: boolean; url: string };
   brand?: { company: string };
 }
@@ -61,7 +64,12 @@ const L: Record<string, Record<Loc, string>> = {
   revenue: { ru: "Выручка по планам", en: "Revenue by plan", tr: "Plana göre gelir" },
   engagement: { ru: "Вовлечённость", en: "Engagement", tr: "Etkileşim" },
   devices: { ru: "Устройства", en: "Devices", tr: "Cihazlar" },
-  events: { ru: "Что делают в продукте", en: "Product activity", tr: "Ürün etkinliği" },
+  events: { ru: "Использование продукта", en: "Product usage", tr: "Ürün kullanımı" },
+  evDoing: { ru: "Что люди делают", en: "What people do", tr: "İnsanlar ne yapıyor" },
+  evBlocking: { ru: "Что им мешает", en: "What gets in their way", tr: "Onları ne engelliyor" },
+  evTimes: { ru: "раз", en: "times", tr: "kez" },
+  evPeople: { ru: "чел.", en: "people", tr: "kişi" },
+  evNoProblems: { ru: "Проблем не замечено", en: "No friction detected", tr: "Sorun görülmedi" },
   mrr: { ru: "MRR", en: "MRR", tr: "MRR" },
   arr: { ru: "ARR", en: "ARR", tr: "ARR" },
   arpu: { ru: "ARPU", en: "ARPU", tr: "ARPU" },
@@ -395,7 +403,6 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
   };
   const geoMax = Math.max(...(geo?.countries.map((c) => c.users) ?? [1]), 1);
   const devTotal = (dev?.mobile ?? 0) + (dev?.desktop ?? 0);
-  const evMax = Math.max(...(evs?.top.map((e) => e.count) ?? [1]), 1);
   const cov = data.coverage;
   const shown = useMounted();
   // горизонтальные бары вырастают на монтировании через transform (композитор,
@@ -652,21 +659,42 @@ export function AnalyticsDashboard({ data, onShare, publicMode }: {
         </Section>
       </div>
 
-      {/* Активность в продукте */}
-      {evs && evs.top.length > 0 && (
+      {/* Использование: что люди делают ценного и что им мешает.
+          Никаких баров - сравнивать «генерации» с «ошибками» бессмысленно;
+          каждая строка отвечает сама за себя: сколько раз и сколько людей. */}
+      {evs && (evs.usage.length > 0 || evs.problems.length > 0) && (
         <Section title={t("events")} right={<span className="text-[12px] text-steel">{t("last30")}</span>}>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {evs.top.map((e) => (
-              <div key={e.type} className="flex items-center gap-3" title={`${e.type}: ${num(e.count)}`}>
-                <span className="text-[13px] text-ink w-32 sm:w-44 flex-none truncate">
-                  {EVENT_HUMAN[e.type]?.[lc] ?? e.type}
-                </span>
-                <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
-                  <div className="h-full rounded-full bg-primary" style={grow((e.count / evMax) * 100, { opacity: 0.7 })} />
-                </div>
-                <span className="text-[12px] text-steel w-16 text-right flex-none tabular-nums">{num(e.count)}</span>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <div className="text-[13px] font-semibold text-ink mb-2">{t("evDoing")}</div>
+              <div className="flex flex-col">
+                {evs.usage.map((e) => (
+                  <div key={e.type} className="flex items-baseline justify-between gap-3 border-b border-hair py-2 last:border-0">
+                    <span className="text-[13px] text-ink">{EVENT_HUMAN[e.type]?.[lc] ?? e.type}</span>
+                    <span className="flex-none text-[13px] text-steel tabular-nums">
+                      <b className="font-semibold text-ink">{num(e.count)}</b> {t("evTimes")} · {num(e.users)} {t("evPeople")}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            <div>
+              <div className="text-[13px] font-semibold text-ink mb-2">{t("evBlocking")}</div>
+              {evs.problems.length ? (
+                <div className="flex flex-col">
+                  {evs.problems.map((e) => (
+                    <div key={e.type} className="flex items-baseline justify-between gap-3 border-b border-hair py-2 last:border-0">
+                      <span className="text-[13px] text-ink">{EVENT_HUMAN[e.type]?.[lc] ?? e.type}</span>
+                      <span className="flex-none text-[13px] text-steel tabular-nums">
+                        <b className="font-semibold text-neg">{num(e.count)}</b> {t("evTimes")} · {num(e.users)} {t("evPeople")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[13px] text-steel py-2">{t("evNoProblems")}</div>
+              )}
+            </div>
           </div>
         </Section>
       )}

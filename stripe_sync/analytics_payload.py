@@ -382,22 +382,31 @@ def _devices(q, p) -> dict | None:
         return None
 
 
+# Блок «использование»: не свалка счётчиков, а два ответа - что люди ДЕЛАЮТ
+# ценного и что им МЕШАЕТ. Всё остальное (просмотры, фокусы полей, выходы) -
+# телеметрия, владельцу она не говорит ничего.
+USAGE_EVENTS = ('generation_completed', 'project_created', 'media_complete',
+                'download_click', 'copy_event', 'credit_spend', 'checkout_started')
+PROBLEM_EVENTS = ('js_error', 'rage_click', 'net_offline')
+
+
 def _events(q, p) -> dict | None:
-    """Пульс продукта: топ типов событий за 30 дней (что люди вообще делают)."""
+    """Использование за 30 дней: ценные действия и трение, с числом людей."""
     try:
-        # прячем чистую телеметрию (сеть/видимость/сессия) - блок про то, что
-        # люди ДЕЛАЮТ в продукте, а не про технические тики браузера
-        rows = q("""
-            SELECT event_type, count()
+        wanted = ", ".join(f"'{e}'" for e in USAGE_EVENTS + PROBLEM_EVENTS)
+        rows = q(f"""
+            SELECT event_type, count(), uniqExact(identity_id)
             FROM saas_events_deduped
-            WHERE tenant_id = {t:String} AND ts >= now() - INTERVAL 30 DAY
-              AND event_type NOT IN (
-                'heartbeat', 'ping', 'network_change', 'visibility_change',
-                'session_start', 'session_end', 'inapp_shown', 'inapp_dismissed',
-                'scroll', 'focus', 'blur', 'resize', 'online', 'offline')
-            GROUP BY event_type ORDER BY count() DESC LIMIT 12
+            WHERE tenant_id = {{t:String}} AND ts >= now() - INTERVAL 30 DAY
+              AND event_type IN ({wanted})
+            GROUP BY event_type
             """, p)[1]
-        return {'top': [{'type': str(r[0]), 'count': int(r[1])} for r in rows]}
+        by_type = {str(r[0]): {'type': str(r[0]), 'count': int(r[1]),
+                               'users': int(r[2])} for r in rows}
+        return {
+            'usage': [by_type[e] for e in USAGE_EVENTS if e in by_type],
+            'problems': [by_type[e] for e in PROBLEM_EVENTS if e in by_type],
+        }
     except Exception as exc:  # noqa: BLE001
         print(f'[analytics] events failed: {exc}', flush=True)
         return None
