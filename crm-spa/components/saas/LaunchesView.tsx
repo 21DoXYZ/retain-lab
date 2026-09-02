@@ -14,21 +14,22 @@ import { Card, PageHeader, Spinner, ErrorState } from "@/components/ui";
  */
 
 interface Cohort { day: string; signups: number; activated: number; paying: number; cash: number }
-interface Segment { key: string; count: number; reachable_email: number; audience: Record<string, unknown> }
+interface Segment { key: string; count: number; reachable_email: number; audience?: Record<string, unknown> }
 interface LaunchesData { cohorts: Cohort[] | null; segments: Segment[] | null }
 
 const usd = (n: number) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
-export function LaunchesView() {
+export function LaunchesView({ preset, publicMode }: { preset?: LaunchesData; publicMode?: boolean } = {}) {
   const t = useT();
-  const [data, setData] = useState<LaunchesData | null>(null);
-  const [state, setState] = useState<"loading" | "ok" | "err">("loading");
+  const [data, setData] = useState<LaunchesData | null>(preset ?? null);
+  const [state, setState] = useState<"loading" | "ok" | "err">(preset ? "ok" : "loading");
 
   useEffect(() => {
+    if (preset) return;
     flaskFetch<LaunchesData>("/api/v1/saas/launches")
       .then((d) => { setData(d); setState("ok"); })
       .catch(() => setState("err"));
-  }, []);
+  }, [preset]);
 
   if (state === "loading") return <div className="py-16 flex justify-center"><Spinner /></div>;
   if (state === "err" || !data) return <ErrorState />;
@@ -60,12 +61,14 @@ export function LaunchesView() {
                 <span className="text-[12px] text-steel tabular-nums">
                   {s.reachable_email} {t("saas.launch2.reachable")}
                 </span>
-                <Link
-                  href={`/campaigns?preset=${s.key}&audience=${encodeURIComponent(JSON.stringify(s.audience))}`}
-                  className={"rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-opacity " +
-                    (s.count > 0 ? "bg-primary text-white hover:opacity-90" : "pointer-events-none bg-surface text-steel border border-hair2")}>
-                  {t("saas.launch2.makeCampaign")}
-                </Link>
+                {!publicMode && s.audience ? (
+                  <Link
+                    href={`/campaigns?preset=${s.key}&audience=${encodeURIComponent(JSON.stringify(s.audience))}`}
+                    className={"rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-opacity " +
+                      (s.count > 0 ? "bg-primary text-white hover:opacity-90" : "pointer-events-none bg-surface text-steel border border-hair2")}>
+                    {t("saas.launch2.makeCampaign")}
+                  </Link>
+                ) : null}
               </div>
             </div>
           ))}

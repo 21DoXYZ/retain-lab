@@ -105,9 +105,9 @@ const L: Record<string, Record<Loc, string>> = {
   disable: { ru: "Отключить", en: "Disable", tr: "Kapat" },
   enableShare: { ru: "Открыть внешний доступ", en: "Create public link", tr: "Genel bağlantı oluştur" },
   shareHint: {
-    ru: "Read-only дашборд без имён и email - для инвестора или партнёра.",
-    en: "Read-only dashboard, no names or emails - for an investor or partner.",
-    tr: "Salt okunur pano, isim veya e-posta yok - yatırımcı veya ortak için.",
+    ru: "Полный отчёт по ссылке: обзор, деньги, запуски, удержание. Read-only, email замаскированы - для инвестора или партнёра.",
+    en: "Full report by link: overview, money, launches, retention. Read-only, emails masked - for an investor or partner.",
+    tr: "Bağlantıyla tam rapor: genel bakış, para, lansmanlar, elde tutma. Salt okunur, e-postalar maskeli.",
   },
   last30: { ru: "за 30 дней", en: "last 30 days", tr: "son 30 gün" },
   poweredBy: { ru: "Аналитика", en: "Analytics", tr: "Analitik" },

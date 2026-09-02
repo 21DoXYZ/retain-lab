@@ -27,16 +27,17 @@ const usd = (n: number) => "$" + n.toLocaleString("en-US", { maximumFractionDigi
 const fmtF = (k: string, v: number) =>
   k === "avg_check" ? usd(v) : k.endsWith("_rate") ? `${v}%` : v.toLocaleString("en-US");
 
-export function MoneyView() {
+export function MoneyView({ preset, publicMode }: { preset?: Data; publicMode?: boolean } = {}) {
   const t = useT();
-  const [data, setData] = useState<Data | null>(null);
-  const [state, setState] = useState<"loading" | "ok" | "err">("loading");
+  const [data, setData] = useState<Data | null>(preset ?? null);
+  const [state, setState] = useState<"loading" | "ok" | "err">(preset ? "ok" : "loading");
 
   useEffect(() => {
+    if (preset) return;
     flaskFetch<Data>("/api/v1/saas/money")
       .then((d) => { setData(d); setState("ok"); })
       .catch(() => setState("err"));
-  }, []);
+  }, [preset]);
 
   if (state === "loading") return <div className="py-16 flex justify-center"><Spinner /></div>;
   if (state === "err" || !data) return <ErrorState />;

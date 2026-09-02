@@ -3779,6 +3779,63 @@ def saas_analytics_share():
                      'url': _share_url(token) if enabled else ''})
 
 
+def _mask_email(e: str) -> str:
+    """a***@domain: наружу по ссылке личные адреса целиком не отдаём."""
+    e = str(e or '')
+    if '@' not in e:
+        return e[:2] + '***' if e else ''
+    name, dom = e.split('@', 1)
+    return (name[:2] or '*') + '***@' + dom
+
+
+def _share_tenant(token: str) -> str:
+    row = q("SELECT tenant_id FROM analytics_shares_current "
+            "WHERE token = {tok:String} AND enabled = 1 LIMIT 1",
+            {'tok': (token or '').strip()})[1]
+    return str(row[0][0]) if row else ''
+
+
+@bp.get('/public/report/<token>/<section>')
+def public_report(token: str, section: str):
+    """Публичный полный отчёт по ссылке: analytics | money | launches |
+    retention. Без авторизации, БЕЗ PII: email в риск-листе маскируются,
+    identity наружу не уходит, кнопок действий нет."""
+    tenant = _share_tenant(token)
+    if not tenant:
+        return api_json(error='link not found', code=404)
+    tch = ca.load_tenants().get(tenant, {}) or {}
+    brand = {'company': str(tch.get('company') or tch.get('name') or 'Revenue Autopilot')}
+
+    if section == 'analytics':
+        from stripe_sync import analytics_payload as ap
+        data = ap.build(q, tenant, public=True)
+        data.pop('tenant', None)
+    elif section == 'money':
+        from stripe_sync import analytics_payload as ap
+        from stripe_sync import money_payload as mp
+        data = {'decomposition': mp.decomposition(q, tenant),
+                'cancel_reasons': mp.cancel_reasons(q, tenant),
+                'cash': ap._cash(q, {'t': tenant}),
+                'revenue': ap._revenue(q, {'t': tenant})}
+    elif section == 'launches':
+        from stripe_sync import launches_payload as lp
+        segs = [{k: v for k, v in s0.items() if k != 'audience'}
+                for s0 in (lp.stuck_segments(q, tenant) or [])]
+        data = {'cohorts': lp.cohorts(q, tenant, days=21), 'segments': segs}
+    elif section == 'retention':
+        from stripe_sync import retention_payload as rp
+        risk = [{'email': _mask_email(r0['email']), 'mrr': r0['mrr'],
+                 'p_churn': r0['p_churn'], 'stage': r0['stage'],
+                 'reasons': r0['reasons']}
+                for r0 in (rp.risk_list(q, tenant) or [])]
+        data = {'risk': risk, 'weekly': rp.weekly_return(q, tenant),
+                'saved': rp.saved(q, tenant)}
+    else:
+        return api_json(error='unknown section', code=404)
+    data['brand'] = brand
+    return api_json(data)
+
+
 @bp.get('/public/analytics/<token>')
 def public_analytics(token: str):
     """Публичный read-only дашборд по токену. БЕЗ авторизации - но без PII:

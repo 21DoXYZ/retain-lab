@@ -13,7 +13,7 @@ import { Card, PageHeader, Spinner, ErrorState } from "@/components/ui";
  */
 
 interface Risk {
-  identity_id: string; email: string; mrr: number; p_churn: number;
+  identity_id?: string; email: string; mrr: number; p_churn: number;
   stage: string; reasons: string[];
 }
 interface Weekly { week: string; cohort: number; d1: number; d7: number; d30: number }
@@ -42,16 +42,17 @@ function retCell(v: number): string {
   return "text-neg font-semibold";
 }
 
-export function RetentionView() {
+export function RetentionView({ preset, publicMode }: { preset?: Data; publicMode?: boolean } = {}) {
   const t = useT();
-  const [data, setData] = useState<Data | null>(null);
-  const [state, setState] = useState<"loading" | "ok" | "err">("loading");
+  const [data, setData] = useState<Data | null>(preset ?? null);
+  const [state, setState] = useState<"loading" | "ok" | "err">(preset ? "ok" : "loading");
 
   useEffect(() => {
+    if (preset) return;
     flaskFetch<Data>("/api/v1/saas/retention")
       .then((d) => { setData(d); setState("ok"); })
       .catch(() => setState("err"));
-  }, []);
+  }, [preset]);
 
   if (state === "loading") return <div className="py-16 flex justify-center"><Spinner /></div>;
   if (state === "err" || !data) return <ErrorState />;
@@ -73,8 +74,10 @@ export function RetentionView() {
         </div>
         {risk.length ? (
           <div className="mt-3 flex flex-col">
-            {risk.map((r) => (
-              <Link key={r.identity_id} href={`/users/${encodeURIComponent(r.identity_id)}`}
+            {risk.map((r, ri) => (
+              <Link key={r.identity_id ?? ri}
+                href={r.identity_id && !publicMode ? `/users/${encodeURIComponent(r.identity_id)}` : "#"}
+                onClick={r.identity_id && !publicMode ? undefined : (e) => e.preventDefault()}
                 className="group flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-hair py-2.5 last:border-0">
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink group-hover:text-primary">
                   {r.email}
