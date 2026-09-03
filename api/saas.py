@@ -3754,7 +3754,9 @@ def saas_analytics_share():
     enable - создаёт токен, если ссылки ещё нет (иначе отдаёт текущую);
     rotate - выдаёт новый токен (старая ссылка мгновенно битая);
     disable - гасит (enabled=0), не удаляя историю."""
-    tenant = _tenant_arg_write()
+    tenant, _err = _tenant_arg_write()
+    if _err:
+        return _err
     body = request.get_json(silent=True) or {}
     action = str(body.get('action') or 'enable').strip()
     if action not in ('enable', 'rotate', 'disable'):
