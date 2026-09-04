@@ -456,6 +456,13 @@ def _home_actions(tenant: str) -> list | None:
         if cards:
             out.append({'key': 'cards_expiring', 'count': cards, 'href': '/users'})
 
+        cb = int(q(
+            "SELECT count() FROM campaign_send_log "
+            "WHERE tenant_id = {t:String} AND reason = 'callback_not_configured' "
+            "AND ts >= now() - INTERVAL 2 DAY", {'t': tenant})[1][0][0])
+        if cb:
+            out.append({'key': 'offer_callback', 'count': cb, 'href': '/campaigns'})
+
         guard = q(
             "SELECT status FROM pipeline_health WHERE tenant_id = {t:String} "
             "AND stage = 'ops_guard'", {'t': tenant})[1]

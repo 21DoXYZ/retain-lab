@@ -1147,3 +1147,13 @@ SELECT tenant_id,
        min(created_at)             AS created_at
 FROM retention.analytics_shares
 GROUP BY tenant_id;
+
+
+-- ── Журнал платформенных алертов (дедуп: один и тот же ключ не чаще 24ч) ─────
+CREATE TABLE IF NOT EXISTS retention.ops_alert_log
+(
+    alert_key  String,
+    sent_at    DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(sent_at)
+ORDER BY (alert_key);

@@ -114,6 +114,13 @@ STAGES: dict[str, dict] = {
         "when": lambda t: t.weekday() == 1 and t.hour == 8 and t.minute == 0,
         "deps": ["product_sync"], "fresh_h": 24 * 8,
     },
+    "ops_alerts": {
+        # сторож молчаливых поломок: падающие триггеры, тишина приёма,
+        # умирающие офферы -> письмо владельцу платформы (дедуп 24ч внутри)
+        "argv": ["python", "ops_alerts.py"],
+        "when": lambda t: t.minute == 7,
+        "deps": [], "fresh_h": 26,
+    },
     "weekly_digest": {
         # письмо владельцу после свежего uplift: ценность видна без входа в CRM
         "argv": ["python", "weekly_digest.py"],

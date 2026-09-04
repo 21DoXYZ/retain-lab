@@ -52,6 +52,7 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-}
       # Недельный uplift-дайджест владельцу (uplift_report.py, Пн 08:00)
       OWNER_EMAIL: ${OWNER_EMAIL:-}
+      PLATFORM_ALERT_EMAIL: ${PLATFORM_ALERT_EMAIL:-}
       # статус платформенного dry-run для /saas/campaigns (честность UI)
       SIGNALS_DRY_RUN: ${SIGNALS_DRY_RUN:-1}
       RESEND_API_KEY: ${RESEND_API_KEY:-}

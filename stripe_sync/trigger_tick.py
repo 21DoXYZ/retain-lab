@@ -152,6 +152,7 @@ def fire(client, tenant: str) -> dict[str, int]:
         except Exception as exc:  # noqa: BLE001 - один триггер не валит остальные
             print(f"[trigger] {tenant}: {cid} condition failed: "
                   f"{type(exc).__name__}: {exc}", flush=True)
+            _record_trigger_error(client, tenant, cid, exc)
             continue
         if not hits:
             continue
@@ -183,6 +184,22 @@ def fire(client, tenant: str) -> dict[str, int]:
         client.insert("retention.campaign_enrollments", rows, column_names=cols)
         out[cid] = len(rows)
     return out
+
+
+def _record_trigger_error(client, tenant: str, cid: str, exc: Exception) -> None:
+    """Падение триггера - в pipeline_runs: ops_alerts разбудит владельца.
+    Урок T2 (2026-09-04): триггер молча падал каждую минуту, никто не знал."""
+    try:
+        from datetime import datetime, timezone
+        now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        client.insert(
+            "retention.pipeline_runs",
+            [[tenant, f"trigger:{cid}", "error",
+              f"{type(exc).__name__}: {exc}"[:300], 1, "", 0, 0.0, now]],
+            column_names=["tenant_id", "stage", "status", "detail", "input_fresh",
+                          "skipped_reason", "rows", "duration_s", "started_at"])
+    except Exception as exc2:  # noqa: BLE001 - журнал не роняет триггеры
+        print(f"[trigger] {tenant}: error-журнал не записан: {exc2}", flush=True)
 
 
 def main() -> None:
