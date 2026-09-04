@@ -68,7 +68,7 @@ TRIGGERS: dict[str, str] = {
         SELECT identity_id FROM (
             SELECT identity_id,
                    -- argMaxIf по строкам, ГДЕ balance_after ЕСТЬ (2026-08-26):
-                   -- часть credit_spend приходит без balance_after (~9% дыра),
+                   -- часть credit_spend приходит без balance_after (~9%% дыра),
                    -- голый argMax брал 0 у свежего пустого события и слал
                    -- ложное «кредиты кончились» юзеру с полным балансом
                    argMaxIf(JSONExtractFloat(meta, 'balance_after'), ts,
