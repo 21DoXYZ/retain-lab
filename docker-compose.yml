@@ -198,7 +198,9 @@ services:
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
     volumes:
-      - ./secrets:/secrets:ro   # tenants.json - идентичность отправителей тенантов
+      # rw (2026-09-07): авто-мозг (auto_improve) и ab_winner пишут
+      # overrides.json - конфиг кампаний живёт здесь же
+      - ./secrets:/secrets      # tenants.json + overrides.json
     restart: unless-stopped
 
   # Пушер сигналов модели -> колбэк казино. Батч-задача (profiles: не стартует с up).

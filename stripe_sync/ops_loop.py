@@ -114,6 +114,13 @@ STAGES: dict[str, dict] = {
         "when": lambda t: t.weekday() == 1 and t.hour == 8 and t.minute == 0,
         "deps": ["product_sync"], "fresh_h": 24 * 8,
     },
+    "auto_improve": {
+        # авто-мозг: сам запускает кампании на сегменты, доливает новых,
+        # ставит на паузу бесполезное, шлёт владельцу отчёт (раз в день)
+        "argv": ["python", "auto_improve.py"],
+        "when": lambda t: t.hour == 9 and t.minute == 3,
+        "deps": ["stitch"], "fresh_h": 26,
+    },
     "ops_alerts": {
         # сторож молчаливых поломок: падающие триггеры, тишина приёма,
         # умирающие офферы -> письмо владельцу платформы (дедуп 24ч внутри)
@@ -259,10 +266,15 @@ def name_argv(name: str) -> list[str]:
 
 # Порядок исполнения в один тик: топологический (зависимость раньше зависящей),
 # чтобы свежесть, поднятая stitch в этот же тик, сразу увидел scoring/campaign.
+# ЛОВУШКА (2026-09-07): стадия, добавленная в STAGES, но забытая здесь,
+# молча никогда не запустится - ops_alerts так простоял 3 дня. Санити-чек
+# ниже валит процесс на старте, если списки разъехались.
 _ORDER = ["stitch", "plans", "contacts", "users_sync", "product_sync",
           "cancel_reasons", "scoring", "campaign_tick", "replenishment",
-          "triggers",
+          "triggers", "ops_alerts", "auto_improve",
           "uplift_report", "ai_analyst", "product_insights", "weekly_digest"]
+assert set(_ORDER) == set(STAGES), (
+    f"_ORDER != STAGES: {set(_ORDER) ^ set(STAGES)}")
 
 
 def main() -> None:

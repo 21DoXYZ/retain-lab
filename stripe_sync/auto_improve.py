@@ -1,0 +1,280 @@
+"""Авто-мозг кампаний: раз в день система улучшает себя сама.
+
+Запрос владельца (2026-09-07): «нужен авторежим - сама сканирует, сама
+запускает и проверяет кампании». Что делает ежедневный проход:
+
+  1. ЗАПУСК: для каждого сегмента застревания из плейбука - если людей >= 30
+     и живой авто-кампании на этот сегмент ещё нет - запускает её (копия
+     логики /saas/campaigns/custom: снапшот + holdout 10%).
+  2. ДОЛИВКА: в живые авто-кампании доливает НОВЫХ людей, попавших в сегмент
+     после запуска (кто уже зачислялся - не трогается: re-enroll нет).
+  3. ПРОВЕРКА: кампания старше 7 дней с >= 150 доставленных касаний, у которой
+     конверсия в цель НЕ лучше контрольной группы, - ставится на паузу.
+  4. ОТЧЁТ: одно письмо владельцу «что я сегодня сделал» (только если что-то
+     делал). Молчание = делать было нечего.
+
+Все касания по-прежнему идут через штатный тик со всеми предохранителями
+(тихие часы, частоты, подавления, warmup). Мозг только решает КОГО и ЧТО.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from datetime import datetime, timezone
+
+MIN_SEGMENT = 30          # меньше - шум, кампания не окупает внимание
+EVAL_MIN_DAYS = 7
+EVAL_MIN_SENT = 150
+CONTROL_PCT = 10
+
+# Плейбук сегментов: audience -> цель -> утверждённая копия (2026-09-07).
+# Тексты человеческие (§8a), подпись добавит отправитель.
+PLAYBOOK: list[dict] = [
+    {
+        "key": "paywall",
+        "title": "Saw pricing, did not buy",
+        "audience": {"status": "free", "saw_pricing": True},
+        "goal_event": "billing.invoice_paid",
+        "subject": "quick question about pricing",
+        "body": ("Hey, I noticed you checked out our pricing but held off. "
+                 "Totally fair - most people want to see one real result "
+                 "first. Your account still has free credits, so make one "
+                 "video and judge for yourself.\n\nIf pricing itself is the "
+                 "blocker, just reply - I read every answer.\n\n"
+                 "https://hubcontent.ai/app"),
+    },
+    {
+        "key": "no_gen",
+        "title": "Project without generation",
+        "audience": {"projects_min": 1, "gens_max": 0},
+        "goal_event": "generation_completed",
+        "subject": "your project is one click from done",
+        "body": ("You set up a project but haven't rendered it yet. It takes "
+                 "about a minute, and it's the fastest way to see if this "
+                 "fits you.\n\nIf something got confusing along the way, "
+                 "reply and tell me where - that's exactly what I want to "
+                 "fix.\n\nhttps://hubcontent.ai/app"),
+    },
+    {
+        "key": "no_download",
+        "title": "Generated, not downloaded",
+        "audience": {"gens_min": 1, "no_download": True, "status": "free"},
+        "goal_event": "download_click",
+        "subject": "your video is ready and waiting",
+        "body": ("Your video rendered - but you never downloaded it. It's "
+                 "sitting in your project right now. Grab it while your "
+                 "credits cover it.\n\nIf the result wasn't what you "
+                 "expected, reply with one line about what was off - I'll "
+                 "take it to the team.\n\nhttps://hubcontent.ai/app"),
+    },
+    {
+        "key": "gone_quiet",
+        "title": "Cooling off",
+        "audience": {"not_seen_days": 14, "gens_min": 1, "status": "free"},
+        "goal_event": "generation_completed",
+        "subject": "still here when you need us",
+        "body": ("You made a few videos with us and then went quiet - no "
+                 "guilt, life happens. Your projects and credits are still "
+                 "in place.\n\nIf something pushed you away, tell me in one "
+                 "line - I read every reply.\n\nhttps://hubcontent.ai/app"),
+    },
+]
+
+
+def _now() -> datetime:
+    return datetime.now(tz=timezone.utc)
+
+
+def _ch():
+    import clickhouse_connect
+    return clickhouse_connect.get_client(
+        host=os.environ.get("CH_HOST", "clickhouse"),
+        port=int(os.environ.get("CH_PORT", "8123")),
+        username=os.environ.get("CH_USER", "default"),
+        password=os.environ.get("CH_PASSWORD", ""),
+        database=os.environ.get("CH_DB", "retention"))
+
+
+def _segment_ids(ch, tenant: str, audience: dict) -> list[tuple]:
+    from segment import audience_sql, build
+    conds, sparams, unknown = build(dict(audience))
+    if unknown:
+        raise ValueError(f"unknown filters: {unknown}")
+    sql = (audience_sql(conds)
+           .replace("{t:String}", "%(t)s")
+           .replace("{sg_plan:String}", "%(sg_plan)s"))
+    return ch.query(sql, parameters={"t": tenant, **sparams}).result_rows
+
+
+def _active_auto(tenant: str) -> dict[str, dict]:
+    """segment_key -> conf живой авто-кампании этого тенанта."""
+    import overrides as ovr
+    out = {}
+    for c in (ovr.load_tenant(tenant).get("custom_campaigns") or []):
+        if c.get("auto_brain") and c.get("status") == "active":
+            out[str(c.get("segment_key"))] = c
+    return out
+
+
+def _enroll(ch, tenant: str, cid: str, steps: list, rows: list,
+            skip_ids: set) -> tuple[int, int]:
+    from campaign_tick import holdout_split, next_step_time
+    now = _now()
+    first_at = next_step_time(steps, now, 0)
+    cols = ["tenant_id", "campaign_id", "identity_id", "control", "entry_stage",
+            "step_idx", "next_step_at", "status", "enrolled_at", "updated_at"]
+    data, control_n = [], 0
+    for r in rows:
+        if str(r[0]) in skip_ids:
+            continue
+        control = holdout_split(tenant, cid, r[0], CONTROL_PCT)
+        control_n += 1 if control else 0
+        data.append([tenant, cid, r[0], 1 if control else 0,
+                     str(r[1] or "MANUAL"), 0, first_at, "active", now, now])
+    if data:
+        ch.insert("retention.campaign_enrollments", data, column_names=cols)
+    return len(data), control_n
+
+
+def launch_missing(ch, tenant: str, actions: list) -> None:
+    """Плейбук: сегмент без живой авто-кампании и с людьми - запуск."""
+    import overrides as ovr
+    from segment import describe, validate_steps
+    active = _active_auto(tenant)
+    for pb in PLAYBOOK:
+        if pb["key"] in active:
+            continue
+        rows = _segment_ids(ch, tenant, pb["audience"])
+        if len(rows) < MIN_SEGMENT:
+            continue
+        steps, reason = validate_steps([
+            {"action": "email", "subject": pb["subject"], "body": pb["body"],
+             "cta_label": "Open the app", "delay_h": 0}])
+        if reason:
+            actions.append(f"NOT launched {pb['key']}: bad copy ({reason})")
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "_", pb["title"].lower()).strip("_")[:24]
+        cid = f"M_{slug}_{_now().strftime('%m%d%H%M')}"
+        ovr.add_custom_campaign(tenant, {
+            "campaign_id": cid, "title": pb["title"], "status": "active",
+            "goal_event": pb["goal_event"], "audience": pb["audience"],
+            "audience_note": describe(pb["audience"]),
+            "created_at": _now().strftime("%Y-%m-%d %H:%M:%S"),
+            "steps": steps, "auto_brain": True, "segment_key": pb["key"]})
+        n, c = _enroll(ch, tenant, cid, steps, rows, set())
+        actions.append(f"launched '{pb['title']}' ({cid}): {n} people, "
+                       f"{c} in control")
+
+
+def top_up(ch, tenant: str, actions: list) -> None:
+    """Доливка: новые люди сегмента, ещё не бывавшие в кампании."""
+    for key, conf in _active_auto(tenant).items():
+        pb = next((p for p in PLAYBOOK if p["key"] == key), None)
+        if not pb:
+            continue
+        cid = conf["campaign_id"]
+        seen = {str(r[0]) for r in ch.query(
+            "SELECT DISTINCT identity_id FROM retention.campaign_enrollments "
+            "WHERE tenant_id = %(t)s AND campaign_id = %(c)s",
+            parameters={"t": tenant, "c": cid}).result_rows}
+        rows = _segment_ids(ch, tenant, pb["audience"])
+        n, c = _enroll(ch, tenant, cid, conf.get("steps") or [], rows, seen)
+        if n:
+            actions.append(f"topped up '{conf.get('title', cid)}': +{n} new "
+                           f"people ({c} control)")
+
+
+def evaluate(ch, tenant: str, actions: list) -> None:
+    """Пауза кампаний, которые не двигают цель против контроля."""
+    import overrides as ovr
+    for key, conf in _active_auto(tenant).items():
+        cid = conf["campaign_id"]
+        goal = str(conf.get("goal_event") or "")
+        if not goal:
+            continue
+        stats = ch.query("""
+            SELECT dateDiff('day', min(enrolled_at), now()),
+                   uniqExactIf(identity_id, control = 0),
+                   uniqExactIf(identity_id, control = 1)
+            FROM retention.campaign_enrollments
+            WHERE tenant_id = %(t)s AND campaign_id = %(c)s
+            """, parameters={"t": tenant, "c": cid}).result_rows[0]
+        sent = int(ch.query(
+            "SELECT count() FROM retention.campaign_send_log "
+            "WHERE tenant_id = %(t)s AND campaign_id = %(c)s AND status = 'sent'",
+            parameters={"t": tenant, "c": cid}).result_rows[0][0])
+        conv = ch.query("""
+            SELECT countIf(e.control = 0 AND hit), countIf(e.control = 1 AND hit)
+            FROM (
+              SELECT identity_id, max(control) AS control,
+                     min(enrolled_at) AS enr
+              FROM retention.campaign_enrollments
+              WHERE tenant_id = %(t)s AND campaign_id = %(c)s
+              GROUP BY identity_id
+            ) e
+            LEFT JOIN (
+              SELECT identity_id, min(ts) AS first_goal
+              FROM retention.saas_events_deduped
+              WHERE tenant_id = %(t)s AND event_type = %(g)s
+              GROUP BY identity_id
+            ) g ON g.identity_id = e.identity_id
+            ARRAY JOIN [g.first_goal >= e.enr] AS hit
+            """, parameters={"t": tenant, "c": cid, "g": goal}).result_rows[0]
+        row = (stats[0], sent, conv[0], stats[1], conv[1], stats[2])
+        days, sent = int(row[0] or 0), int(row[1] or 0)
+        t_hit, t_n, c_hit, c_n = (int(row[2]), int(row[3]),
+                                  int(row[4]), int(row[5]))
+        if days < EVAL_MIN_DAYS or sent < EVAL_MIN_SENT or not c_n:
+            continue
+        t_rate = t_hit / t_n if t_n else 0.0
+        c_rate = c_hit / c_n if c_n else 0.0
+        if t_rate <= c_rate:
+            ovr.set_custom_campaign_status(tenant, cid, "paused")
+            actions.append(
+                f"paused '{conf.get('title', cid)}': target {t_rate:.1%} vs "
+                f"control {c_rate:.1%} after {days}d / {sent} sent - no lift")
+
+
+def run_tenant(ch, tenant: str) -> list[str]:
+    actions: list[str] = []
+    for fn in (launch_missing, top_up, evaluate):
+        try:
+            fn(ch, tenant, actions)
+        except Exception as exc:  # noqa: BLE001 - один блок не валит мозг
+            actions.append(f"ERROR {fn.__name__}: {type(exc).__name__}: {exc}")
+            print(f"[brain] {tenant}: {fn.__name__} failed: {exc}", flush=True)
+    return actions
+
+
+def main() -> None:
+    tenant = os.environ.get("TENANT_ID", "").strip()
+    if not tenant:
+        raise SystemExit("нужен TENANT_ID")
+    ch = _ch()
+    actions = run_tenant(ch, tenant)
+    for a in actions:
+        print(f"[brain] {tenant}: {a}", flush=True)
+    if not actions:
+        print(f"[brain] {tenant}: nothing to do", flush=True)
+        return
+
+    to = os.environ.get("PLATFORM_ALERT_EMAIL", "").strip()
+    if not to:
+        return
+    from saas_senders import (EmailConfig, MessagingConfig, send_email,
+                              tenant_configs)
+    e, _m = tenant_configs(tenant, EmailConfig.from_env(),
+                           MessagingConfig.from_env())
+    if not (e.resend_api_key and e.email_from):
+        return
+    body = (f"Hi,\n\nAutopilot brain did this for {tenant} today:\n\n"
+            + "\n".join(f"- {a}" for a in actions)
+            + "\n\nEvery touch still goes through the usual guards "
+            "(quiet hours, frequency caps, suppressions, holdout).")
+    ok, detail = send_email(to, "Autopilot brain: daily actions", body, e)
+    print(f"[brain] {tenant}: report to={to} sent={ok} {detail}", flush=True)
+
+
+if __name__ == "__main__":
+    main()
