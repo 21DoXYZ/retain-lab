@@ -127,11 +127,12 @@ def main() -> None:
             if e.resend_api_key and e.email_from:
                 cfg = e
                 break
-    body = ("Hi,\n\nRevenue Autopilot noticed problems that do not show up "
-            "on the screens:\n\n"
+    body = ("Привет.\n\nRevenue Autopilot заметил проблемы, которых не видно "
+            "на экранах:\n\n"
             + "\n".join(f"- {msg}" for _k, msg in fresh)
-            + "\n\nEach item repeats at most once a day while it persists.")
-    ok, detail = send_email(to, "Autopilot alert: silent failures", body, cfg)
+            + "\n\nКаждый пункт повторяется не чаще раза в сутки, пока "
+            "проблема не решена.")
+    ok, detail = send_email(to, "Автопилот: молчаливые поломки", body, cfg)
     print(f"[alerts] to={to} sent={ok} {detail}", flush=True)
     if ok:
         client.insert("retention.ops_alert_log",

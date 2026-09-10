@@ -152,7 +152,7 @@ def launch_missing(ch, tenant: str, actions: list) -> None:
             {"action": "email", "subject": pb["subject"], "body": pb["body"],
              "cta_label": "Open the app", "delay_h": 0}])
         if reason:
-            actions.append(f"NOT launched {pb['key']}: bad copy ({reason})")
+            actions.append(f"НЕ запустил {pb['key']}: копия не прошла валидатор ({reason})")
             continue
         slug = re.sub(r"[^a-z0-9]+", "_", pb["title"].lower()).strip("_")[:24]
         cid = f"M_{slug}_{_now().strftime('%m%d%H%M')}"
@@ -163,8 +163,8 @@ def launch_missing(ch, tenant: str, actions: list) -> None:
             "created_at": _now().strftime("%Y-%m-%d %H:%M:%S"),
             "steps": steps, "auto_brain": True, "segment_key": pb["key"]})
         n, c = _enroll(ch, tenant, cid, steps, rows, set())
-        actions.append(f"launched '{pb['title']}' ({cid}): {n} people, "
-                       f"{c} in control")
+        actions.append(f"запустил «{pb['title']}» ({cid}): {n} человек, "
+                       f"{c} в контрольной группе")
 
 
 def top_up(ch, tenant: str, actions: list) -> None:
@@ -181,8 +181,8 @@ def top_up(ch, tenant: str, actions: list) -> None:
         rows = _segment_ids(ch, tenant, pb["audience"])
         n, c = _enroll(ch, tenant, cid, conf.get("steps") or [], rows, seen)
         if n:
-            actions.append(f"topped up '{conf.get('title', cid)}': +{n} new "
-                           f"people ({c} control)")
+            actions.append(f"долил в «{conf.get('title', cid)}»: +{n} новых "
+                           f"({c} в контроле)")
 
 
 def evaluate(ch, tenant: str, actions: list) -> None:
@@ -232,8 +232,9 @@ def evaluate(ch, tenant: str, actions: list) -> None:
         if t_rate <= c_rate:
             ovr.set_custom_campaign_status(tenant, cid, "paused")
             actions.append(
-                f"paused '{conf.get('title', cid)}': target {t_rate:.1%} vs "
-                f"control {c_rate:.1%} after {days}d / {sent} sent - no lift")
+                f"поставил на паузу «{conf.get('title', cid)}»: цель {t_rate:.1%} "
+                f"против контроля {c_rate:.1%} за {days}д / {sent} отправок - "
+                f"прироста нет")
 
 
 def run_tenant(ch, tenant: str) -> list[str]:
@@ -268,11 +269,11 @@ def main() -> None:
                            MessagingConfig.from_env())
     if not (e.resend_api_key and e.email_from):
         return
-    body = (f"Hi,\n\nAutopilot brain did this for {tenant} today:\n\n"
+    body = (f"Привет.\n\nЧто автопилот сделал сегодня для {tenant}:\n\n"
             + "\n".join(f"- {a}" for a in actions)
-            + "\n\nEvery touch still goes through the usual guards "
-            "(quiet hours, frequency caps, suppressions, holdout).")
-    ok, detail = send_email(to, "Autopilot brain: daily actions", body, e)
+            + "\n\nВсе касания по-прежнему идут через предохранители "
+            "(тихие часы, частотные лимиты, подавления, контрольная группа).")
+    ok, detail = send_email(to, "Автопилот: действия за день", body, e)
     print(f"[brain] {tenant}: report to={to} sent={ok} {detail}", flush=True)
 
 
