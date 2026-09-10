@@ -36,7 +36,7 @@ PLAYBOOK: list[dict] = [
         "title": "Saw pricing, did not buy",
         "audience": {"status": "free", "saw_pricing": True},
         "goal_event": "billing.invoice_paid",
-        "subject": "quick question about pricing",
+        "subject": "one thing about pricing",
         "body": ("Hey, I noticed you checked out our pricing but held off. "
                  "Totally fair - most people want to see one real result "
                  "first. Your account still has free credits, so make one "
@@ -137,6 +137,15 @@ def _enroll(ch, tenant: str, cid: str, steps: list, rows: list,
     return len(data), control_n
 
 
+def _tenant_profile(tenant: str) -> dict:
+    """Профиль тенанта для copy_review (разрешённые цифры, способности)."""
+    try:
+        from channels_admin import load_tenants
+        return (load_tenants().get(tenant, {}) or {}).get("onboarding_answers") or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def launch_missing(ch, tenant: str, actions: list) -> None:
     """Плейбук: сегмент без живой авто-кампании и с людьми - запуск."""
     import overrides as ovr
@@ -153,6 +162,16 @@ def launch_missing(ch, tenant: str, actions: list) -> None:
              "cta_label": "Open the app", "delay_h": 0}])
         if reason:
             actions.append(f"НЕ запустил {pb['key']}: копия не прошла валидатор ({reason})")
+            continue
+        # методология текстов v2: клише/цифры без источника/крик - не уходит
+        from copy_review import fatal as _copy_fatal, review_step
+        profile = _tenant_profile(tenant)
+        bad = [f for st in steps for f in review_step(
+            st.get("subject", ""), st.get("body", ""), pb["key"], "email", profile)
+            if f["level"] == "fatal"]
+        if bad:
+            actions.append(f"НЕ запустил {pb['key']}: текст завален "
+                           f"({', '.join(sorted({f['code'] for f in bad}))})")
             continue
         slug = re.sub(r"[^a-z0-9]+", "_", pb["title"].lower()).strip("_")[:24]
         cid = f"M_{slug}_{_now().strftime('%m%d%H%M')}"

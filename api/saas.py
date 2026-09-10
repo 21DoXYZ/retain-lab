@@ -1930,8 +1930,10 @@ def saas_campaign_custom_create():
     # предупреждения методологии копирайта (§8) - не блокируют, но видны
     warnings = []
     try:
-        from stripe_sync.copy_review import review_step
+        from stripe_sync.copy_review import review_sequence, review_step
         profile = (ca.load_tenants().get(tenant, {}) or {}).get('onboarding_answers') or {}
+        warnings += [f"seq:{f['code']}:step_{f.get('step')}"
+                     for f in review_sequence(steps)]
         for i, st in enumerate(steps):
             flags = review_step(st.get('subject', ''), st.get('body', ''),
                                 cid, st['action'], profile) or []

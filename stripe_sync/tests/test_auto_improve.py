@@ -23,3 +23,12 @@ def test_playbook_copy_passes_validator():
 
 def test_min_segment_sane():
     assert 10 <= MIN_SEGMENT <= 100
+
+
+def test_playbook_copy_passes_methodology_v2():
+    """Мозг не имеет права запускать текст, который завалил copy_review."""
+    from copy_review import fatal, review_step
+    for pb in PLAYBOOK:
+        flags = review_step(pb["subject"], pb["body"], pb["key"], "email", {})
+        fatals = [f for f in flags if f["level"] == "fatal"]
+        assert not fatals, (pb["key"], fatals)
