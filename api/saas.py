@@ -1689,6 +1689,87 @@ def _campaigns_payload(tenant: str) -> dict:
         FROM campaign_send_log WHERE tenant_id = {t:String} GROUP BY campaign_id
         """, {'t': tenant})[1]}
 
+    # Честная атрибуция - строго ПОСЛЕ доставленного письма. Урок 10.09:
+    # «конверсии после зачисления» считали и тех, до кого письмо ещё не дошло
+    # (прогрев шлёт порциями), владелец путался в отчётах. Здесь три числа:
+    # delivered - скольким реально ушло; converted - кто сделал целевое
+    # событие ПОЗЖЕ своей доставки; buyers/revenue - оплаченные инвойсы Stripe
+    # ПОЗЖЕ доставки (деньги, а не события).
+    delivered = {r[0]: int(r[1]) for r in q(
+        """
+        SELECT campaign_id, uniqExact(identity_id)
+        FROM campaign_send_log
+        WHERE tenant_id = {t:String} AND status = 'sent'
+        GROUP BY campaign_id
+        """, {'t': tenant})[1]}
+
+    # цель шаблонной кампании - goal.event_type, ручной/мозговой - goal_event
+    def _goal_ev(c: dict) -> str:
+        g = c.get('goal') or {}
+        if g.get('invert'):
+            return ''
+        return str(g.get('event_type') or c.get('goal_event') or '')
+
+    goal_events: dict[str, list[str]] = {}
+    for c in conf.get('campaigns', []):
+        ev = _goal_ev(c)
+        if ev:
+            goal_events.setdefault(ev, []).append(c['campaign_id'])
+    converted: dict[str, int] = {}
+    for ev, cids in goal_events.items():
+        try:
+            for r in q(
+                """
+                SELECT campaign_id, count() FROM (
+                    SELECT s.campaign_id AS campaign_id, s.id AS id
+                    FROM (
+                        SELECT campaign_id, identity_id AS id, min(ts) AS sent_at
+                        FROM campaign_send_log
+                        WHERE tenant_id = {t:String} AND status = 'sent'
+                        GROUP BY campaign_id, identity_id
+                    ) AS s
+                    JOIN saas_events_deduped p ON p.identity_id = s.id
+                    WHERE p.tenant_id = {t:String} AND p.event_type = {ev:String}
+                    GROUP BY s.campaign_id, s.id, s.sent_at
+                    HAVING min(p.ts) > s.sent_at
+                ) GROUP BY campaign_id
+                """, {'t': tenant, 'ev': ev})[1]:
+                if str(r[0]) in cids:
+                    converted[str(r[0])] = int(r[1])
+        except Exception as exc:  # noqa: BLE001 - атрибуция не роняет экран
+            print(f'[campaigns] {tenant}: strict conv failed: {exc}', flush=True)
+
+    # Инвойсы - ReplacingMergeTree по invoice_id: без argMax по версии
+    # повторные слияния задвоят выручку.
+    revenue: dict[str, dict] = {}
+    try:
+        for r in q(
+            """
+            SELECT campaign_id, uniqExact(id), sum(usd) FROM (
+                SELECT s.campaign_id AS campaign_id, s.id AS id, i.invoice_id,
+                       argMax(i.amount_paid, i.updated_at) AS usd
+                FROM (
+                    SELECT campaign_id, identity_id AS id, min(ts) AS sent_at
+                    FROM campaign_send_log
+                    WHERE tenant_id = {t:String} AND status = 'sent'
+                    GROUP BY campaign_id, identity_id
+                ) AS s
+                JOIN (
+                    SELECT identity_id AS iid,
+                           argMax(stripe_customer_id, updated_at) AS cust
+                    FROM identities WHERE tenant_id = {t:String}
+                    GROUP BY identity_id
+                ) AS c2 ON c2.iid = s.id
+                JOIN stripe_invoices i ON i.customer_id = c2.cust
+                WHERE i.tenant_id = {t:String} AND i.status = 'paid'
+                  AND c2.cust != '' AND i.created_ts > s.sent_at
+                GROUP BY s.campaign_id, s.id, i.invoice_id
+            ) GROUP BY campaign_id
+            """, {'t': tenant})[1]:
+            revenue[str(r[0])] = {'buyers': int(r[1]), 'usd': float(r[2])}
+    except Exception as exc:  # noqa: BLE001
+        print(f'[campaigns] {tenant}: strict revenue failed: {exc}', flush=True)
+
     empty = {'enrolled': 0, 'active': 0, 'holdout': 0, 'done': 0, 'exited': 0}
     campaigns = [{
         'campaign_id': c['campaign_id'],
@@ -1708,7 +1789,13 @@ def _campaigns_payload(tenant: str) -> dict:
                    'source': (s.get('_src') or 'manual') if s.get('_edited') else 'template',
                    } for s in c.get('steps', [])],
         'stats': {**enr.get(c['campaign_id'], empty),
-                  'touches': touches.get(c['campaign_id'], 0)},
+                  'touches': touches.get(c['campaign_id'], 0),
+                  'delivered': delivered.get(c['campaign_id'], 0),
+                  # None = у кампании нет событийной цели, чёрточка на экране
+                  'converted': (converted.get(c['campaign_id'], 0)
+                                if _goal_ev(c) else None),
+                  'buyers': revenue.get(c['campaign_id'], {}).get('buyers', 0),
+                  'revenue_usd': revenue.get(c['campaign_id'], {}).get('usd', 0.0)},
         'custom': bool(c.get('_custom')),
         'status': str(c.get('status') or 'active'),
         'audience_note': str(c.get('audience_note') or ''),

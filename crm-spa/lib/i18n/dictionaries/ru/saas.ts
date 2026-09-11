@@ -317,6 +317,9 @@ export const saas = {
   "saas.camp.active": "Активны",
   "saas.camp.holdout": "Контроль",
   "saas.camp.touches": "Касаний",
+  "saas.camp.delivered": "Доставлено",
+  "saas.camp.convertedStrict": "Сделали цель после письма",
+  "saas.camp.paidAfter": "Оплатили после письма",
 
   "saas.home.golive.title": "Запуск: 5 шагов до живого автопилота",
   "saas.home.golive.open": "Открыть",

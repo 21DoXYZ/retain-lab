@@ -318,6 +318,9 @@ export const saas: Partial<Messages> = {
   "saas.camp.active": "Active",
   "saas.camp.holdout": "Holdout",
   "saas.camp.touches": "Touches",
+  "saas.camp.delivered": "Delivered",
+  "saas.camp.convertedStrict": "Hit goal after the email",
+  "saas.camp.paidAfter": "Paid after the email",
 
   "saas.home.golive.title": "Go live: 5 steps to a working autopilot",
   "saas.home.golive.open": "Open",

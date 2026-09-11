@@ -48,7 +48,10 @@ interface Campaign {
   entry_stage: string;
   goal: { event_type?: string; window_days?: number; invert?: boolean };
   steps: Step[];
-  stats: { enrolled: number; active: number; holdout: number; done: number; exited: number; touches: number };
+  stats: {
+    enrolled: number; active: number; holdout: number; done: number; exited: number; touches: number;
+    delivered: number; converted: number | null; buyers: number; revenue_usd: number;
+  };
 }
 
 interface CopyFlag { code: string; level: string }
@@ -537,6 +540,23 @@ export function CampaignsView() {
                 <span>
                   {t("saas.camp.touches")}: <span className="font-mono text-ink">{c.stats.touches}</span>
                 </span>
+                <span>
+                  {t("saas.camp.delivered")}: <span className="font-mono text-ink">{c.stats.delivered ?? 0}</span>
+                </span>
+                {c.stats.converted != null && (
+                  <span>
+                    {t("saas.camp.convertedStrict")}:{" "}
+                    <span className="font-mono text-ink">{c.stats.converted}</span>
+                  </span>
+                )}
+                {(c.stats.buyers ?? 0) > 0 && (
+                  <span className="text-pos">
+                    {t("saas.camp.paidAfter")}:{" "}
+                    <span className="font-mono font-semibold">
+                      {c.stats.buyers} · ${Math.round(c.stats.revenue_usd).toLocaleString("en-US")}
+                    </span>
+                  </span>
+                )}
               </div>
             </Card>
           ))}

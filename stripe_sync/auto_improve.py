@@ -27,6 +27,10 @@ MIN_SEGMENT = 30          # меньше - шум, кампания не оку�
 EVAL_MIN_DAYS = 7
 EVAL_MIN_SENT = 150
 CONTROL_PCT = 10
+# Второе касание через 4 дня: первый подтверждённый платёж (2026-09-08, $99)
+# пришёл от человека, получившего ДВА письма. Одно касание - недожатая
+# последовательность; review_sequence не даст второму пересказать первое.
+FOLLOW_UP_DELAY_H = 96
 
 # Плейбук сегментов: audience -> цель -> утверждённая копия (2026-09-07).
 # Тексты человеческие (§8a), подпись добавит отправитель.
@@ -43,6 +47,15 @@ PLAYBOOK: list[dict] = [
                  "video and judge for yourself.\n\nIf pricing itself is the "
                  "blocker, just reply - I read every answer.\n\n"
                  "https://hubcontent.ai/app"),
+        "follow_up": {
+            "subject": "what held you back",
+            "body": ("Following up once about the plans page. If a specific "
+                     "thing stopped you - price, a missing feature, or doubt "
+                     "it fits your workflow - reply with a single word and I "
+                     "will answer straight.\n\nIf you simply have not needed "
+                     "it yet, that is fine too. The free credits stay "
+                     "yours.\n\nhttps://hubcontent.ai/app"),
+        },
     },
     {
         "key": "no_gen",
@@ -55,6 +68,14 @@ PLAYBOOK: list[dict] = [
                  "fits you.\n\nIf something got confusing along the way, "
                  "reply and tell me where - that's exactly what I want to "
                  "fix.\n\nhttps://hubcontent.ai/app"),
+        "follow_up": {
+            "subject": "your project is still saved",
+            "body": ("Checking in once more: the project you created is "
+                     "still there, nothing expired. If a step confused you, "
+                     "reply and name it and I will walk you through.\n\nOr "
+                     "open it and press generate - the render finishes fast."
+                     "\n\nhttps://hubcontent.ai/app"),
+        },
     },
     {
         "key": "no_download",
@@ -67,6 +88,15 @@ PLAYBOOK: list[dict] = [
                  "credits cover it.\n\nIf the result wasn't what you "
                  "expected, reply with one line about what was off - I'll "
                  "take it to the team.\n\nhttps://hubcontent.ai/app"),
+        "follow_up": {
+            "subject": "your render is still in the project",
+            "body": ("One more nudge and then I will leave it alone: the "
+                     "video you made is finished and sitting in your "
+                     "account. Download it while the credits still cover "
+                     "it.\n\nIf the result missed the mark, reply and say "
+                     "what was wrong - I will pass it on.\n\n"
+                     "https://hubcontent.ai/app"),
+        },
     },
     {
         "key": "gone_quiet",
@@ -78,8 +108,29 @@ PLAYBOOK: list[dict] = [
                  "guilt, life happens. Your projects and credits are still "
                  "in place.\n\nIf something pushed you away, tell me in one "
                  "line - I read every reply.\n\nhttps://hubcontent.ai/app"),
+        "follow_up": {
+            "subject": "one word is enough",
+            "body": ("Last note from me. If hubcontent did not click for "
+                     "you, tell me why with a single word: price, quality, "
+                     "time, or something else. That answer decides what we "
+                     "fix next.\n\nAnd if you just got busy, your projects "
+                     "are waiting where you left them.\n\n"
+                     "https://hubcontent.ai/app"),
+        },
     },
 ]
+
+
+def playbook_steps(pb: dict) -> list[dict]:
+    """Сырые шаги кампании плейбука: письмо сразу + дожим через 4 дня."""
+    steps = [{"action": "email", "subject": pb["subject"], "body": pb["body"],
+              "cta_label": "Open the app", "delay_h": 0}]
+    fu = pb.get("follow_up")
+    if fu:
+        steps.append({"action": "email", "subject": fu["subject"],
+                      "body": fu["body"], "cta_label": "Open the app",
+                      "delay_h": FOLLOW_UP_DELAY_H})
+    return steps
 
 
 def _now() -> datetime:
@@ -157,18 +208,18 @@ def launch_missing(ch, tenant: str, actions: list) -> None:
         rows = _segment_ids(ch, tenant, pb["audience"])
         if len(rows) < MIN_SEGMENT:
             continue
-        steps, reason = validate_steps([
-            {"action": "email", "subject": pb["subject"], "body": pb["body"],
-             "cta_label": "Open the app", "delay_h": 0}])
+        steps, reason = validate_steps(playbook_steps(pb))
         if reason:
             actions.append(f"НЕ запустил {pb['key']}: копия не прошла валидатор ({reason})")
             continue
-        # методология текстов v2: клише/цифры без источника/крик - не уходит
-        from copy_review import fatal as _copy_fatal, review_step
+        # методология текстов v2: клише/цифры без источника/крик - не уходит;
+        # дожим, пересказывающий первое письмо, - тоже (review_sequence)
+        from copy_review import review_sequence, review_step
         profile = _tenant_profile(tenant)
         bad = [f for st in steps for f in review_step(
             st.get("subject", ""), st.get("body", ""), pb["key"], "email", profile)
             if f["level"] == "fatal"]
+        bad += [f for f in review_sequence(steps) if f["level"] == "fatal"]
         if bad:
             actions.append(f"НЕ запустил {pb['key']}: текст завален "
                            f"({', '.join(sorted({f['code'] for f in bad}))})")
