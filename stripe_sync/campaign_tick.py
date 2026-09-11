@@ -434,7 +434,14 @@ def _log_send(client, tenant: str, camp_id: str, identity: str, step_idx: int,
 # человека - лог раздувался тысячами, а «удержано предохранителями» на
 # дашборде превращалось в бессмысленное число. Пишем такой отказ раз в сутки.
 RETRY_REASONS = ("quiet_hours", "freq_cap_day", "freq_cap_week",
-                 "awaiting_retry", "warmup_cap")
+                 "awaiting_retry", "warmup_cap", "esp_quota")
+
+
+def esp_quota_hit(detail: str) -> bool:
+    """Провайдер упёрся в ДНЕВНУЮ квоту аккаунта (Resend: 429
+    daily_quota_exceeded). Ждём завтра, попытки не тратим."""
+    d = str(detail or "")
+    return "daily_quota" in d or ("http_429" in d and "quota" in d.lower())
 
 # ПРОГРЕВ ДОМЕНА. Свежий отправитель, у которого в первый день уходит сотня
 # писем с нулевой историей - спам-паттерн для Gmail. Но темп зависит от того,
@@ -926,6 +933,19 @@ def tick(client, tenant: str) -> dict[str, int]:
                                         if channel == "email" and detail != "dry_run":
                                             email_budget["left"] -= 1
                                         delivered = True
+                                        break
+                                    # Дневная квота ESP - НЕ отказ, а «подожди до
+                                    # завтра», как warmup_cap: без лимита попыток.
+                                    # Урок 2026-09-07: 674 человека сгорели done
+                                    # без единого письма, когда 429 quota съел
+                                    # MAX_SEND_RETRIES; заодно гасим бюджет тика -
+                                    # квота общая на аккаунт, долбить её остальными
+                                    # ещё 2000 раз бессмысленно.
+                                    if channel == "email" and esp_quota_hit(detail):
+                                        email_budget["left"] = 0
+                                        _log_retry(cid, i, identity, "email",
+                                                   step.get("subject", ""), "esp_quota")
+                                        retry_step = True
                                         break
                                     # Провайдер лёг или придушил лимитом - касание
                                     # НЕ отработано: тот же канал повторит следующий
