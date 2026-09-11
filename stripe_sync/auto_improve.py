@@ -47,6 +47,13 @@ PLAYBOOK: list[dict] = [
                  "video and judge for yourself.\n\nIf pricing itself is the "
                  "blocker, just reply - I read every answer.\n\n"
                  "https://hubcontent.ai/app"),
+        "subject_ru": "пара слов про цены",
+        "body_ru": ("Привет. Видел, что вы смотрели тарифы, но так и не "
+                    "решились. Это нормально - большинству сначала нужен "
+                    "один готовый результат. Бесплатные кредиты на аккаунте "
+                    "ещё живы: сделайте одно видео и решите сами.\n\nЕсли "
+                    "смущает именно цена - просто ответьте на письмо, я "
+                    "читаю каждый ответ.\n\nhttps://hubcontent.ai/app"),
         "follow_up": {
             "subject": "what held you back",
             "body": ("Following up once about the plans page. If a specific "
@@ -55,6 +62,14 @@ PLAYBOOK: list[dict] = [
                      "will answer straight.\n\nIf you simply have not needed "
                      "it yet, that is fine too. The free credits stay "
                      "yours.\n\nhttps://hubcontent.ai/app"),
+            "subject_ru": "что вас остановило",
+            "body_ru": ("Возвращаюсь один раз к теме тарифов. Если "
+                        "остановило что-то конкретное - цена, нехватка "
+                        "функции или сомнение, что подойдёт под вашу "
+                        "задачу - ответьте одним словом, и я отвечу по "
+                        "делу.\n\nА если просто пока не нужно - тоже "
+                        "нормально, бесплатные кредиты остаются вашими."
+                        "\n\nhttps://hubcontent.ai/app"),
         },
     },
     {
@@ -68,6 +83,12 @@ PLAYBOOK: list[dict] = [
                  "fits you.\n\nIf something got confusing along the way, "
                  "reply and tell me where - that's exactly what I want to "
                  "fix.\n\nhttps://hubcontent.ai/app"),
+        "subject_ru": "ваш проект в одном клике от готового",
+        "body_ru": ("Вы создали проект, но так и не запустили генерацию. "
+                    "Это занимает около минуты - и это самый быстрый способ "
+                    "понять, подходит ли вам инструмент.\n\nЕсли что-то по "
+                    "пути запутало, ответьте и скажите где - именно это я и "
+                    "хочу починить.\n\nhttps://hubcontent.ai/app"),
         "follow_up": {
             "subject": "your project is still saved",
             "body": ("Checking in once more: the project you created is "
@@ -75,6 +96,12 @@ PLAYBOOK: list[dict] = [
                      "reply and name it and I will walk you through.\n\nOr "
                      "open it and press generate - the render finishes fast."
                      "\n\nhttps://hubcontent.ai/app"),
+            "subject_ru": "проект никуда не делся",
+            "body_ru": ("Пишу ещё раз: проект, который вы создали, на "
+                        "месте, ничего не сгорело. Если какой-то шаг сбил "
+                        "с толку - ответьте, и я проведу за руку.\n\nИли "
+                        "просто откройте его и нажмите «сгенерировать», "
+                        "рендер быстрый.\n\nhttps://hubcontent.ai/app"),
         },
     },
     {
@@ -88,6 +115,12 @@ PLAYBOOK: list[dict] = [
                  "credits cover it.\n\nIf the result wasn't what you "
                  "expected, reply with one line about what was off - I'll "
                  "take it to the team.\n\nhttps://hubcontent.ai/app"),
+        "subject_ru": "ваше видео готово и ждёт",
+        "body_ru": ("Видео срендерилось, но вы его так и не скачали. Оно "
+                    "лежит в вашем проекте прямо сейчас - заберите, пока "
+                    "кредиты покрывают рендер.\n\nЕсли результат не тот, "
+                    "которого ждали, ответьте одной строкой, что не так - "
+                    "передам команде.\n\nhttps://hubcontent.ai/app"),
         "follow_up": {
             "subject": "your render is still in the project",
             "body": ("One more nudge and then I will leave it alone: the "
@@ -96,6 +129,12 @@ PLAYBOOK: list[dict] = [
                      "it.\n\nIf the result missed the mark, reply and say "
                      "what was wrong - I will pass it on.\n\n"
                      "https://hubcontent.ai/app"),
+            "subject_ru": "рендер всё ещё в проекте",
+            "body_ru": ("Последнее напоминание, дальше не беспокою: "
+                        "готовое видео лежит в вашем аккаунте, один клик - "
+                        "и оно у вас.\n\nЕсли результат разочаровал, "
+                        "ответьте и скажите чем - это уйдёт прямо команде."
+                        "\n\nhttps://hubcontent.ai/app"),
         },
     },
     {
@@ -108,6 +147,12 @@ PLAYBOOK: list[dict] = [
                  "guilt, life happens. Your projects and credits are still "
                  "in place.\n\nIf something pushed you away, tell me in one "
                  "line - I read every reply.\n\nhttps://hubcontent.ai/app"),
+        "subject_ru": "мы на месте, если что",
+        "body_ru": ("Вы сделали у нас несколько видео и пропали - без "
+                    "упрёка, жизнь бывает разной. Ваши проекты и кредиты "
+                    "на месте.\n\nЕсли что-то оттолкнуло, напишите одной "
+                    "строкой что - я читаю каждый ответ.\n\n"
+                    "https://hubcontent.ai/app"),
         "follow_up": {
             "subject": "one word is enough",
             "body": ("Last note from me. If hubcontent did not click for "
@@ -116,20 +161,35 @@ PLAYBOOK: list[dict] = [
                      "fix next.\n\nAnd if you just got busy, your projects "
                      "are waiting where you left them.\n\n"
                      "https://hubcontent.ai/app"),
+            "subject_ru": "одного слова хватит",
+            "body_ru": ("Последняя весточка от меня. Если hubcontent вам "
+                        "не зашёл, скажите почему одним словом: цена, "
+                        "качество, время или что-то ещё. Этот ответ "
+                        "решает, что мы чиним дальше.\n\nА если просто "
+                        "закрутились - проекты ждут там же, где вы их "
+                        "оставили.\n\nhttps://hubcontent.ai/app"),
         },
     },
 ]
 
 
 def playbook_steps(pb: dict) -> list[dict]:
-    """Сырые шаги кампании плейбука: письмо сразу + дожим через 4 дня."""
-    steps = [{"action": "email", "subject": pb["subject"], "body": pb["body"],
-              "cta_label": "Open the app", "delay_h": 0}]
+    """Сырые шаги кампании плейбука: письмо сразу + дожим через 4 дня.
+    subject_ru/body_ru едут в шаг как есть - тик подставит их русскоязычным
+    юзерам (campaign_tick.apply_locale)."""
+    def _step(src: dict, delay: float) -> dict:
+        out = {"action": "email", "subject": src["subject"],
+               "body": src["body"], "cta_label": "Open the app",
+               "delay_h": delay}
+        for lf in ("subject_ru", "body_ru"):
+            if src.get(lf):
+                out[lf] = src[lf]
+        return out
+
+    steps = [_step(pb, 0)]
     fu = pb.get("follow_up")
     if fu:
-        steps.append({"action": "email", "subject": fu["subject"],
-                      "body": fu["body"], "cta_label": "Open the app",
-                      "delay_h": FOLLOW_UP_DELAY_H})
+        steps.append(_step(fu, FOLLOW_UP_DELAY_H))
     return steps
 
 
@@ -219,7 +279,14 @@ def launch_missing(ch, tenant: str, actions: list) -> None:
         bad = [f for st in steps for f in review_step(
             st.get("subject", ""), st.get("body", ""), pb["key"], "email", profile)
             if f["level"] == "fatal"]
+        # русские версии - через тот же фильтр (тире, крик, цифры, ссылка)
+        bad += [f for st in steps if st.get("body_ru") for f in review_step(
+            st.get("subject_ru", ""), st.get("body_ru", ""), pb["key"],
+            "email", profile) if f["level"] == "fatal"]
         bad += [f for f in review_sequence(steps) if f["level"] == "fatal"]
+        bad += [f for f in review_sequence(
+            [{"body": st.get("body_ru", "")} for st in steps])
+            if f["level"] == "fatal"]
         if bad:
             actions.append(f"НЕ запустил {pb['key']}: текст завален "
                            f"({', '.join(sorted({f['code'] for f in bad}))})")

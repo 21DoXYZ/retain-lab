@@ -242,6 +242,12 @@ def validate_steps(raw_steps: list) -> tuple[list, str]:
         step = {"action": action, "delay_h": delay,
                 "subject": subject.replace("—", "-").replace("–", "-"),
                 "body": body_t.replace("—", "-").replace("–", "-")}
+        # локализованные версии текста: тик подставит их юзерам с этой
+        # локалью (campaign_tick.apply_locale), остальным уйдёт основная
+        for lf in ("subject_ru", "body_ru"):
+            if s.get(lf):
+                step[lf] = (str(s[lf]).strip()[:4000]
+                            .replace("—", "-").replace("–", "-"))
         if s.get("cta_label"):
             step["cta_label"] = str(s["cta_label"]).strip()[:80]
         if s.get("cta_url"):

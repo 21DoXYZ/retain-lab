@@ -230,7 +230,9 @@ _REPEAT_WINDOW = 6
 
 
 def _shingles(text: str, size: int) -> set[str]:
-    words = re.findall(r"[a-z0-9']+", (text or "").lower())
+    # кириллица в классе обязательна: без неё русский фоллоуап был бы
+    # невидим для анти-повтора (2026-09-11, ввод русских версий писем)
+    words = re.findall(r"[a-zа-яё0-9']+", (text or "").lower())
     return {" ".join(words[i:i + size])
             for i in range(max(0, len(words) - size + 1))}
 

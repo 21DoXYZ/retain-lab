@@ -184,6 +184,38 @@ def quiet_hours_block(campaign_id: str, now_utc: datetime, tz_name: str,
 # variants_off=true (ставит автопобедитель) - сплит выключен, текст шага уже
 # заменён на победителя через overrides.
 
+# ЯЗЫК ПИСЬМА = ЯЗЫК ЮЗЕРА. Урок 2026-09-11: конвертящие юзеры hubcontent -
+# mail.ru и Europe/Moscow, а письма уходили на английском. Локаль решаем по
+# двум сигналам: домен почты (самый честный - юзер сам его выбрал) и страна
+# из событий. Украина НЕ в списке намеренно: русское письмо туда может
+# оттолкнуть, английский дефолт нейтрален.
+RU_EMAIL_DOMAINS = ("mail.ru", "bk.ru", "list.ru", "inbox.ru", "internet.ru",
+                    "yandex.ru", "ya.ru", "rambler.ru")
+RU_GEO = {"RU", "BY", "KZ", "KG", "UZ", "TJ", "TM", "AM", "AZ", "MD"}
+
+
+def locale_for(email: str, geo_country: str) -> str:
+    dom = email.rsplit("@", 1)[-1].lower() if "@" in (email or "") else ""
+    if dom in RU_EMAIL_DOMAINS:
+        return "ru"
+    if (geo_country or "").upper() in RU_GEO:
+        return "ru"
+    return "en"
+
+
+def apply_locale(step: dict, locale: str) -> dict:
+    """Подменить текст шага локализованной версией (subject_ru/body_ru).
+    Нет перевода - молча уходит основная версия, письмо не теряется."""
+    if locale == "en":
+        return step
+    out = dict(step)
+    for f in ("subject", "body"):
+        v = step.get(f + "_" + locale)
+        if v:
+            out[f] = v
+    return out
+
+
 def pick_variant(identity: str, campaign_id: str, step_idx: int, n: int) -> int:
     """Стабильный индекс варианта для юзера. n<=1 - вариантов нет."""
     if n <= 1:
@@ -481,6 +513,20 @@ def tick(client, tenant: str) -> dict[str, int]:
         print(f"[tick] {tenant}: pref hours unavailable: {type(exc).__name__}",
               flush=True)
 
+    # Страна юзера - для выбора языка письма (locale_for + apply_locale)
+    geo_map: dict[str, str] = {}
+    try:
+        for r in client.query(
+            "SELECT identity_id, argMax(geo_country, last_seen) "
+            "FROM retention.user_event_features "
+            "WHERE tenant_id = %(t)s AND geo_country != '' "
+            "GROUP BY identity_id",
+            parameters={"t": tenant}).result_rows:
+            geo_map[str(r[0])] = str(r[1])
+    except Exception as exc:  # noqa: BLE001 - без гео просто английский
+        print(f"[tick] {tenant}: geo unavailable: {type(exc).__name__}",
+              flush=True)
+
     # Дневной бюджет ЛИЧНОГО WhatsApp: сколько автокасаний номер ещё может
     # отправить сегодня. Считаем по логу (все wa-отправки суток), лимит -
     # wa_personal_daily_cap тенанта (деф. 20). Бан прилетает личному номеру
@@ -706,6 +752,9 @@ def tick(client, tenant: str) -> dict[str, int]:
                 # вариант юзера накладывается ДО всех веток: и email, и in-app,
                 # и лестница каналов видят один и тот же текст его группы
                 step = apply_variant(steps[i], identity, cid, i)
+                # затем язык: русскоязычному юзеру - русская версия шага
+                step = apply_locale(step,
+                                    locale_for(email, geo_map.get(identity, "")))
                 retry_step = False
                 try:
                     if not row["control"]:
