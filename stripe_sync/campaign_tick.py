@@ -216,6 +216,23 @@ def apply_locale(step: dict, locale: str) -> dict:
     return out
 
 
+# ПРИОРИТЕТ НА ДНЕВНОЙ БЮДЖЕТ. Когда писем можно мало (прогрев или лимит
+# ESP - у hubcontent Resend режет 100/день), решает ПОРЯДОК: первыми должны
+# уходить письма людям с максимальными шансами на деньги, а не «кто раньше
+# в словаре». Скор - грубая монотонная смесь готовых ML-полей юзера; точная
+# калибровка не нужна, нужен лишь правильный порядок очереди.
+def priority_score(buy_intent: float, p_convert: float,
+                   ltv_estimate: float) -> float:
+    return (float(buy_intent or 0) * 10 + float(p_convert or 0) * 10
+            + min(float(ltv_estimate or 0), 1000) / 100)
+
+
+def by_priority(enrolled: dict, prio: dict) -> list:
+    """Пары (identity, row) в порядке убывания скора; без скора - в хвост."""
+    return sorted(enrolled.items(),
+                  key=lambda kv: -float(prio.get(kv[0]) or 0.0))
+
+
 def pick_variant(identity: str, campaign_id: str, step_idx: int, n: int) -> int:
     """Стабильный индекс варианта для юзера. n<=1 - вариантов нет."""
     if n <= 1:
@@ -513,6 +530,20 @@ def tick(client, tenant: str) -> dict[str, int]:
         print(f"[tick] {tenant}: pref hours unavailable: {type(exc).__name__}",
               flush=True)
 
+    # Скор юзера для очереди на дневной бюджет писем (см. priority_score)
+    prio: dict[str, float] = {}
+    try:
+        for r in client.query(
+            "SELECT identity_id, argMax(buy_intent, scored_at), "
+            "argMax(p_convert, scored_at), argMax(ltv_estimate, scored_at) "
+            "FROM retention.user_actions WHERE tenant_id = %(t)s "
+            "GROUP BY identity_id",
+            parameters={"t": tenant}).result_rows:
+            prio[str(r[0])] = priority_score(r[1], r[2], r[3])
+    except Exception as exc:  # noqa: BLE001 - без скоров порядок прежний
+        print(f"[tick] {tenant}: priority scores unavailable: "
+              f"{type(exc).__name__}", flush=True)
+
     # Страна юзера - для выбора языка письма (locale_for + apply_locale)
     geo_map: dict[str, str] = {}
     try:
@@ -740,8 +771,9 @@ def tick(client, tenant: str) -> dict[str, int]:
             stats["enrolled"] += 1
             stats["control"] += 1 if control else 0
 
-        # 2. EXECUTE + 3. EXIT
-        for identity, row in enrolled.items():
+        # 2. EXECUTE + 3. EXIT - горячие по скору первыми: при дневном
+        # лимите писем бюджет достаётся самым денежным людям
+        for identity, row in by_priority(enrolled, prio):
             if row["status"] != "active":
                 continue
             enrolled_at = row["enrolled_at"] if isinstance(row["enrolled_at"], datetime) \
