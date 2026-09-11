@@ -627,6 +627,7 @@ export const saas = {
   "saas.home.act.wa_down": "Сессия WhatsApp слетела - переподключите по QR",
   "saas.home.act.cards_expiring": "У {n} платящих карта истекает в ближайшие 14 дней",
   "saas.home.act.offer_callback": "Бонусы не доходят: {n} офферов за 2 дня отбиты - у клиента не настроен callback начисления",
+  "saas.home.act.replies": "Ответили на письма: {n} за неделю - прочитай и ответь лично",
   "saas.home.act.infra": "Сбой в обработке данных - откройте Конвейер",
   "saas.home.act.delivery_alarm": "Письма не доходят: {n} возвратов и жалоб за сутки - репутация домена под угрозой",
   "saas.home.dg.title": "Пока вас не было - последние 24 часа",

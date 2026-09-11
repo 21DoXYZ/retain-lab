@@ -892,6 +892,22 @@ CREATE TABLE IF NOT EXISTS retention.email_events
 ENGINE = MergeTree
 ORDER BY (tenant_id, provider_id, event_type, ts);
 
+-- Входящие ответы юзеров на письма (Resend inbound, email.received).
+-- Ответ - самый горячий сигнал: цепочки ответившему останавливаются,
+-- сам ответ виден владельцу на Home («Требуют тебя»).
+CREATE TABLE IF NOT EXISTS retention.email_replies
+(
+    `tenant_id`   LowCardinality(String),
+    `from_email`  String,
+    `identity_id` String,                   -- '' - адрес не нашёлся в identities
+    `subject`     String,
+    `body`        String,
+    `provider_id` String,
+    `ts`          DateTime64(3)
+)
+ENGINE = MergeTree
+ORDER BY (tenant_id, ts);
+
 -- Список подавления: кому больше НЕ пишем никогда. Причины: отписка юзера,
 -- жалоба на спам, жёсткий баунс (адрес не существует).
 CREATE TABLE IF NOT EXISTS retention.email_suppressions

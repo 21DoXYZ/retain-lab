@@ -326,6 +326,53 @@ def resend_webhook():
     except ValueError:
         return api_json(None, 400, 'invalid_json')
 
+    # Входящий ОТВЕТ юзера (email.received, Resend inbound). Самый горячий
+    # сигнал из всех: пишем в email_replies, находим юзера по адресу и
+    # останавливаем ему все живые цепочки - дожимать ответившего роботом
+    # нельзя, дальше разговор ведёт человек.
+    from stripe_sync.email_delivery import parse_inbound
+    inb = parse_inbound(doc)
+    if inb:
+        from datetime import datetime, timezone
+        now = datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        client = _ch_client()
+        identity = ''
+        if inb['from_email']:
+            rows = client.query(
+                'SELECT identity_id FROM retention.identities '
+                'WHERE tenant_id = %(t)s AND email_norm = %(e)s LIMIT 1',
+                parameters={'t': tenant, 'e': inb['from_email']}).result_rows
+            identity = str(rows[0][0]) if rows else ''
+        client.insert(
+            'retention.email_replies',
+            [[tenant, inb['from_email'], identity, inb['subject'],
+              inb['text'], inb['provider_id'], now]],
+            column_names=['tenant_id', 'from_email', 'identity_id', 'subject',
+                          'body', 'provider_id', 'ts'])
+        stopped = 0
+        if identity:
+            active = client.query(
+                'SELECT campaign_id, control, entry_stage, step_idx, '
+                'next_step_at, enrolled_at '
+                'FROM retention.campaign_enrollments_current '
+                "WHERE tenant_id = %(t)s AND identity_id = %(i)s "
+                "AND status = 'active'",
+                parameters={'t': tenant, 'i': identity}).result_rows
+            if active:
+                client.insert(
+                    'retention.campaign_enrollments',
+                    [[tenant, str(r[0]), identity, int(r[1]), str(r[2]),
+                      int(r[3]), r[4], 'exited', r[5], now] for r in active],
+                    column_names=['tenant_id', 'campaign_id', 'identity_id',
+                                  'control', 'entry_stage', 'step_idx',
+                                  'next_step_at', 'status', 'enrolled_at',
+                                  'updated_at'])
+                stopped = len(active)
+        print(f'[resend] {tenant}: reply from {inb["from_email"] or "?"} '
+              f'(identity={identity or "-"}, chains stopped={stopped})',
+              flush=True)
+        return api_json({'status': 'reply'})
+
     ev = parse_webhook(doc)
     if not ev:
         return api_json({'status': 'ignored'})

@@ -201,6 +201,36 @@ KNOWN_EVENTS = {"email.sent", "email.delivered", "email.delivery_delayed",
                 "email.complained"}
 
 
+# ── Входящие ответы (Resend inbound) ─────────────────────────────────────────
+# Каждое письмо кампании просит «просто ответь» - значит, ответы обязаны
+# куда-то приходить. email.received прилетает в тот же вебхук с той же
+# Svix-подписью; настройка на стороне Resend - включить inbound на домене
+# отправителя (MX-запись), код ниже уже готов принимать.
+INBOUND_EVENT = "email.received"
+
+_ADDR = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+
+
+def parse_inbound(doc: dict) -> dict:
+    """email.received -> кто ответил и что написал. {} - событие не наше."""
+    if str(doc.get("type") or "") != INBOUND_EVENT:
+        return {}
+    data = doc.get("data") or {}
+    frm = data.get("from")
+    if isinstance(frm, dict):
+        frm = frm.get("email") or frm.get("address") or ""
+    m = _ADDR.search(str(frm or ""))
+    text = str(data.get("text") or "")
+    if not text.strip():
+        text = re.sub(r"<[^>]+>", " ", str(data.get("html") or ""))
+    return {
+        "from_email": m.group(0).lower() if m else "",
+        "subject": str(data.get("subject") or "")[:200],
+        "text": _html.unescape(text).strip()[:4000],
+        "provider_id": str(data.get("email_id") or data.get("id") or ""),
+    }
+
+
 def parse_webhook(doc: dict) -> dict:
     """Полезное из тела вебхука. {} - событие не наше/непонятное."""
     etype = str(doc.get("type") or "")

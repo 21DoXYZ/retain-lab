@@ -430,6 +430,16 @@ def _home_actions(tenant: str) -> list | None:
     try:
         tch = ca.load_tenants().get(tenant, {}) or {}
 
+        # ответы на письма - первыми: живой человек ждёт живого ответа
+        try:
+            rep = int(q(
+                'SELECT count() FROM email_replies WHERE tenant_id = {t:String} '
+                'AND ts >= now() - INTERVAL 7 DAY', {'t': tenant})[1][0][0])
+            if rep:
+                out.append({'key': 'replies', 'count': rep, 'href': '/users'})
+        except Exception:  # noqa: BLE001 - таблицы может ещё не быть
+            pass
+
         pending = int(q(
             "SELECT count() FROM ai_insights_current WHERE tenant_id = {t:String} "
             "AND status = 'new'", {'t': tenant})[1][0][0])

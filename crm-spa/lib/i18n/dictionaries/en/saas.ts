@@ -628,6 +628,7 @@ export const saas: Partial<Messages> = {
   "saas.home.act.wa_down": "WhatsApp session dropped - reconnect with the QR code",
   "saas.home.act.cards_expiring": "{n} paying customers have cards expiring within 14 days",
   "saas.home.act.offer_callback": "Bonuses are not landing: {n} offers bounced in 2 days - the client callback is not configured",
+  "saas.home.act.replies": "Replied to your emails: {n} this week - read and answer personally",
   "saas.home.act.infra": "Data processing issue - open Pipeline",
   "saas.home.act.delivery_alarm": "Emails are not landing: {n} bounces and complaints in 24h - domain reputation at risk",
   "saas.home.dg.title": "While you were away - last 24 hours",
