@@ -403,6 +403,29 @@
         ]
       },
       {
+        "campaign_id": "T5_paywall_hot",
+        "title": "Trigger: looked at pricing within the hour",
+        "entry_stage": "TRIGGER",
+        "manual_audience": true,
+        "reentry_days": 30,
+        "goal": {
+          "event_type": "billing.invoice_paid",
+          "window_days": 7
+        },
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "you were just looking at the plans",
+            "body": "Saw you checking the plans a moment ago. If a question is holding you back - price, features, whatever it is - reply with one line and I will answer straight.\n\nAnd if you are just browsing, no push: {{app_url}}",
+            "subject_ru": "вы только что смотрели тарифы",
+            "body_ru": "Видел, что вы только что смотрели тарифы. Если держит какой-то вопрос - цена, функции, что угодно - ответьте одной строкой, отвечу по делу.\n\nА если просто присматриваетесь - не навязываюсь: {{app_url}}",
+            "cta_label": "Open the app",
+            "cta_url": "{{app_url}}"
+          }
+        ]
+      },
+      {
         "campaign_id": "T2_credits_out",
         "title": "Trigger: credits exhausted",
         "entry_stage": "TRIGGER",

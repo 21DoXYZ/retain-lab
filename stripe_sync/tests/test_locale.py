@@ -48,7 +48,7 @@ def test_playbook_ru_versions_pass_review():
         flags = []
         for st in steps:
             flags += review_step(st["subject_ru"], st["body_ru"], pb["key"],
-                                 "email", {})
+                                 st.get("action", "email"), {})
         flags += review_sequence([{"body": st["body_ru"]} for st in steps])
         fatals = [f for f in flags if f["level"] == "fatal"]
         assert not fatals, (pb["key"], fatals)

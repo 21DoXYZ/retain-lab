@@ -190,6 +190,10 @@ def build(flt: dict) -> tuple[list[str], dict, list[str]]:
     if flt.get("no_download"):
         # получил результат, но не забрал его (окно фичи - 14 дней)
         conds.append("coalesce(f.downloads_14d, 0) = 0")
+    if flt.get("checkout_abandoned"):
+        # дошёл до формы оплаты и ушёл - самый горячий сегмент воронки:
+        # человек уже доставал карту, это не «смотрел цены»
+        conds.append("coalesce(f.checkout_starts, 0) > 0")
 
     # тип контакта: широкий фильтр «кому вообще можно написать и как»
     c_conds, c_unknown = contact_conditions(
@@ -248,6 +252,11 @@ def validate_steps(raw_steps: list) -> tuple[list, str]:
             if s.get(lf):
                 step[lf] = (str(s[lf]).strip()[:4000]
                             .replace("—", "-").replace("–", "-"))
+        if action == "inapp" and s.get("ttl_days"):
+            try:
+                step["ttl_days"] = min(max(float(s["ttl_days"]), 1.0), 30.0)
+            except (TypeError, ValueError):
+                pass
         if s.get("cta_label"):
             step["cta_label"] = str(s["cta_label"]).strip()[:80]
         if s.get("cta_url"):
@@ -291,6 +300,8 @@ def describe(flt: dict) -> str:
         parts.append("saw pricing/paywall")
     if flt.get("no_download"):
         parts.append("no download")
+    if flt.get("checkout_abandoned"):
+        parts.append("abandoned checkout")
     toks = flt.get("contacts")
     toks = toks if isinstance(toks, (list, tuple)) else (
         [t for t in str(toks or "").split(",") if t] if toks else [])

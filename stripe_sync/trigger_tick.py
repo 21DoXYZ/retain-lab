@@ -111,6 +111,31 @@ TRIGGERS: dict[str, str] = {
           AND ts >= now() - INTERVAL 24 HOUR
         GROUP BY identity_id
     """,
+    # Пейвол смотрели 30мин-24ч назад, человек не платящий и после просмотра
+    # не оплатил. Суточный сканер мозга ловит таких «на неделе» - остывшими;
+    # триггер бьёт в живое намерение. Кулдаун 30д = reentry кампании; тем,
+    # кому за 7 дней уже ушло письмо кампании про цены, не дублируем.
+    "T5_paywall_hot": """
+        SELECT pv.identity_id
+        FROM (
+            SELECT identity_id, max(ts) AS last_view
+            FROM retention.saas_events_resolved
+            WHERE tenant_id = %(t)s AND event_type = 'paywall_viewed'
+              AND ts BETWEEN now() - INTERVAL 24 HOUR AND now() - INTERVAL 30 MINUTE
+            GROUP BY identity_id
+        ) pv
+        JOIN retention.user_actions ua
+          ON ua.tenant_id = %(t)s AND ua.identity_id = pv.identity_id
+        WHERE ua.sub_status NOT IN ('active', 'trialing', 'past_due')
+          AND pv.identity_id NOT IN (
+              SELECT identity_id FROM retention.saas_events_resolved
+              WHERE tenant_id = %(t)s AND event_type = 'billing.invoice_paid'
+                AND ts >= now() - INTERVAL 24 HOUR)
+          AND pv.identity_id NOT IN (
+              SELECT identity_id FROM retention.campaign_send_log
+              WHERE tenant_id = %(t)s AND campaign_id LIKE '%%saw_pricing%%'
+                AND status = 'sent' AND ts >= now() - INTERVAL 7 DAY)
+    """,
     # Карта платящего истекает в ближайшие 14 дней - невольный отток,
     # который дешевле всего перехватить ДО фейла списания.
     "T3_card_expiring": """

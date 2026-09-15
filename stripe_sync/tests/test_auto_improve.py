@@ -28,8 +28,10 @@ def test_playbook_has_follow_up():
     assert 48 <= FOLLOW_UP_DELAY_H <= 168
     for pb in PLAYBOOK:
         steps = playbook_steps(pb)
-        assert len(steps) == 2, pb["key"]
-        assert steps[1]["delay_h"] == FOLLOW_UP_DELAY_H
+        assert 2 <= len(steps) <= 3, pb["key"]
+        assert steps[-1]["delay_h"] == FOLLOW_UP_DELAY_H
+        if pb.get("inapp"):
+            assert steps[1]["action"] == "inapp" and steps[1]["delay_h"] == 0
 
 
 def test_playbook_copy_passes_methodology_v2():
@@ -39,7 +41,7 @@ def test_playbook_copy_passes_methodology_v2():
         flags = []
         for st in playbook_steps(pb):
             flags += review_step(st["subject"], st["body"], pb["key"],
-                                 "email", {})
+                                 st.get("action", "email"), {})
         flags += review_sequence(playbook_steps(pb))
         fatals = [f for f in flags if f["level"] == "fatal"]
         assert not fatals, (pb["key"], fatals)

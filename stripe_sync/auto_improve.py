@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 MIN_SEGMENT = 30          # меньше - шум, кампания не окупает внимание
 EVAL_MIN_DAYS = 7
 EVAL_MIN_SENT = 150
+EVAL_MIN_CONTROL = 20     # меньше - одна случайная конверсия глушит кампанию
 CONTROL_PCT = 10
 # Второе касание через 4 дня: первый подтверждённый платёж (2026-09-08, $99)
 # пришёл от человека, получившего ДВА письма. Одно касание - недожатая
@@ -89,6 +90,12 @@ PLAYBOOK: list[dict] = [
                     "понять, подходит ли вам инструмент.\n\nЕсли что-то по "
                     "пути запутало, ответьте и скажите где - именно это я и "
                     "хочу починить.\n\nhttps://hubcontent.ai/app"),
+        "inapp": {
+            "subject": "Your project is one render away",
+            "body": "Press generate and see the first result - about a minute.",
+            "subject_ru": "Проект в одном рендере от результата",
+            "body_ru": "Нажмите «сгенерировать» и посмотрите первый результат - это займёт около минуты.",
+        },
         "follow_up": {
             "subject": "your project is still saved",
             "body": ("Checking in once more: the project you created is "
@@ -121,6 +128,12 @@ PLAYBOOK: list[dict] = [
                     "кредиты покрывают рендер.\n\nЕсли результат не тот, "
                     "которого ждали, ответьте одной строкой, что не так - "
                     "передам команде.\n\nhttps://hubcontent.ai/app"),
+        "inapp": {
+            "subject": "Your video is ready",
+            "body": "It is rendered and waiting in your project - one click to save it.",
+            "subject_ru": "Ваше видео готово",
+            "body_ru": "Оно срендерено и ждёт в проекте - заберите одним кликом.",
+        },
         "follow_up": {
             "subject": "your render is still in the project",
             "body": ("One more nudge and then I will leave it alone: the "
@@ -187,6 +200,17 @@ def playbook_steps(pb: dict) -> list[dict]:
         return out
 
     steps = [_step(pb, 0)]
+    ia = pb.get("inapp")
+    if ia:
+        # баннер в продукте тем же днём: канал бесплатный, лимитов ESP нет,
+        # человек видит его в самый конвертящий момент - уже внутри продукта
+        banner = {"action": "inapp", "delay_h": 0, "ttl_days": 3,
+                  "subject": ia["subject"], "body": ia["body"],
+                  "cta_label": "Open the app"}
+        for lf in ("subject_ru", "body_ru"):
+            if ia.get(lf):
+                banner[lf] = ia[lf]
+        steps.append(banner)
     fu = pb.get("follow_up")
     if fu:
         steps.append(_step(fu, FOLLOW_UP_DELAY_H))
@@ -228,6 +252,17 @@ def _active_auto(tenant: str) -> dict[str, dict]:
     return out
 
 
+def _brain_keys(tenant: str) -> set[str]:
+    """Сегменты, на которые мозг УЖЕ заводил кампанию - в ЛЮБОМ статусе.
+    Урок 2026-09-15: пауза считалась вакансией, и launch_missing тут же
+    перезапускал сегмент новой кампанией с тем же текстом - 150 человек
+    получили дубль письма. Пауза - это решение, а не свободное место."""
+    import overrides as ovr
+    return {str(c.get("segment_key"))
+            for c in (ovr.load_tenant(tenant).get("custom_campaigns") or [])
+            if c.get("auto_brain")}
+
+
 def _enroll(ch, tenant: str, cid: str, steps: list, rows: list,
             skip_ids: set) -> tuple[int, int]:
     from campaign_tick import holdout_split, next_step_time
@@ -261,9 +296,9 @@ def launch_missing(ch, tenant: str, actions: list) -> None:
     """Плейбук: сегмент без живой авто-кампании и с людьми - запуск."""
     import overrides as ovr
     from segment import describe, validate_steps
-    active = _active_auto(tenant)
+    taken = _brain_keys(tenant)
     for pb in PLAYBOOK:
-        if pb["key"] in active:
+        if pb["key"] in taken:
             continue
         rows = _segment_ids(ch, tenant, pb["audience"])
         if len(rows) < MIN_SEGMENT:
@@ -277,12 +312,12 @@ def launch_missing(ch, tenant: str, actions: list) -> None:
         from copy_review import review_sequence, review_step
         profile = _tenant_profile(tenant)
         bad = [f for st in steps for f in review_step(
-            st.get("subject", ""), st.get("body", ""), pb["key"], "email", profile)
-            if f["level"] == "fatal"]
+            st.get("subject", ""), st.get("body", ""), pb["key"],
+            st.get("action", "email"), profile) if f["level"] == "fatal"]
         # русские версии - через тот же фильтр (тире, крик, цифры, ссылка)
         bad += [f for st in steps if st.get("body_ru") for f in review_step(
             st.get("subject_ru", ""), st.get("body_ru", ""), pb["key"],
-            "email", profile) if f["level"] == "fatal"]
+            st.get("action", "email"), profile) if f["level"] == "fatal"]
         bad += [f for f in review_sequence(steps) if f["level"] == "fatal"]
         bad += [f for f in review_sequence(
             [{"body": st.get("body_ru", "")} for st in steps])
@@ -330,24 +365,39 @@ def evaluate(ch, tenant: str, actions: list) -> None:
         goal = str(conf.get("goal_event") or "")
         if not goal:
             continue
+        # ЦЕЛЬ - строго ПОСЛЕ ДОСТАВЛЕННОГО письма (урок 2026-09-15: счёт
+        # «после зачисления» мешал в кучу сотни недоставленных и пауза
+        # срабатывала на мусоре). Таргет = кому реально ушло письмо.
         stats = ch.query("""
             SELECT dateDiff('day', min(enrolled_at), now()),
-                   uniqExactIf(identity_id, control = 0),
                    uniqExactIf(identity_id, control = 1)
             FROM retention.campaign_enrollments
             WHERE tenant_id = %(t)s AND campaign_id = %(c)s
             """, parameters={"t": tenant, "c": cid}).result_rows[0]
-        sent = int(ch.query(
-            "SELECT count() FROM retention.campaign_send_log "
+        t_n = int(ch.query(
+            "SELECT uniqExact(identity_id) FROM retention.campaign_send_log "
             "WHERE tenant_id = %(t)s AND campaign_id = %(c)s AND status = 'sent'",
             parameters={"t": tenant, "c": cid}).result_rows[0][0])
-        conv = ch.query("""
-            SELECT countIf(e.control = 0 AND hit), countIf(e.control = 1 AND hit)
+        t_hit = int(ch.query("""
+            SELECT count() FROM (
+              SELECT s.id FROM (
+                SELECT identity_id AS id, min(ts) AS sent_at
+                FROM retention.campaign_send_log
+                WHERE tenant_id = %(t)s AND campaign_id = %(c)s
+                  AND status = 'sent'
+                GROUP BY identity_id
+              ) s
+              JOIN retention.saas_events_deduped p ON p.identity_id = s.id
+              WHERE p.tenant_id = %(t)s AND p.event_type = %(g)s
+              GROUP BY s.id, s.sent_at
+              HAVING min(p.ts) > s.sent_at
+            )""", parameters={"t": tenant, "c": cid, "g": goal}).result_rows[0][0])
+        c_conv = ch.query("""
+            SELECT countIf(hit)
             FROM (
-              SELECT identity_id, max(control) AS control,
-                     min(enrolled_at) AS enr
+              SELECT identity_id, min(enrolled_at) AS enr
               FROM retention.campaign_enrollments
-              WHERE tenant_id = %(t)s AND campaign_id = %(c)s
+              WHERE tenant_id = %(t)s AND campaign_id = %(c)s AND control = 1
               GROUP BY identity_id
             ) e
             LEFT JOIN (
@@ -358,11 +408,13 @@ def evaluate(ch, tenant: str, actions: list) -> None:
             ) g ON g.identity_id = e.identity_id
             ARRAY JOIN [g.first_goal >= e.enr] AS hit
             """, parameters={"t": tenant, "c": cid, "g": goal}).result_rows[0]
-        row = (stats[0], sent, conv[0], stats[1], conv[1], stats[2])
-        days, sent = int(row[0] or 0), int(row[1] or 0)
-        t_hit, t_n, c_hit, c_n = (int(row[2]), int(row[3]),
-                                  int(row[4]), int(row[5]))
-        if days < EVAL_MIN_DAYS or sent < EVAL_MIN_SENT or not c_n:
+        days, c_n = int(stats[0] or 0), int(stats[1] or 0)
+        c_hit = int(c_conv[0] or 0)
+        # Пауза только на достаточном объёме С ОБЕИХ сторон: маленький
+        # контроль шумит (1 случайная конверсия из 25 = 4% и глушит любую
+        # живую кампанию). Мало контроля - ждём, не судим.
+        if (days < EVAL_MIN_DAYS or t_n < EVAL_MIN_SENT
+                or c_n < EVAL_MIN_CONTROL):
             continue
         t_rate = t_hit / t_n if t_n else 0.0
         c_rate = c_hit / c_n if c_n else 0.0
@@ -370,8 +422,8 @@ def evaluate(ch, tenant: str, actions: list) -> None:
             ovr.set_custom_campaign_status(tenant, cid, "paused")
             actions.append(
                 f"поставил на паузу «{conf.get('title', cid)}»: цель {t_rate:.1%} "
-                f"против контроля {c_rate:.1%} за {days}д / {sent} отправок - "
-                f"прироста нет")
+                f"({t_hit}/{t_n} доставленных) против контроля {c_rate:.1%} "
+                f"({c_hit}/{c_n}) за {days}д - прироста нет")
 
 
 def run_tenant(ch, tenant: str) -> list[str]:
