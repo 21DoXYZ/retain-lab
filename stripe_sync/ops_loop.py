@@ -128,6 +128,13 @@ STAGES: dict[str, dict] = {
         "when": lambda t: t.minute == 7,
         "deps": [], "fresh_h": 26,
     },
+    "mail_poll": {
+        # ответы юзеров из Google-ящика тенанта (IMAP, BODY.PEEK): в базу,
+        # цепочку ответившему стоп; без imap_app_password - тихий пропуск
+        "argv": ["python", "mail_poll.py"],
+        "when": lambda t: t.minute % 5 == 2,
+        "deps": [], "fresh_h": 26,
+    },
     "weekly_digest": {
         # письмо владельцу после свежего uplift: ценность видна без входа в CRM
         "argv": ["python", "weekly_digest.py"],
@@ -271,7 +278,7 @@ def name_argv(name: str) -> list[str]:
 # ниже валит процесс на старте, если списки разъехались.
 _ORDER = ["stitch", "plans", "contacts", "users_sync", "product_sync",
           "cancel_reasons", "scoring", "campaign_tick", "replenishment",
-          "triggers", "ops_alerts", "auto_improve",
+          "triggers", "ops_alerts", "mail_poll", "auto_improve",
           "uplift_report", "ai_analyst", "product_insights", "weekly_digest"]
 assert set(_ORDER) == set(STAGES), (
     f"_ORDER != STAGES: {set(_ORDER) ^ set(STAGES)}")
