@@ -419,6 +419,58 @@ def evaluate(ch, tenant: str, actions: list) -> None:
         t_rate = t_hit / t_n if t_n else 0.0
         c_rate = c_hit / c_n if c_n else 0.0
         if t_rate <= c_rate:
+            # ДЕНЕЖНЫЙ ПРЕДОХРАНИТЕЛЬ (2026-09-18): проксицель - не деньги.
+            # «Проект без генерации» был запаузен по цели, принеся $423
+            # оплат после писем. Кампанию, чья аудитория после доставки
+            # платит больше контроля на человека, не паузим.
+            t_rev = float(ch.query("""
+                SELECT sum(usd) FROM (
+                  SELECT s.id, i.invoice_id,
+                         argMax(i.amount_paid, i.updated_at) AS usd
+                  FROM (
+                    SELECT identity_id AS id, min(ts) AS sent_at
+                    FROM retention.campaign_send_log
+                    WHERE tenant_id = %(t)s AND campaign_id = %(c)s
+                      AND status = 'sent' GROUP BY identity_id
+                  ) s
+                  JOIN (
+                    SELECT identity_id AS iid,
+                           argMax(stripe_customer_id, updated_at) AS cust
+                    FROM retention.identities WHERE tenant_id = %(t)s
+                    GROUP BY identity_id
+                  ) c2 ON c2.iid = s.id
+                  JOIN retention.stripe_invoices i ON i.customer_id = c2.cust
+                  WHERE i.tenant_id = %(t)s AND i.status = 'paid'
+                    AND c2.cust != '' AND i.created_ts > s.sent_at
+                  GROUP BY s.id, i.invoice_id
+                )""", parameters={"t": tenant, "c": cid}).result_rows[0][0] or 0)
+            c_rev = float(ch.query("""
+                SELECT sum(usd) FROM (
+                  SELECT e.id, i.invoice_id,
+                         argMax(i.amount_paid, i.updated_at) AS usd
+                  FROM (
+                    SELECT identity_id AS id, min(enrolled_at) AS enr
+                    FROM retention.campaign_enrollments
+                    WHERE tenant_id = %(t)s AND campaign_id = %(c)s
+                      AND control = 1 GROUP BY identity_id
+                  ) e
+                  JOIN (
+                    SELECT identity_id AS iid,
+                           argMax(stripe_customer_id, updated_at) AS cust
+                    FROM retention.identities WHERE tenant_id = %(t)s
+                    GROUP BY identity_id
+                  ) c2 ON c2.iid = e.id
+                  JOIN retention.stripe_invoices i ON i.customer_id = c2.cust
+                  WHERE i.tenant_id = %(t)s AND i.status = 'paid'
+                    AND c2.cust != '' AND i.created_ts > e.enr
+                  GROUP BY e.id, i.invoice_id
+                )""", parameters={"t": tenant, "c": cid}).result_rows[0][0] or 0)
+            if t_rev / t_n > c_rev / c_n:
+                actions.append(
+                    f"оставил «{conf.get('title', cid)}» несмотря на слабую "
+                    f"цель: деньги после писем ${t_rev:.0f} на {t_n} чел "
+                    f"против ${c_rev:.0f} на {c_n} в контроле")
+                continue
             ovr.set_custom_campaign_status(tenant, cid, "paused")
             actions.append(
                 f"поставил на паузу «{conf.get('title', cid)}»: цель {t_rate:.1%} "

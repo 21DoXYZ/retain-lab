@@ -136,6 +136,18 @@ TRIGGERS: dict[str, str] = {
               WHERE tenant_id = %(t)s AND campaign_id LIKE '%%saw_pricing%%'
                 AND status = 'sent' AND ts >= now() - INTERVAL 7 DAY)
     """,
+    # Запланировал отмену подписки за последние сутки - самый дорогой
+    # сегмент из всех: это ПЛАТЯЩИЙ, который уже решил уйти. Час письма
+    # решает: пока решение свежее, человек ещё готов сказать почему.
+    # Стадийная K4_save догонит позже (скоринг ночной), триггер - сразу.
+    "T6_cancel_save": """
+        SELECT identity_id
+        FROM retention.saas_events_resolved
+        WHERE tenant_id = %(t)s
+          AND event_type = 'billing.subscription_cancel_scheduled'
+          AND ts >= now() - INTERVAL 24 HOUR
+        GROUP BY identity_id
+    """,
     # Карта платящего истекает в ближайшие 14 дней - невольный отток,
     # который дешевле всего перехватить ДО фейла списания.
     "T3_card_expiring": """

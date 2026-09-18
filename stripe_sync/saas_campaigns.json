@@ -403,6 +403,36 @@
         ]
       },
       {
+        "campaign_id": "T6_cancel_save",
+        "title": "Trigger: scheduled a cancellation today",
+        "entry_stage": "TRIGGER",
+        "manual_audience": true,
+        "reentry_days": 60,
+        "goal": {
+          "event_type": "billing.subscription_cancel_scheduled",
+          "window_days": 30,
+          "invert": true
+        },
+        "steps": [
+          {
+            "delay_h": 0,
+            "action": "email",
+            "subject": "before your plan winds down - one question",
+            "body": "I saw you scheduled your subscription to end. No hard sell - the plan keeps working until the end of the period either way.\n\nOne question, so we fix the right thing: what made you decide? Price, quality, a missing feature, or something else. One word back is enough - I read every reply.",
+            "subject_ru": "пока подписка не закрылась - один вопрос",
+            "body_ru": "Увидел, что вы запланировали отмену подписки. Не уговариваю - план в любом случае работает до конца оплаченного периода.\n\nОдин вопрос, чтобы мы чинили нужное: что подтолкнуло? Цена, качество, нехватка функции или что-то ещё. Одного слова в ответ достаточно - я читаю каждый ответ."
+          },
+          {
+            "delay_h": 72,
+            "action": "email",
+            "subject": "if it was the price",
+            "body": "Last note on this. If the price was the reason, reply and I will see what I can do for you personally.\n\nIf you are simply done with us - fair, thanks for giving it a shot. This is my last email about it.",
+            "subject_ru": "если дело было в цене",
+            "body_ru": "Последняя весточка об этом. Если причина в цене - ответьте, посмотрю, что могу сделать для вас лично.\n\nА если просто наигрались - честно, спасибо, что попробовали. Больше писем об этом не будет."
+          }
+        ]
+      },
+      {
         "campaign_id": "T5_paywall_hot",
         "title": "Trigger: looked at pricing within the hour",
         "entry_stage": "TRIGGER",
