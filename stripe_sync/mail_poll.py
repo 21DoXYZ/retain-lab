@@ -172,24 +172,30 @@ def poll_tenant(ch, tenant: str, conf: dict) -> None:
         if not uids:
             return
         seen = _seen_ids(ch, tenant)
+        # адреса наших юзеров разом: дешевле одного запроса на письмо
+        known = {str(r[0]) for r in ch.query(
+            "SELECT DISTINCT email_norm FROM retention.identities "
+            "WHERE tenant_id = %(t)s AND email_norm != ''",
+            parameters={"t": tenant}).result_rows}
         got, stopped = 0, 0
         for uid in uids[-500:]:
-            # PEEK: не менять флаги - ящик живой, им пользуется команда
+            # Двухфазно: сперва только заголовки (лёгкие), полное тело - лишь
+            # для писем наших юзеров. PEEK: флаги не трогаем, ящик живой.
+            _st, hdr = box.fetch(
+                uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT MESSAGE-ID)])")
+            raw_h = next((p[1] for p in hdr if isinstance(p, tuple)), None)
+            if not raw_h:
+                continue
+            head = parse_message(raw_h)
+            if (not head["from_email"] or is_own(head["from_email"])
+                    or head["from_email"] not in known
+                    or (head["message_id"] and head["message_id"] in seen)):
+                continue
             _st, msg_data = box.fetch(uid, "(BODY.PEEK[])")
             raw = next((p[1] for p in msg_data if isinstance(p, tuple)), None)
             if not raw:
                 continue
             inb = parse_message(raw)
-            if not inb["from_email"] or is_own(inb["from_email"]):
-                continue
-            if inb["message_id"] and inb["message_id"] in seen:
-                continue
-            known = ch.query(
-                "SELECT count() FROM retention.identities "
-                "WHERE tenant_id = %(t)s AND email_norm = %(e)s",
-                parameters={"t": tenant, "e": inb["from_email"]}).result_rows
-            if not int(known[0][0]):
-                continue          # не наш юзер - чужую почту не трогаем
             stopped += _store_reply(ch, tenant, inb)
             seen.add(inb["message_id"])
             got += 1

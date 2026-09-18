@@ -399,12 +399,24 @@ def _save(client, tenant: str, camp_id: str, row: dict) -> None:
     # зачисление - ручной exit всегда важнее машинного прогресса.
     if row.get("status") == "active":
         cur = client.query(
-            "SELECT argMax(status, updated_at) FROM retention.campaign_enrollments "
+            "SELECT argMax(status, updated_at), max(updated_at) "
+            "FROM retention.campaign_enrollments "
             "WHERE tenant_id = %(t)s AND campaign_id = %(c)s AND identity_id = %(i)s",
             parameters={"t": tenant, "c": camp_id,
                         "i": row["identity_id"]}).result_rows
+        # Блокируем ТОЛЬКО exit, случившийся ПОЗЖЕ этого зачисления (владелец
+        # снял человека из карточки, пока тик шёл по снапшоту). Старый exited
+        # до reentry-окна - легальный re-enroll, его глушить нельзя: аудит
+        # 2026-09-18 нашёл вечный повтор (K1 слал шаг 1 три дня подряд -
+        # незаписанное зачисление каждый день начиналось заново).
         if cur and str(cur[0][0]) == "exited":
-            return
+            enr = row.get("enrolled_at")
+            if not isinstance(enr, datetime):
+                enr = datetime.fromisoformat(str(enr))
+            exited_at = cur[0][1]
+            if isinstance(exited_at, datetime) and \
+                    exited_at.replace(tzinfo=None) >= enr.replace(tzinfo=None):
+                return
     now = _fmt(_now_dt())
     client.insert(
         "retention.campaign_enrollments",

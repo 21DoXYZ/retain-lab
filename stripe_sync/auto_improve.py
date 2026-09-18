@@ -339,6 +339,16 @@ def launch_missing(ch, tenant: str, actions: list) -> None:
                        f"{c} в контрольной группе")
 
 
+def _segment_campaign_ids(tenant: str, key: str) -> list[str]:
+    """ВСЕ кампании мозга этого сегмента, включая запаузенные. Аудит
+    2026-09-18: seen по одной кампании не видел людей из запаузенного
+    дубля - доливка отправила бы им тот же текст третий раз."""
+    import overrides as ovr
+    return [str(c.get("campaign_id"))
+            for c in (ovr.load_tenant(tenant).get("custom_campaigns") or [])
+            if c.get("auto_brain") and str(c.get("segment_key")) == key]
+
+
 def top_up(ch, tenant: str, actions: list) -> None:
     """Доливка: новые люди сегмента, ещё не бывавшие в кампании."""
     for key, conf in _active_auto(tenant).items():
@@ -348,8 +358,9 @@ def top_up(ch, tenant: str, actions: list) -> None:
         cid = conf["campaign_id"]
         seen = {str(r[0]) for r in ch.query(
             "SELECT DISTINCT identity_id FROM retention.campaign_enrollments "
-            "WHERE tenant_id = %(t)s AND campaign_id = %(c)s",
-            parameters={"t": tenant, "c": cid}).result_rows}
+            "WHERE tenant_id = %(t)s AND campaign_id IN %(cc)s",
+            parameters={"t": tenant,
+                        "cc": _segment_campaign_ids(tenant, key)}).result_rows}
         rows = _segment_ids(ch, tenant, pb["audience"])
         n, c = _enroll(ch, tenant, cid, conf.get("steps") or [], rows, seen)
         if n:
