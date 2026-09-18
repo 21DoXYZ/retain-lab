@@ -489,7 +489,13 @@ def tick(client, tenant: str) -> dict[str, int]:
     if not conf:
         raise SystemExit(f"нет кампаний для тенанта {tenant}")
     control_pct = int(conf.get("control_pct", 10))
-    conf = {**conf, "autopilot": resolve_autopilot(conf, load_tenant_channels(tenant))}
+    _tch0 = load_tenant_channels(tenant)
+    conf = {**conf, "autopilot": resolve_autopilot(conf, _tch0)}
+    # базовый текст K7 по вертикали тенанта (service/ecom); ecom = no-op.
+    # Кладётся ДО overrides: правка владельца и A/B-победитель главнее.
+    from replenishment import (apply_vertical_campaign_defaults,
+                               replenishment_config)
+    conf = apply_vertical_campaign_defaults(conf, replenishment_config(_tch0))
     # правки текстов/таймингов из CRM (runtime, без деплоя)
     from overrides import (apply_ab_winners, load_tenant as load_overrides,
                            merge_campaign_conf)

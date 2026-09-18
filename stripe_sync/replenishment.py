@@ -26,11 +26,20 @@ K7_replenishment по событию replenishment_due, campaign_tick шлёт w
 Конфиг тенанта (tenants.json, ключ replenishment): enabled=false по умолчанию -
 выключено означает НОЛЬ активности (ни планов, ни событий).
 
+Вертикали: тот же движок обслуживает сервисные бизнесы (салон/клиника/
+груминг/ТО) через конфиг - vertical="service" + plan_source_events=
+["visit_completed"]. Цикл сервиса = интервал между визитами: meta визита несёт
+{service: "..."} (нормализуется в sku, qty=1), следующий визит пары закрывает
+цикл REORDERED и учит EWMA фактическим интервалом (см. advance_plans), K7
+получает сервисный текст напоминания (apply_vertical_campaign_defaults).
+Всё остальное - EWMA, лимиты, K7-контур, reply-intents - общее.
+
 Запуск: TENANT_ID=<пространство> python replenishment.py
 """
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -45,13 +54,24 @@ except ImportError:
 
 # Дефолты конфига тенанта. lead_days=4 - решение владельца по открытому
 # вопросу спеки; reorder_url_template - шаблон предзаполненного чекаута
-# ТЕНАНТА с плейсхолдерами {sku} и {code} (чекаут на его стороне).
+# ТЕНАНТА с плейсхолдерами {sku} и {code} (чекаут на его стороне; у сервисного
+# тенанта это ссылка записи - плейсхолдеры те же).
+#
+# Вертикали (решение владельца 2026-09-18): продукт один, Brain общий,
+# вертикаль = конфиг тенанта. vertical="service" (салон/клиника/груминг/ТО):
+# цикл - время МЕЖДУ визитами, а не расход упаковки; plan_source_events -
+# какие события создают план (сервисный тенант ставит ["visit_completed"]
+# или оба). Дефолты воспроизводят прежнее ecom-поведение один в один.
 DEFAULTS = {
     "enabled": False,
     "lead_days": 4,
     "reorder_url_template": "",
     "max_per_customer_week": 2,
+    "plan_source_events": ["order_confirmed"],
+    "vertical": "ecom",
 }
+
+VERTICALS = ("ecom", "service")
 
 EWMA_ALPHA = 0.3          # вес свежего цикла в базлайне
 STILL_HAVE_EXT_DAYS = 7   # «ещё есть» = +7 дней к циклу
@@ -87,6 +107,21 @@ def replenishment_config(tenant_conf: dict) -> dict:
             cfg[key] = max(0, int(raw.get(key, cfg[key])))
         except (TypeError, ValueError):
             pass
+    vertical = str(raw.get("vertical") or "").strip().lower()
+    cfg["vertical"] = vertical if vertical in VERTICALS else "ecom"
+    events = raw.get("plan_source_events")
+    if isinstance(events, list):
+        clean = []
+        for ev in events:
+            ev = str(ev or "").strip()
+            if ev and ev not in clean:
+                clean.append(ev)
+        if clean:
+            cfg["plan_source_events"] = clean
+        else:
+            cfg["plan_source_events"] = list(DEFAULTS["plan_source_events"])
+    else:
+        cfg["plan_source_events"] = list(DEFAULTS["plan_source_events"])
     return cfg
 
 
@@ -117,10 +152,34 @@ def parse_items(meta: str) -> list[dict]:
     return out
 
 
+def parse_source_items(meta: str) -> list[dict]:
+    """meta плана-источника -> [{sku, qty, name}]. Путь items (заказ) - как
+    был, без изменений. Если items нет, сервисное событие (visit_completed)
+    может нести {service: "grooming-full"}: нормализуем в тот же вид -
+    sku = услуга, qty = 1, дальше весь контур (атрибуты, базлайны, K7)
+    работает без ветвлений."""
+    items = parse_items(meta)
+    if items:
+        return items
+    try:
+        m = json.loads(meta or "{}")
+    except (ValueError, TypeError):
+        return []
+    service = str(m.get("service") or "").strip()
+    if not service:
+        return []
+    name = str(m.get("service_name") or m.get("name") or "").strip()
+    return [{"sku": service, "qty": 1, "name": name}]
+
+
 def predicted_for(identity: str, sku: str, baselines: dict, medians: dict,
                   defaults: dict) -> int:
     """predicted_days пары: базлайн пары -> медиана SKU -> default_days.
-    0 = данных нет вообще: план не создаём, а не выдумываем цикл."""
+    0 = данных нет вообще: план не создаём, а не выдумываем цикл.
+
+    Лестница общая для обеих вертикалей: у сервиса базлайн - это EWMA на
+    фактических интервалах МЕЖДУ визитами пары (никакой «упаковки» нет),
+    медиана - по всем клиентам той же услуги, default_days - из sku_attrs."""
     base = baselines.get((identity, sku), (0.0, 0))[0]
     if base > 0:
         return max(1, round(base))
@@ -213,15 +272,25 @@ def extension_days_for(plan: dict, still_by_pair: dict) -> int:
 def advance_plans(plans: list[dict], orders_by_pair: dict,
                   confirms_by_plan: dict, confirms_by_pair: dict,
                   still_by_pair: dict, optout_pairs: set, baselines: dict,
-                  now: datetime) -> tuple[list[dict], list[dict]]:
+                  now: datetime,
+                  vertical: str = "ecom") -> tuple[list[dict], list[dict]]:
     """Смена состояний планов за прогон (чистая). Возвращает
     (обновления планов, обновления базлайнов).
 
     Порядок закрытия: явное «закончилось» и реордер соревнуются по времени -
-    закрывает более раннее. EWMA двигает ТОЛЬКО USER_CONFIRMED (принцип 2);
-    REORDERED закрывает цикл, но скорость не обучает. Optout отменяет и
-    ACTIVE, и QUEUED планы пары. Освободившаяся пара продвигает самый старый
-    QUEUED в ACTIVE (запасной пакет начали в момент конца прежнего).
+    закрывает более раннее. Optout отменяет и ACTIVE, и QUEUED планы пары.
+    Освободившаяся пара продвигает самый старый QUEUED в ACTIVE (запасной
+    пакет начали в момент конца прежнего).
+
+    Обучение EWMA зависит от вертикали:
+      - ecom (дефолт, поведение как было): двигает ТОЛЬКО USER_CONFIRMED
+        (принцип 2 спеки) - реордер закрывает цикл REORDERED, но скорость НЕ
+        обучает: заказ мог быть впрок, «кончилось» знает только клиент.
+      - service: следующий visit_completed той же пары закрывает цикл
+        (тот же REORDERED) И учит EWMA фактическим интервалом между визитами.
+        Визит - достоверный факт из первых рук: цикл сервиса ЕСТЬ интервал
+        между визитами, подтверждение клиента «кончилось» не требуется.
+        USER_CONFIRMED учит по-прежнему в обеих вертикалях.
     """
     updates: list[dict] = []
     base_updates: list[dict] = []
@@ -248,7 +317,7 @@ def advance_plans(plans: list[dict], orders_by_pair: dict,
         updates.append({**plan, "status": "FINISHED", "finished_at": closed,
                         "finish_reason": reason})
         freed[pair] = closed
-        if reason == "USER_CONFIRMED":
+        if reason == "USER_CONFIRMED" or vertical == "service":
             cycle = max(1.0, (closed - plan["started_at"]).total_seconds() / 86400)
             old_base, old_cycles = baselines.get(pair, (0.0, 0))
             new_base, new_cycles = ewma_update(old_base, old_cycles, cycle)
@@ -313,6 +382,44 @@ def reorder_url(template: str, sku: str, code: str) -> str:
                     .replace("{code}", urllib.parse.quote(str(code), safe="")))
 
 
+# Дефолтный текст K7-напоминания по вертикали. _default в saas_campaigns.json
+# остаётся ecom-текстом («Running low on ...») и НЕ трогается; сервисному
+# тенанту базовый текст шага подменяется здесь, ДО наложения overrides и
+# A/B-победителей в campaign_tick - правка владельца из CRM ложится поверх,
+# как на любой базовый текст. Плейсхолдеры те же: {{product}} = услуга,
+# {{reorder_url}} = ссылка записи из reorder_url_template.
+K7_CAMPAIGN_ID = "K7_replenishment"
+K7_VERTICAL_STEP_TEXT = {
+    "service": {
+        "subject": "Time for your next {{product}}?",
+        "body": "Judging by your last visit, it is about time for your next "
+                "{{product}}.\n\nBook again in one tap - same service, pick a "
+                "slot that suits you: {{reorder_url}}\n\nNot due yet? Just "
+                "ignore this and we will check back later. If you would rather "
+                "not get these reminders, reply and we will stop.",
+        "cta_label": "Book again",
+    },
+}
+
+
+def apply_vertical_campaign_defaults(conf: dict, repl_cfg: dict) -> dict:
+    """Базовый текст K7 по вертикали тенанта (чистая). vertical="ecom" (дефолт)
+    возвращает конфиг НЕТРОНУТЫМ - тот же объект, ноль изменений поведения.
+    Для service подменяются только текстовые поля первого уровня шага
+    (subject/body/cta_label); структура шагов, каналы, goal - как в базе."""
+    texts = K7_VERTICAL_STEP_TEXT.get(str(repl_cfg.get("vertical") or ""))
+    if not texts:
+        return conf
+    out = copy.deepcopy(conf)
+    for camp in out.get("campaigns", []) or []:
+        if camp.get("campaign_id") != K7_CAMPAIGN_ID:
+            continue
+        for step in camp.get("steps", []) or []:
+            for field, value in texts.items():
+                step[field] = value
+    return out
+
+
 # ── I/O ──────────────────────────────────────────────────────────────────────
 
 PLAN_COLUMNS = ["tenant_id", "plan_id", "identity_id", "sku", "order_ref",
@@ -330,19 +437,23 @@ def _parse_ts(raw) -> datetime:
     return datetime.fromisoformat(str(raw)).replace(tzinfo=None)
 
 
-def _load_orders(client, tenant: str) -> list[dict]:
-    """Подтверждённые заказы с items, дедуплицированные по event_id (сниппет и
-    вебхуки перепосылают). order_ref из meta, фолбэк - event_id."""
+def _load_orders(client, tenant: str,
+                 event_types: list[str] | None = None) -> list[dict]:
+    """События-источники планов (деф. order_confirmed; сервисный тенант через
+    plan_source_events добавляет visit_completed) с items или service,
+    дедуплицированные по event_id (сниппет и вебхуки перепосылают).
+    order_ref из meta, фолбэк - event_id."""
     rows = client.query(
         """
         SELECT identity_id, event_id, any(ts) AS ts, any(meta) AS meta
         FROM retention.saas_events_resolved
-        WHERE tenant_id = %(t)s AND event_type = %(e)s
+        WHERE tenant_id = %(t)s AND event_type IN %(e)s
         GROUP BY identity_id, event_id
-        """, parameters={"t": tenant, "e": EVT_ORDER}).result_rows
+        """, parameters={"t": tenant,
+                         "e": list(event_types or [EVT_ORDER])}).result_rows
     out = []
     for identity, event_id, ts, meta in rows:
-        items = parse_items(meta)
+        items = parse_source_items(meta)
         if not items:
             continue
         try:
@@ -420,7 +531,7 @@ def run(client, tenant: str, cfg: dict, now: datetime | None = None) -> dict:
         "FROM retention.replenishment_plans_current WHERE tenant_id = %(t)s",
         parameters={"t": tenant}).result_rows]
 
-    orders = _load_orders(client, tenant)
+    orders = _load_orders(client, tenant, cfg.get("plan_source_events"))
     orders_by_pair: dict[tuple, list] = {}
     product_names: dict[str, str] = {}
     for order in orders:
@@ -457,7 +568,8 @@ def run(client, tenant: str, cfg: dict, now: datetime | None = None) -> dict:
     # 1. ответы двигают существующие циклы (реордер/подтверждение/optout/+7д)
     updates, base_updates = advance_plans(
         plans, orders_by_pair, confirms_by_plan, confirms_by_pair,
-        still_by_pair, optout_pairs, baselines, now)
+        still_by_pair, optout_pairs, baselines, now,
+        vertical=cfg.get("vertical") or "ecom")
     _save_plans(client, tenant, updates, now)
     if base_updates:
         now_s = _fmt(now)

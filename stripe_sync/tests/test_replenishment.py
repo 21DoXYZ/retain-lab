@@ -4,11 +4,14 @@
 
 from datetime import date, datetime, timedelta
 
-from stripe_sync.replenishment import (advance_plans, build_plans, due_on,
-                                       ewma_update, extension_days_for,
-                                       parse_items, plan_id_for, predicted_for,
-                                       reorder_url, replenishment_config, run,
-                                       select_due, sku_medians)
+from stripe_sync.replenishment import (advance_plans,
+                                       apply_vertical_campaign_defaults,
+                                       build_plans, due_on, ewma_update,
+                                       extension_days_for, parse_items,
+                                       parse_source_items, plan_id_for,
+                                       predicted_for, reorder_url,
+                                       replenishment_config, run, select_due,
+                                       sku_medians)
 from stripe_sync.wa_templates import (parse_reorder_code, parse_reply_intent,
                                       reorder_code)
 
@@ -33,7 +36,9 @@ def _order(identity="id1", ref="o1", ts=T0, skus=("food-2kg",)):
 def test_config_defaults_disabled():
     cfg = replenishment_config({})
     assert cfg == {"enabled": False, "lead_days": 4,
-                   "reorder_url_template": "", "max_per_customer_week": 2}
+                   "reorder_url_template": "", "max_per_customer_week": 2,
+                   "plan_source_events": ["order_confirmed"],
+                   "vertical": "ecom"}
 
 
 def test_config_overrides_and_garbage():
@@ -49,6 +54,36 @@ def test_config_overrides_and_garbage():
 def test_disabled_config_is_total_noop():
     # client=None: любое обращение к базе уронило бы тест - его не происходит
     assert run(None, "t1", replenishment_config({})) == {"skipped": "disabled"}
+
+
+# ── вертикаль service: конфиг ────────────────────────────────────────────────
+
+def test_config_vertical_default_ecom_and_garbage():
+    assert replenishment_config({})["vertical"] == "ecom"
+    assert replenishment_config(
+        {"replenishment": {"vertical": " Service "}})["vertical"] == "service"
+    # неизвестная вертикаль не роняет джоб и не включает чужое поведение
+    assert replenishment_config(
+        {"replenishment": {"vertical": "spa"}})["vertical"] == "ecom"
+
+
+def test_config_plan_source_events_default_and_override():
+    assert replenishment_config({})["plan_source_events"] == ["order_confirmed"]
+    cfg = replenishment_config({"replenishment": {
+        "plan_source_events": ["visit_completed", "order_confirmed",
+                               "visit_completed", "", None]}})
+    # дедуп с сохранением порядка, мусор молча выброшен
+    assert cfg["plan_source_events"] == ["visit_completed", "order_confirmed"]
+    # мусор целиком -> дефолт, не падение и не пустой список
+    for garbage in ("visit_completed", [], [""], {"a": 1}, 7):
+        cfg = replenishment_config(
+            {"replenishment": {"plan_source_events": garbage}})
+        assert cfg["plan_source_events"] == ["order_confirmed"]
+
+
+def test_config_defaults_lists_not_shared_between_tenants():
+    replenishment_config({})["plan_source_events"].append("hacked")
+    assert replenishment_config({})["plan_source_events"] == ["order_confirmed"]
 
 
 # ── создание планов ──────────────────────────────────────────────────────────
@@ -222,6 +257,121 @@ def test_advance_reorder_promotes_queued():
     assert by_id["p1"]["status"] == "FINISHED"
     assert by_id["p2"]["status"] == "ACTIVE"
     assert by_id["p2"]["started_at"] == reorder_ts   # запасной пакет начат тогда
+
+
+# ── вертикаль service: визиты вместо заказов ─────────────────────────────────
+
+def test_parse_source_items_visit_service_meta():
+    # visit_completed несёт service вместо items -> sku=услуга, qty=1
+    assert parse_source_items('{"service": " grooming-full ", '
+                              '"service_name": "Full grooming"}') \
+        == [{"sku": "grooming-full", "qty": 1, "name": "Full grooming"}]
+    assert parse_source_items('{"service": "vet-checkup"}') \
+        == [{"sku": "vet-checkup", "qty": 1, "name": ""}]
+    # items-путь главнее и не изменился ни на йоту
+    both = '{"items": [{"sku": "a"}], "service": "grooming-full"}'
+    assert parse_source_items(both) == parse_items(both)
+    assert parse_source_items("не json") == []
+    assert parse_source_items('{"service": ""}') == []
+
+
+def test_visit_completed_builds_plan_with_service_sku():
+    # заказ-объект тот же, что даёт _load_orders из visit_completed
+    visits = [_order(ref="v1", skus=("grooming-full",))]
+    plans = build_plans("t1", visits, {"grooming-full"}, {}, {},
+                        {"grooming-full": 45}, set(), set(), set())
+    assert [p["sku"] for p in plans] == ["grooming-full"]
+    assert plans[0]["status"] == "ACTIVE"
+    assert plans[0]["predicted_days"] == 45
+
+
+def test_service_predicted_ladder_same_as_ecom():
+    """У сервиса нет «упаковки»: базлайн пары (EWMA на интервалах между
+    визитами) -> медиана по услуге -> default_days. Лестница predicted_for уже
+    работает так - тест фиксирует контракт, правка не требовалась."""
+    baselines = {("id1", "grooming-full"): (42.0, 3)}
+    medians = {"grooming-full": 35.0}
+    defaults = {"grooming-full": 45}
+    assert predicted_for("id1", "grooming-full", baselines, medians,
+                         defaults) == 42
+    assert predicted_for("new", "grooming-full", baselines, medians,
+                         defaults) == 35
+    assert predicted_for("new", "grooming-full", {}, {}, defaults) == 45
+    assert predicted_for("new", "grooming-full", {}, {}, {}) == 0
+
+
+def test_service_second_visit_closes_and_learns_interval():
+    """service: следующий визит пары закрывает цикл REORDERED И учит EWMA
+    фактическим интервалом (визит - достоверный факт, подтверждение клиента
+    не нужно) - в отличие от ecom, где REORDERED не учит."""
+    plan = _plan(sku="grooming-full", predicted=45)
+    visit2_ts = T0 + timedelta(days=35)
+    updates, bases = advance_plans(
+        [plan], {("id1", "grooming-full"): [(T0, "v1"), (visit2_ts, "v2")]},
+        {}, {}, {}, set(), {("id1", "grooming-full"): (45.0, 1)},
+        T0 + timedelta(days=36), vertical="service")
+    assert updates[0]["status"] == "FINISHED"
+    assert updates[0]["finish_reason"] == "REORDERED"
+    assert updates[0]["finished_at"] == visit2_ts
+    assert bases == [{"identity_id": "id1", "sku": "grooming-full",
+                      "baseline_days": 42.0,        # 0.7*45 + 0.3*35
+                      "last_cycle_days": 35.0, "cycles_count": 2}]
+
+
+def test_service_confirm_still_learns_too():
+    plan = _plan(sku="grooming-full")
+    updates, bases = advance_plans(
+        [plan], {}, {"p1": [T0 + timedelta(days=30)]}, {}, {}, set(), {},
+        T0 + timedelta(days=31), vertical="service")
+    assert updates[0]["finish_reason"] == "USER_CONFIRMED"
+    assert bases[0]["cycles_count"] == 1
+
+
+def test_ecom_reorder_still_does_not_learn_regression():
+    """Регрессия: дефолтная вертикаль (без аргумента И с explicit ecom)
+    ведёт себя как раньше - REORDERED закрывает, но EWMA не двигает."""
+    plan = _plan()
+    orders = {("id1", "food-2kg"): [(T0, "o1"), (T0 + timedelta(days=28), "o2")]}
+    for kwargs in ({}, {"vertical": "ecom"}):
+        updates, bases = advance_plans(
+            [dict(plan)], orders, {}, {}, {}, set(), {},
+            T0 + timedelta(days=29), **kwargs)
+        assert updates[0]["finish_reason"] == "REORDERED"
+        assert bases == []
+
+
+# ── вертикаль service: дефолтный текст K7 ────────────────────────────────────
+
+CONF = {"campaigns": [
+    {"campaign_id": "K7_replenishment",
+     "steps": [{"delay_h": 0, "action": "email",
+                "subject": "Running low on {{product}}?",
+                "body": "Reorder: {{reorder_url}}", "cta_label": "Order again",
+                "cta_url": "{{reorder_url}}",
+                "channels": ["whatsapp", "email"]}]},
+    {"campaign_id": "K1_other",
+     "steps": [{"subject": "hi", "body": "there"}]},
+]}
+
+
+def test_vertical_defaults_ecom_is_noop():
+    cfg = replenishment_config({})
+    assert apply_vertical_campaign_defaults(CONF, cfg) is CONF
+
+
+def test_vertical_defaults_service_swaps_k7_text_only():
+    cfg = replenishment_config({"replenishment": {"vertical": "service"}})
+    out = apply_vertical_campaign_defaults(CONF, cfg)
+    step = out["campaigns"][0]["steps"][0]
+    assert step["subject"] == "Time for your next {{product}}?"
+    assert "Book again" in step["body"] and "{{reorder_url}}" in step["body"]
+    assert step["cta_label"] == "Book again"
+    # структура шага и остальные кампании нетронуты; исходник не мутирован
+    assert step["cta_url"] == "{{reorder_url}}"
+    assert step["channels"] == ["whatsapp", "email"]
+    assert out["campaigns"][1] == CONF["campaigns"][1]
+    assert CONF["campaigns"][0]["steps"][0]["subject"] \
+        == "Running low on {{product}}?"
 
 
 # ── подписанный reorder-код и ссылка ─────────────────────────────────────────
