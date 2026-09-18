@@ -25,6 +25,8 @@ interface Created {
   owner_email: string;
   owner_password: string;
   ingest_token: string;
+  // Секрет Server Events API: только он проносит открытый email через ingest.
+  server_events_token?: string;
   snippet: string;
   login_url: string;
 }
@@ -83,6 +85,12 @@ export function WorkspacesView() {
             <Field label={t("saas.ws.f.login")} value={created.owner_email} />
             <Field label={t("saas.ws.f.password")} value={created.owner_password} />
             <Field label={t("saas.ws.f.token")} value={created.ingest_token} />
+            {created.server_events_token ? (
+              <Field
+                label={t("saas.ws.f.serverToken")}
+                value={created.server_events_token}
+              />
+            ) : null}
           </div>
           <pre className="overflow-x-auto rounded-ctl bg-sb p-3.5 font-mono text-[12px] leading-relaxed text-sb-text2 whitespace-pre">
             {created.snippet}
@@ -95,6 +103,10 @@ export function WorkspacesView() {
                 void navigator.clipboard.writeText(
                   `${t("saas.ws.f.login")}: ${created.owner_email}\n` +
                     `${t("saas.ws.f.password")}: ${created.owner_password}\n` +
+                    `${t("saas.ws.f.token")}: ${created.ingest_token}\n` +
+                    (created.server_events_token
+                      ? `${t("saas.ws.f.serverToken")}: ${created.server_events_token}\n`
+                      : "") +
                     `${created.login_url}\n\n${created.snippet}`,
                 );
                 setCopied(true);

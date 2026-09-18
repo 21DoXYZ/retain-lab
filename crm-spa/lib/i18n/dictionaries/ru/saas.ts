@@ -539,6 +539,7 @@ export const saas = {
   "saas.ws.f.login": "Логин",
   "saas.ws.f.password": "Пароль",
   "saas.ws.f.token": "Ingest-токен",
+  "saas.ws.f.serverToken": "Серверный токен (секрет бэкенда)",
   "saas.ws.copyAll": "Скопировать доступы",
   "saas.ws.hide": "Скрыть",
   "saas.ws.existing": "Существующие пространства: {n}",

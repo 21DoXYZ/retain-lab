@@ -454,6 +454,7 @@ export const saas: Partial<Messages> = {
   "saas.ws.f.login": "",
   "saas.ws.f.password": "",
   "saas.ws.f.token": "",
+  "saas.ws.f.serverToken": "Server events token (backend secret)",
   "saas.ws.copyAll": "",
   "saas.ws.hide": "",
   "saas.ws.existing": "",

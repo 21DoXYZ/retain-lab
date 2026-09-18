@@ -540,6 +540,7 @@ export const saas: Partial<Messages> = {
   "saas.ws.f.login": "Login",
   "saas.ws.f.password": "Password",
   "saas.ws.f.token": "Ingest token",
+  "saas.ws.f.serverToken": "Server events token (backend secret)",
   "saas.ws.copyAll": "Copy credentials",
   "saas.ws.hide": "Hide",
   "saas.ws.existing": "Existing workspaces: {n}",
