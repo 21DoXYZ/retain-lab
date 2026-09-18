@@ -42,6 +42,7 @@ PLAYBOOK: list[dict] = [
         "audience": {"status": "free", "saw_pricing": True},
         "goal_event": "billing.invoice_paid",
         "subject": "one thing about pricing",
+        "subject_b": "your free credits are still waiting",
         "body": ("Hey, I noticed you checked out our pricing but held off. "
                  "Totally fair - most people want to see one real result "
                  "first. Your account still has free credits, so make one "
@@ -79,6 +80,7 @@ PLAYBOOK: list[dict] = [
         "audience": {"projects_min": 1, "gens_max": 0},
         "goal_event": "generation_completed",
         "subject": "your project is one click from done",
+        "subject_b": "that project you started",
         "body": ("You set up a project but haven't rendered it yet. It takes "
                  "about a minute, and it's the fastest way to see if this "
                  "fits you.\n\nIf something got confusing along the way, "
@@ -117,6 +119,7 @@ PLAYBOOK: list[dict] = [
         "audience": {"gens_min": 1, "no_download": True, "status": "free"},
         "goal_event": "download_click",
         "subject": "your video is ready and waiting",
+        "subject_b": "one finished video in your account",
         "body": ("Your video rendered - but you never downloaded it. It's "
                  "sitting in your project right now. Grab it while your "
                  "credits cover it.\n\nIf the result wasn't what you "
@@ -156,6 +159,7 @@ PLAYBOOK: list[dict] = [
         "audience": {"not_seen_days": 14, "gens_min": 1, "status": "free"},
         "goal_event": "generation_completed",
         "subject": "still here when you need us",
+        "subject_b": "your projects did not go anywhere",
         "body": ("You made a few videos with us and then went quiet - no "
                  "guilt, life happens. Your projects and credits are still "
                  "in place.\n\nIf something pushed you away, tell me in one "
@@ -200,6 +204,11 @@ def playbook_steps(pb: dict) -> list[dict]:
         return out
 
     steps = [_step(pb, 0)]
+    if pb.get("subject_b"):
+        # A/B темы первого письма: тик делит юзеров сам (pick_variant),
+        # недельный ab_winner фиксирует победителя навсегда
+        steps[0]["variants"] = [{"subject": pb["subject"]},
+                                {"subject": pb["subject_b"]}]
     ia = pb.get("inapp")
     if ia:
         # баннер в продукте тем же днём: канал бесплатный, лимитов ESP нет,
@@ -318,6 +327,12 @@ def launch_missing(ch, tenant: str, actions: list) -> None:
         bad += [f for st in steps if st.get("body_ru") for f in review_step(
             st.get("subject_ru", ""), st.get("body_ru", ""), pb["key"],
             st.get("action", "email"), profile) if f["level"] == "fatal"]
+        # вариант Б проходит тот же фильтр, что и основная тема
+        bad += [f for st in steps for v in (st.get("variants") or [])
+                for f in review_step(v.get("subject", st.get("subject", "")),
+                                     v.get("body", st.get("body", "")),
+                                     pb["key"], st.get("action", "email"),
+                                     profile) if f["level"] == "fatal"]
         bad += [f for f in review_sequence(steps) if f["level"] == "fatal"]
         bad += [f for f in review_sequence(
             [{"body": st.get("body_ru", "")} for st in steps])

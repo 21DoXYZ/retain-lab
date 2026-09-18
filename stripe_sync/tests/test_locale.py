@@ -62,3 +62,18 @@ def test_validate_steps_keeps_ru_fields():
     assert not reason
     assert steps[0]["subject_ru"] == "тема - с тире"   # em-dash вычищен
     assert steps[0]["body_ru"] == "тело"
+
+
+def test_validate_steps_keeps_variants():
+    from segment import validate_steps
+    steps, reason = validate_steps([
+        {"action": "email", "subject": "a", "body": "b http://x", "delay_h": 0,
+         "variants": [{"subject": "a"}, {"subject": "b — dash"}]}])
+    assert not reason
+    vs = steps[0]["variants"]
+    assert len(vs) == 2 and vs[1]["subject"] == "b - dash"
+    # битые варианты молча отбрасываются целиком, шаг живёт
+    steps2, reason2 = validate_steps([
+        {"action": "email", "subject": "a", "body": "b http://x", "delay_h": 0,
+         "variants": ["not-a-dict", {"subject": "x"}]}])
+    assert not reason2 and "variants" not in steps2[0]

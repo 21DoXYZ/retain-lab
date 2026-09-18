@@ -34,6 +34,21 @@ def test_playbook_has_follow_up():
             assert steps[1]["action"] == "inapp" and steps[1]["delay_h"] == 0
 
 
+def test_playbook_subject_ab_variants():
+    """A/B темы: два варианта на первом шаге, оба проходят методологию."""
+    from copy_review import review_step
+    for pb in PLAYBOOK:
+        steps = playbook_steps(pb)
+        variants = steps[0].get("variants") or []
+        assert len(variants) == 2, pb["key"]
+        assert variants[0]["subject"] != variants[1]["subject"]
+        for v in variants:
+            flags = review_step(v["subject"], steps[0]["body"], pb["key"],
+                                "email", {})
+            fatals = [f for f in flags if f["level"] == "fatal"]
+            assert not fatals, (pb["key"], v["subject"], fatals)
+
+
 def test_playbook_copy_passes_methodology_v2():
     """Мозг не имеет права запускать текст, который завалил copy_review."""
     from copy_review import review_sequence, review_step

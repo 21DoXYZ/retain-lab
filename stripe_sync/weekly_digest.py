@@ -68,6 +68,49 @@ def build_digest(client, tenant: str) -> str:
     if float(uplift) > 0:
         lines.append(f"- Proven uplift so far: +${float(uplift):.2f} "
                      "(measured against the holdout)")
+
+    # Письма -> деньги: строгая атрибуция (оплата ПОСЛЕ доставленного
+    # письма, инвойсы этой недели). Та же математика, что на экране
+    # Кампаний, - владелец видит доход машины без входа в CRM.
+    money = q("""
+        SELECT campaign_id, uniqExactIf(id, usd > 0) AS buyers,
+               round(sum(usd)) AS revenue
+        FROM (
+            SELECT s.campaign_id AS campaign_id, s.id AS id,
+                   sumIf(inv.usd, inv.created_ts > s.sent_at) AS usd
+            FROM (
+                SELECT campaign_id, identity_id AS id, min(ts) AS sent_at
+                FROM retention.campaign_send_log
+                WHERE tenant_id = %(t)s AND status = 'sent'
+                GROUP BY campaign_id, identity_id
+            ) AS s
+            LEFT JOIN (
+                SELECT c2.iid AS iid, i.created_ts AS created_ts,
+                       argMax(i.amount_paid, i.updated_at) AS usd
+                FROM (
+                    SELECT identity_id AS iid,
+                           argMax(stripe_customer_id, updated_at) AS cust
+                    FROM retention.identities WHERE tenant_id = %(t)s
+                    GROUP BY identity_id
+                ) AS c2
+                JOIN retention.stripe_invoices i ON i.customer_id = c2.cust
+                WHERE i.tenant_id = %(t)s AND i.status = 'paid'
+                  AND c2.cust != ''
+                  AND i.created_ts >= now() - INTERVAL 7 DAY
+                GROUP BY c2.iid, i.invoice_id, i.created_ts
+            ) AS inv ON inv.iid = s.id
+            GROUP BY s.campaign_id, s.id
+        )
+        GROUP BY campaign_id HAVING revenue > 0
+        ORDER BY revenue DESC LIMIT 6""")
+    if money:
+        total_b = sum(int(r[1]) for r in money)
+        total_r = sum(float(r[2]) for r in money)
+        lines += ["", f"Paid after our emails this week: {total_b} customers, "
+                      f"${total_r:.0f}:"]
+        lines += [f"  - {r[0]}: {int(r[1])} paid, ${float(r[2]):.0f}"
+                  for r in money]
+
     lines += ["", "Full picture: https://retivo.digital/home"]
     return "\n".join(lines)
 

@@ -252,6 +252,22 @@ def validate_steps(raw_steps: list) -> tuple[list, str]:
             if s.get(lf):
                 step[lf] = (str(s[lf]).strip()[:4000]
                             .replace("—", "-").replace("–", "-"))
+        # A/B-варианты шага: тик сам делит юзеров (pick_variant), недельный
+        # джоб фиксирует победителя. Санитизация та же, что у основного текста.
+        vraw = s.get("variants")
+        if action == "email" and isinstance(vraw, list) and 2 <= len(vraw) <= 4:
+            vs = []
+            for v in vraw:
+                if not isinstance(v, dict):
+                    vs = []
+                    break
+                vv = {f: str(v[f]).strip()[:4000]
+                      .replace("—", "-").replace("–", "-")
+                      for f in ("subject", "body", "cta_label", "cta_url")
+                      if v.get(f)}
+                vs.append(vv)
+            if len(vs) >= 2:
+                step["variants"] = vs
         if action == "inapp" and s.get("ttl_days"):
             try:
                 step["ttl_days"] = min(max(float(s["ttl_days"]), 1.0), 30.0)
