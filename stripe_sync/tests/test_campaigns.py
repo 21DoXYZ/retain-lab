@@ -173,10 +173,13 @@ class FakeCH:
 
     def query(self, sql, parameters=None):
         if "argMax(status, updated_at)" in sql:
-            # гард _save: не воскрешать зачисление, снятое вручную из карточки
+            # гард _save: не воскрешать зачисление, снятое вручную из карточки;
+            # вторая колонка - когда случился exit (для легального re-enroll)
+            from datetime import datetime as _dt
             ident = (parameters or {}).get("i")
-            return _Res([["exited" if ident in getattr(self, "exited", set())
-                          else "active"]])
+            is_ex = ident in getattr(self, "exited", set())
+            when = getattr(self, "exited_at", _dt(2100, 1, 1))
+            return _Res([["exited" if is_ex else "active", when]])
         if "user_actions" in sql:
             # витрина отдаёт 6 колонок (+buy_intent,+p_churn); фикстуры дают
             # 4 - дополняем нулями скоров, чтобы отбор по сигналам не падал
@@ -600,6 +603,14 @@ def test_manual_exit_is_not_resurrected_by_a_running_tick():
     fake3.exited = {"id1"}
     ct._save(fake3, "t", "K1_activation", {**row, "status": "exited"})
     assert len(fake3.inserts) == 1
+
+    # exited ДО этого зачисления (reentry-окно прошло) - легальный re-enroll,
+    # save обязан пройти: иначе вечный повтор шага (аудит 2026-09-18)
+    fake4 = FakeCH([])
+    fake4.exited = {"id1"}
+    fake4.exited_at = datetime(2020, 1, 1)
+    ct._save(fake4, "t", "K1_activation", row)
+    assert len(fake4.inserts) == 1
 
 
 # ── Точность дуннинга, ветвление, лестница каналов (аудит качества) ──────────
