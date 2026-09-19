@@ -1,0 +1,13 @@
+{
+  "event_id": "simbago-visit_completed:GB-CONTRACT-1",
+  "tenant_id": "simbago",
+  "event_type": "visit_completed",
+  "ts": "<TS>",
+  "client_user_id": "guest:+628123456789",
+  "source": "api",
+  "meta": {
+    "service": "full-grooming",
+    "service_name": "Full Grooming",
+    "booking_ref": "GB-CONTRACT-1"
+  }
+}

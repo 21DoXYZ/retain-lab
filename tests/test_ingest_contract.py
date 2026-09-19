@@ -52,7 +52,9 @@ ROOT = Path(__file__).resolve().parent.parent
 GOLDEN = Path(__file__).resolve().parent / "golden_simbago"
 
 sys.path.insert(0, str(ROOT))
-from stripe_sync.replenishment import build_plans, parse_items, plan_id_for  # noqa: E402
+from stripe_sync.replenishment import (  # noqa: E402
+    build_plans, parse_items, parse_source_items, plan_id_for,
+)
 from stripe_sync.stitch import EventKey, build_identities  # noqa: E402
 
 
@@ -74,9 +76,13 @@ class FakeProducer:
 @pytest.fixture(scope="module")
 def ingest(tmp_path_factory):
     """ingest/app.py с фейковым producer'ом и токеном тенанта simbago."""
-    tokens = tmp_path_factory.mktemp("secrets") / "tokens.json"
+    secrets = tmp_path_factory.mktemp("secrets")
+    tokens = secrets / "tokens.json"
     tokens.write_text(json.dumps({"simbago": "test-token"}))
+    server_tokens = secrets / "server_tokens.json"
+    server_tokens.write_text(json.dumps({"simbago": "server-token"}))
     os.environ["TOKENS_FILE"] = str(tokens)
+    os.environ["SERVER_TOKENS_FILE"] = str(server_tokens)
     os.environ["INGEST_REQUIRE_AUTH"] = "1"
     os.environ.pop("INGEST_TOKEN", None)
 
@@ -123,7 +129,7 @@ def golden(name: str, ts: str = "", user_id: str = "42") -> dict:
 
 ALL_GOLDEN = ["signup", "order_confirmed", "value_moment", "invoice_paid",
               "order_cancelled", "order_confirmed_guest", "mp_order",
-              "mp_order_empty_items"]
+              "mp_order_empty_items", "visit_completed"]
 
 AUTH = {"Authorization": "Bearer test-token"}
 
@@ -360,3 +366,63 @@ def test_replenishment_ineligible_sku_no_plan():
                         medians={}, defaults={}, active_pairs=set(),
                         existing_plan_ids=set(), optout_pairs=set())
     assert plans == []
+
+
+# ── 6. сервисная вертикаль: visit_completed -> план цикла визитов ────────────
+
+def test_visit_completed_accepted_via_server_token(client, ingest):
+    """Серверный токен - штатный путь simbago: source='api' уцелел, meta
+    доехала строкой с service/service_name/booking_ref."""
+    ts = _now_ms()
+    resp = client.post("/ingest/saas/events",
+                       json=golden("visit_completed", ts=ts),
+                       headers={"Authorization": "Bearer server-token"})
+    assert resp.status_code == 200
+    e = landed(ingest)
+    assert e["tenant_id"] == "simbago"
+    assert e["source"] == "api"            # серверный токен не затирает source
+    assert e["ts"] == ts
+    assert ingest.producer.messages[0]["key"] == "guest:+628123456789"
+    assert isinstance(e["meta"], str)
+    m = json.loads(e["meta"])
+    # geo/ua дописывает шлюз (штатное обогащение) - контракт отправителя без них.
+    m.pop("geo", None)
+    m.pop("ua", None)
+    assert m == {"service": "full-grooming", "service_name": "Full Grooming",
+                 "booking_ref": "GB-CONTRACT-1"}
+
+
+def test_visit_completed_meta_normalized_to_items():
+    """parse_source_items: {service, service_name} -> [{sku, qty=1, name}] -
+    дальше весь ecom-контур (атрибуты, базлайны, K7) без ветвлений."""
+    meta = golden("visit_completed")["meta"]
+    assert parse_items(meta) == []         # items-пути в сервисном событии нет
+    assert parse_source_items(meta) == [
+        {"sku": "full-grooming", "qty": 1, "name": "Full Grooming"}]
+
+
+def test_replenishment_plan_created_from_visit_completed():
+    """План цикла визитов из visit_completed: order_ref в meta нет -
+    _load_orders падает на детерминированный event_id (дубль-защита жива)."""
+    p = golden("visit_completed")
+    items = parse_source_items(p["meta"])
+    ref = str(json.loads(p["meta"]).get("order_ref") or "").strip() or p["event_id"]
+    assert ref == "simbago-visit_completed:GB-CONTRACT-1"
+    visit = {"identity_id": "ident-groom", "order_ref": ref,
+             "ts": datetime(2026, 9, 1, 10, 0, 0), "items": items}
+    plans = build_plans(
+        tenant="simbago", orders=[visit], eligible={"full-grooming"},
+        baselines={}, medians={}, defaults={"full-grooming": 30},
+        active_pairs=set(), existing_plan_ids=set(), optout_pairs=set())
+    assert len(plans) == 1
+    plan = plans[0]
+    assert plan["sku"] == "full-grooming"
+    assert plan["status"] == "ACTIVE"
+    assert plan["predicted_days"] == 30
+    assert plan["plan_id"] == plan_id_for(
+        "simbago", "ident-groom", "full-grooming", ref)
+    # ретрай того же события -> тот же plan_id, дубль отсечён
+    again = build_plans("simbago", [visit], {"full-grooming"}, {}, {},
+                        {"full-grooming": 30}, set(),
+                        {plan["plan_id"]}, set())
+    assert again == []
