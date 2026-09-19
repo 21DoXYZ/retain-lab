@@ -212,12 +212,22 @@ def poll_tenant(ch, tenant: str, conf: dict) -> None:
 def main() -> None:
     from channels_admin import load_tenants
     ch = _ch()
+    ok, failed = 0, 0
     for tenant, conf in load_tenants().items():
+        if not str((conf or {}).get("imap_app_password") or "").strip():
+            continue                       # ящик не подключён - не считается
         try:
             poll_tenant(ch, tenant, conf or {})
+            ok += 1
         except Exception as exc:  # noqa: BLE001 - один ящик не валит остальные
+            failed += 1
             print(f"[mail] {tenant}: poll failed: {type(exc).__name__}: {exc}",
                   flush=True)
+    if failed and not ok:
+        # все подключённые ящики упали (протух пароль и т.п.) - выходим
+        # с ошибкой, чтобы ops_loop записал pipeline_runs error и сторож
+        # разбудил владельца; иначе ответы копились бы в ящике молча
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

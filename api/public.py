@@ -336,6 +336,15 @@ def resend_webhook():
         from datetime import datetime, timezone
         now = datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         client = _ch_client()
+        # Resend ретраит вебхук при таймауте - без дедупа один ответ плодил
+        # бы копии в email_replies и повторные exit цепочек (аудит 2026-09-19)
+        if inb['provider_id']:
+            dup = client.query(
+                'SELECT count() FROM retention.email_replies '
+                'WHERE tenant_id = %(t)s AND provider_id = %(p)s',
+                parameters={'t': tenant, 'p': inb['provider_id']}).result_rows
+            if int(dup[0][0]):
+                return api_json({'status': 'duplicate'})
         identity = ''
         if inb['from_email']:
             rows = client.query(
