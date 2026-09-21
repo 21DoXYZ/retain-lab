@@ -72,6 +72,11 @@ def uplift_math(n_target: int, n_control: int, conv_target_cnt: int,
 
 def campaign_report(client, tenant: str, camp: dict, days: int) -> dict | None:
     goal = camp.get("goal")
+    # у кастомных/мозговых кампаний цель хранится плоско (goal_event) -
+    # без этого фолбэка замер их молча пропускал (аудит 2026-09-21,
+    # третий экземпляр одной и той же ловушки goal vs goal_event)
+    if not goal and camp.get("goal_event"):
+        goal = {"event_type": str(camp["goal_event"]), "window_days": 14}
     if not goal:
         return None
     window_days = int(goal["window_days"])
