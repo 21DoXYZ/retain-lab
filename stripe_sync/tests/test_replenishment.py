@@ -318,6 +318,55 @@ def test_service_second_visit_closes_and_learns_interval():
                       "last_cycle_days": 35.0, "cycles_count": 2}]
 
 
+def test_service_order_reorder_does_not_learn_interval():
+    """Смешанный тенант (vertical=service, plan_source_events включает
+    order_confirmed): повторный ЗАКАЗ закрывает товарный цикл REORDERED, но
+    EWMA НЕ учит - заказ мог быть впрок (принцип 2 ecom действует и у
+    сервисного тенанта для заказов). Учит только визит (первоисточник)."""
+    plan = _plan()                        # товарный план food-2kg
+    orders = {("id1", "food-2kg"): [
+        (T0, "o1", "order_confirmed"),
+        (T0 + timedelta(days=3), "o2", "order_confirmed")]}   # закупка впрок
+    updates, bases = advance_plans(
+        [plan], orders, {}, {}, {}, set(), {},
+        T0 + timedelta(days=4), vertical="service")
+    assert updates[0]["finish_reason"] == "REORDERED"
+    assert bases == []                    # 3 дня НЕ стали "циклом" пары
+
+
+def test_service_visit_close_learns_with_typed_entries():
+    """Типизированные записи (ts, ref, event_type): визит учит как раньше."""
+    plan = _plan(sku="grooming-full", predicted=45)
+    orders = {("id1", "grooming-full"): [
+        (T0, "v1", "visit_completed"),
+        (T0 + timedelta(days=35), "v2", "visit_completed")]}
+    updates, bases = advance_plans(
+        [plan], orders, {}, {}, {}, set(), {},
+        T0 + timedelta(days=36), vertical="service")
+    assert updates[0]["finish_reason"] == "REORDERED"
+    assert bases and bases[0]["last_cycle_days"] == 35.0
+
+
+def test_load_orders_carries_event_type():
+    """_load_orders отдаёт event_type источника - без него advance_plans не
+    отличит визит от заказа у смешанного тенанта."""
+    import types
+
+    class _CH:
+        def query(self, sql, parameters=None):
+            rows = [("id1", "e1", T0, '{"service": "grooming-full"}',
+                     "visit_completed"),
+                    ("id1", "e2", T0, '{"items": [{"sku": "food-2kg"}]}',
+                     "order_confirmed")]
+            return types.SimpleNamespace(result_rows=rows)
+
+    from stripe_sync.replenishment import _load_orders
+    orders = _load_orders(_CH(), "t1", ["visit_completed", "order_confirmed"])
+    by_ref = {o["order_ref"]: o for o in orders}
+    assert by_ref["e1"]["event_type"] == "visit_completed"
+    assert by_ref["e2"]["event_type"] == "order_confirmed"
+
+
 def test_service_confirm_still_learns_too():
     plan = _plan(sku="grooming-full")
     updates, bases = advance_plans(
@@ -372,6 +421,35 @@ def test_vertical_defaults_service_swaps_k7_text_only():
     assert out["campaigns"][1] == CONF["campaigns"][1]
     assert CONF["campaigns"][0]["steps"][0]["subject"] \
         == "Running low on {{product}}?"
+
+
+def test_vertical_defaults_service_swaps_k7_goal_event():
+    """Сервисный тенант: цель K7 - следующий ВИЗИТ, а не order_confirmed.
+    Иначе converted на экране кампаний и uplift-замер K7 у сервисного тенанта
+    навсегда нули: событие order_confirmed он не шлёт вовсе."""
+    conf = {"campaigns": [
+        {"campaign_id": "K7_replenishment",
+         "goal": {"event_type": "order_confirmed", "window_days": 14},
+         "steps": [{"action": "email", "subject": "s", "body": "b"}]}]}
+    cfg = replenishment_config({"replenishment": {
+        "vertical": "service", "plan_source_events": ["visit_completed"]}})
+    out = apply_vertical_campaign_defaults(conf, cfg)
+    assert out["campaigns"][0]["goal"] == {"event_type": "visit_completed",
+                                           "window_days": 14}
+    # смешанный тенант: цель - первый НЕ-заказный источник
+    cfg2 = replenishment_config({"replenishment": {
+        "vertical": "service",
+        "plan_source_events": ["order_confirmed", "visit_completed"]}})
+    out2 = apply_vertical_campaign_defaults(conf, cfg2)
+    assert out2["campaigns"][0]["goal"]["event_type"] == "visit_completed"
+    # исходник не мутирован; кастомную цель (не order_confirmed) не трогаем
+    assert conf["campaigns"][0]["goal"]["event_type"] == "order_confirmed"
+    conf_custom = {"campaigns": [
+        {"campaign_id": "K7_replenishment",
+         "goal": {"event_type": "booking_created", "window_days": 14},
+         "steps": []}]}
+    out3 = apply_vertical_campaign_defaults(conf_custom, cfg)
+    assert out3["campaigns"][0]["goal"]["event_type"] == "booking_created"
 
 
 # ── подписанный reorder-код и ссылка ─────────────────────────────────────────

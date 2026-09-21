@@ -240,13 +240,22 @@ def ewma_update(baseline: float, cycles_count: int,
     return round(new, 2), cycles_count + 1
 
 
+def reorder_close_entry(plan: dict, orders_by_pair: dict):
+    """Самая ранняя запись-реордер пары ПОСЛЕ старта цикла (другой order_ref).
+    Запись - (ts, ref) или (ts, ref, event_type); None - реордера не было.
+    event_type нужен advance_plans: у смешанного сервисного тенанта заказ и
+    визит закрывают цикл одинаково, но учат EWMA по-разному."""
+    hits = [e for e in
+            orders_by_pair.get((plan["identity_id"], plan["sku"]), [])
+            if e[0] > plan["started_at"] and e[1] != plan["order_ref"]]
+    return min(hits, key=lambda e: e[0]) if hits else None
+
+
 def reorder_close_ts(plan: dict, orders_by_pair: dict):
     """Момент реордера: заказ той же пары ПОСЛЕ старта цикла, другой order_ref.
     None - реордера не было."""
-    hits = [ts for ts, ref in
-            orders_by_pair.get((plan["identity_id"], plan["sku"]), [])
-            if ts > plan["started_at"] and ref != plan["order_ref"]]
-    return min(hits) if hits else None
+    entry = reorder_close_entry(plan, orders_by_pair)
+    return entry[0] if entry else None
 
 
 def confirm_close_ts(plan: dict, confirms_by_plan: dict, confirms_by_pair: dict):
@@ -291,6 +300,11 @@ def advance_plans(plans: list[dict], orders_by_pair: dict,
         Визит - достоверный факт из первых рук: цикл сервиса ЕСТЬ интервал
         между визитами, подтверждение клиента «кончилось» не требуется.
         USER_CONFIRMED учит по-прежнему в обеих вертикалях.
+        НО: если запись-реордер типизирована (ts, ref, event_type) и закрыл
+        цикл ЗАКАЗ (order_confirmed) - не учим и у сервисного тенанта:
+        заказ мог быть впрок, «впрок» не бывает только у визита. Смешанный
+        тенант (plan_source_events с обоими событиями) иначе портил бы
+        базлайны товарных пар закупками.
     """
     updates: list[dict] = []
     base_updates: list[dict] = []
@@ -303,7 +317,8 @@ def advance_plans(plans: list[dict], orders_by_pair: dict,
             updates.append({**plan, "status": "FINISHED", "finished_at": now,
                             "finish_reason": "CANCELLED"})
             continue                       # QUEUED пары отменит ветка ниже
-        r_ts = reorder_close_ts(plan, orders_by_pair)
+        r_entry = reorder_close_entry(plan, orders_by_pair)
+        r_ts = r_entry[0] if r_entry else None
         c_ts = confirm_close_ts(plan, confirms_by_plan, confirms_by_pair)
         closed = min((t for t in (r_ts, c_ts) if t is not None), default=None)
         if closed is None:
@@ -317,7 +332,13 @@ def advance_plans(plans: list[dict], orders_by_pair: dict,
         updates.append({**plan, "status": "FINISHED", "finished_at": closed,
                         "finish_reason": reason})
         freed[pair] = closed
-        if reason == "USER_CONFIRMED" or vertical == "service":
+        learns = reason == "USER_CONFIRMED"
+        if not learns and vertical == "service":
+            # закрыл визит (или нетипизированная запись прежнего формата) -
+            # учим; закрыл заказ - нет (закупка впрок не есть интервал)
+            src = r_entry[2] if r_entry and len(r_entry) > 2 else ""
+            learns = src != EVT_ORDER
+        if learns:
             cycle = max(1.0, (closed - plan["started_at"]).total_seconds() / 86400)
             old_base, old_cycles = baselines.get(pair, (0.0, 0))
             new_base, new_cycles = ewma_update(old_base, old_cycles, cycle)
@@ -411,9 +432,19 @@ def apply_vertical_campaign_defaults(conf: dict, repl_cfg: dict) -> dict:
     if not texts:
         return conf
     out = copy.deepcopy(conf)
+    # цель K7 у сервиса - следующий ВИЗИТ: событие order_confirmed сервисный
+    # тенант не шлёт вовсе, и с базовой целью converted/uplift K7 были бы
+    # нулями навсегда. Меняем только базовую цель (order_confirmed); кастомную
+    # цель тенанта не трогаем.
+    goal_event = next((e for e in (repl_cfg.get("plan_source_events") or [])
+                       if e != EVT_ORDER), "")
     for camp in out.get("campaigns", []) or []:
         if camp.get("campaign_id") != K7_CAMPAIGN_ID:
             continue
+        goal = camp.get("goal")
+        if goal_event and isinstance(goal, dict) \
+                and goal.get("event_type") == EVT_ORDER:
+            goal["event_type"] = goal_event
         for step in camp.get("steps", []) or []:
             for field, value in texts.items():
                 step[field] = value
@@ -445,14 +476,15 @@ def _load_orders(client, tenant: str,
     order_ref из meta, фолбэк - event_id."""
     rows = client.query(
         """
-        SELECT identity_id, event_id, any(ts) AS ts, any(meta) AS meta
+        SELECT identity_id, event_id, any(ts) AS ts, any(meta) AS meta,
+               any(event_type) AS event_type
         FROM retention.saas_events_resolved
         WHERE tenant_id = %(t)s AND event_type IN %(e)s
         GROUP BY identity_id, event_id
         """, parameters={"t": tenant,
                          "e": list(event_types or [EVT_ORDER])}).result_rows
     out = []
-    for identity, event_id, ts, meta in rows:
+    for identity, event_id, ts, meta, event_type in rows:
         items = parse_source_items(meta)
         if not items:
             continue
@@ -461,7 +493,8 @@ def _load_orders(client, tenant: str,
         except (ValueError, TypeError):
             ref = ""
         out.append({"identity_id": identity, "order_ref": ref or str(event_id),
-                    "ts": _parse_ts(ts), "items": items})
+                    "ts": _parse_ts(ts), "items": items,
+                    "event_type": str(event_type or "")})
     return out
 
 
@@ -538,7 +571,8 @@ def run(client, tenant: str, cfg: dict, now: datetime | None = None) -> dict:
         for item in order["items"]:
             orders_by_pair.setdefault(
                 (order["identity_id"], item["sku"]), []).append(
-                (order["ts"], order["order_ref"]))
+                (order["ts"], order["order_ref"],
+                 order.get("event_type") or ""))
             if item["name"]:
                 product_names[item["sku"]] = item["name"]
 

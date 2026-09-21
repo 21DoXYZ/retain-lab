@@ -1595,6 +1595,15 @@ def _campaigns_conf(tenant: str) -> dict:
     p = Path(__file__).resolve().parent.parent / 'stripe_sync' / 'saas_campaigns.json'
     data = _json.loads(p.read_text()) if p.exists() else {}
     conf = data.get(tenant) or data.get('_default') or {}
+    # вертикаль тенанта (service): экран обязан показывать ТОТ ЖЕ базовый
+    # текст и цель K7, что реально шлёт tick, а не ecom-каркас
+    try:
+        from stripe_sync.replenishment import (
+            apply_vertical_campaign_defaults, replenishment_config)
+        conf = apply_vertical_campaign_defaults(
+            conf, replenishment_config(ca.load_tenants().get(tenant, {}) or {}))
+    except Exception:
+        pass
     conf = ovr.merge_campaign_conf(conf, ovr.load_tenant(tenant))
     try:
         from stripe_sync.knowledge import load as _kb_load

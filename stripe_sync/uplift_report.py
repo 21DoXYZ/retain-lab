@@ -173,9 +173,15 @@ def main() -> None:
     # Кастомные кампании (мозг, ручные) живут в overrides - без мержа их не
     # видят ни uplift-замер, ни ab_winner (аудит 2026-09-21: A/B победители
     # для M_* кампаний иначе не фиксировались бы никогда)
+    from saas_senders import load_tenant_channels
+    # вертикаль тенанта (service): базовая цель K7 = следующий визит, иначе
+    # сервисный K7 мерялся бы по order_confirmed, которого у тенанта нет
+    from replenishment import (apply_vertical_campaign_defaults,
+                               replenishment_config)
+    conf = apply_vertical_campaign_defaults(
+        conf, replenishment_config(load_tenant_channels(tenant)))
     from overrides import load_tenant as _load_ovr, merge_campaign_conf
     conf = merge_campaign_conf(conf, _load_ovr(tenant))
-    from saas_senders import load_tenant_channels
     from campaign_tick import resolve_autopilot
     autopilot_on = resolve_autopilot(conf, load_tenant_channels(tenant))
     now = datetime.now(tz=timezone.utc)
