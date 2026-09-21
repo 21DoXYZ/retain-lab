@@ -268,6 +268,8 @@ def validate_steps(raw_steps: list) -> tuple[list, str]:
                 vs.append(vv)
             if len(vs) >= 2:
                 step["variants"] = vs
+                if s.get("variants_since"):
+                    step["variants_since"] = str(s["variants_since"])[:32]
         if action == "inapp" and s.get("ttl_days"):
             try:
                 step["ttl_days"] = min(max(float(s["ttl_days"]), 1.0), 30.0)

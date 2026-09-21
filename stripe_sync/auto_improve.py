@@ -206,9 +206,11 @@ def playbook_steps(pb: dict) -> list[dict]:
     steps = [_step(pb, 0)]
     if pb.get("subject_b"):
         # A/B темы первого письма: тик делит юзеров сам (pick_variant),
-        # недельный ab_winner фиксирует победителя навсегда
+        # недельный ab_winner фиксирует победителя навсегда; variants_since
+        # отсекает отправки до появления вариантов от статистики
         steps[0]["variants"] = [{"subject": pb["subject"]},
                                 {"subject": pb["subject_b"]}]
+        steps[0]["variants_since"] = _now().strftime("%Y-%m-%d %H:%M:%S")
     ia = pb.get("inapp")
     if ia:
         # баннер в продукте тем же днём: канал бесплатный, лимитов ESP нет,

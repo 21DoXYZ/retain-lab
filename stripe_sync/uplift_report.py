@@ -170,6 +170,11 @@ def main() -> None:
     )
     cfgs = json.loads(CAMPAIGNS_PATH.read_text())
     conf = cfgs.get(tenant) or cfgs.get("_default") or {"campaigns": []}
+    # Кастомные кампании (мозг, ручные) живут в overrides - без мержа их не
+    # видят ни uplift-замер, ни ab_winner (аудит 2026-09-21: A/B победители
+    # для M_* кампаний иначе не фиксировались бы никогда)
+    from overrides import load_tenant as _load_ovr, merge_campaign_conf
+    conf = merge_campaign_conf(conf, _load_ovr(tenant))
     from saas_senders import load_tenant_channels
     from campaign_tick import resolve_autopilot
     autopilot_on = resolve_autopilot(conf, load_tenant_channels(tenant))

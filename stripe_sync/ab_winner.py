@@ -41,17 +41,23 @@ def winner(stats: dict[int, dict]) -> int | None:
 
 
 def variant_stats(client, tenant: str, cid: str, step_idx: int,
-                  n_variants: int) -> dict[int, dict]:
+                  n_variants: int, since: str = "") -> dict[int, dict]:
     """Отправки и клики по вариантам. Вариант юзера восстанавливается тем же
-    хэшем, что его назначил (pick_variant) - хранить ничего не нужно."""
+    хэшем, что его назначил (pick_variant) - хранить ничего не нужно.
+
+    since - когда варианты ПОЯВИЛИСЬ у шага: отправки до этой даты все несли
+    один текст, но хэш задним числом приписал бы половину варианту Б -
+    победитель зафиксировался бы на шуме (аудит 2026-09-21)."""
     from campaign_tick import pick_variant
 
+    cond = "AND ts >= %(since)s" if since else ""
     sent_rows = client.query(
-        """
+        f"""
         SELECT identity_id FROM retention.campaign_send_log
         WHERE tenant_id = %(t)s AND campaign_id = %(c)s AND step_idx = %(i)s
-          AND action = 'email' AND status = 'sent'
-        """, parameters={"t": tenant, "c": cid, "i": step_idx}).result_rows
+          AND action = 'email' AND status = 'sent' {cond}
+        """, parameters={"t": tenant, "c": cid, "i": step_idx,
+                         "since": since}).result_rows
     emails = {r[0]: str(r[1] or "").lower() for r in client.query(
         "SELECT identity_id, email_norm FROM retention.identities_current "
         "WHERE tenant_id = %(t)s", parameters={"t": tenant}).result_rows}
@@ -90,7 +96,10 @@ def run(client, tenant: str, conf: dict) -> list[str]:
             key = f"{cid}#{i}"
             if len(variants) < 2 or step.get("variants_off") or key in winners:
                 continue
-            stats = variant_stats(client, tenant, cid, i, len(variants))
+            since = str(step.get("variants_since")
+                        or camp.get("created_at") or "")
+            stats = variant_stats(client, tenant, cid, i, len(variants),
+                                  since=since)
             best = winner(stats)
             if best is None:
                 continue
