@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Retivo Revenue Autopilot - stop subscription revenue leaks</title>
+<meta name="description" content="Revenue autopilot for SaaS: finds where MRR leaks, sends the right touch from your brand, and proves incremental dollars against a holdout.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Retivo">
+  <meta property="og:title" content="Retivo Revenue Autopilot - stop subscription revenue leaks">
+  <meta property="og:description" content="Finds where MRR leaks, sends the right touch from your brand, and proves incremental dollars against a holdout.">
+  <meta property="og:url" content="https://retivo.digital/">
+  <meta property="og:image" content="https://retivo.digital/img/og-landing.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Retivo Revenue Autopilot">
+  <meta name="twitter:description" content="Stop subscription revenue leaks. Prove the dollars.">
+  <meta name="twitter:image" content="https://retivo.digital/img/og-landing.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* Retivo brandbook: hi-Red F21D32 · hi-Black 1B1B1C · soft-pink FFCDCD ·
+     off-white EDEDED · asterisk emblem · Plain-style big light type */
+  :root{
+    --red:#f21d32; --black:#1b1b1c; --pink:#ffcdcd; --off:#ededed;
+    --white:#fafafa; --gray:#6e6e70; --line:rgba(27,27,28,.12);
+  }
+  *{box-sizing:border-box;margin:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--off);color:var(--black);
+       font-family:'Golos Text',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--red);color:var(--white)}
+  input,textarea{caret-color:var(--red)}
+  ::-webkit-scrollbar{width:10px}
+  ::-webkit-scrollbar-thumb{background:#c9c9cb;border-radius:100px}
+  ::-webkit-scrollbar-thumb:hover{background:#b3b3b6}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+  .wrap{max-width:1240px;margin-inline:auto;padding-inline:28px}
+  .display{font-weight:500;letter-spacing:-.035em;line-height:.96;text-wrap:balance}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .rise{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+  .rise-2{animation-delay:.07s}.rise-3{animation-delay:.14s}.rise-4{animation-delay:.21s}
+  @media(prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+  }
+  a{color:inherit;text-decoration:none}
+  p{line-height:1.5}
+  .btn{display:inline-flex;align-items:center;gap:10px;border-radius:100px;
+       padding:16px 30px;font-weight:600;font-size:16px;border:0;cursor:pointer;
+       transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+  .btn:hover{transform:translateY(-2px)}
+  .btn:active{transform:scale(.97)}
+  :focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:4px}
+  section{position:relative;overflow:hidden}
+  .ast{position:absolute;pointer-events:none}
+  .grid{display:grid;gap:14px}
+  @media(min-width:800px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}}
+  nav{position:sticky;top:0;z-index:20;background:var(--black);color:var(--white)}
+  .nav-in{display:flex;align-items:center;justify-content:space-between;height:66px}
+  .nav-links{display:flex;gap:26px;font-size:14.5px;align-items:center}
+  @media(max-width:820px){.nav-links a:not(.btn):not(.keep){display:none}}
+  .nav-links a{opacity:.85;transition:color .15s ease-out,opacity .15s ease-out}
+  .nav-links a:hover{opacity:1;color:var(--pink)}
+  .logo{display:flex;align-items:center;gap:11px;font-weight:700;font-size:17px;letter-spacing:-.02em}
+  .card-b{background:rgba(250,250,250,.06);border:1px solid rgba(250,250,250,.14);
+          border-radius:18px;padding:26px}
+  .card-w{background:var(--white);border-radius:18px;padding:26px;
+          transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+  .card-w:hover{transform:translateY(-3px)}
+  .num{font-family:'JetBrains Mono',monospace}
+  .chain{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:18px}
+  .chip{font-family:'JetBrains Mono',monospace;font-size:12px;border:1px solid var(--line);
+        border-radius:100px;padding:7px 13px;background:var(--off);white-space:nowrap}
+  .chip b{font-weight:600}
+  .chip.hot{background:var(--black);color:var(--white);border-color:var(--black)}
+  .arr{color:var(--gray);font-size:13px}
+  .faq details{border-bottom:1px solid var(--line)}
+  .faq summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;
+               gap:18px;align-items:baseline;padding:22px 0;font-size:18px;font-weight:600}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:"+";font-weight:500;color:var(--red);font-size:24px;line-height:1;
+                      transition:transform .2s cubic-bezier(.2,.8,.2,1);flex-shrink:0}
+  .faq details[open] summary::after{transform:rotate(45deg)}
+  .faq p{color:var(--gray);font-size:15px;max-width:68ch;padding-bottom:22px;margin-top:-6px}
+  footer{background:var(--black);color:rgba(250,250,250,.7);padding:44px 0;font-size:14px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <g id="ast"><rect x="-16" y="-54" width="32" height="108" rx="4"/>
+    <rect x="-16" y="-54" width="32" height="108" rx="4" transform="rotate(60)"/>
+    <rect x="-16" y="-54" width="32" height="108" rx="4" transform="rotate(-60)"/></g>
+</defs></svg>
+
+<nav>
+  <div class="wrap nav-in">
+    <a class="logo" href="/">
+      <svg width="30" height="30" viewBox="-60 -60 120 120"><rect x="-60" y="-60" width="120" height="120" rx="26" fill="#1b1b1c" stroke="rgba(250,250,250,.25)"/><use href="#ast" fill="#f21d32" transform="scale(.82)"/></svg>
+      retivo<span style="opacity:.5;font-weight:500">·autopilot</span>
+    </a>
+    <div class="nav-links">
+      <a href="#leaks">leaks</a><a href="#proof">proof</a><a href="#how">how it works</a><a href="#features">features</a><a href="#pricing">pricing</a>
+      <a href="/login" class="keep" style="border:1px solid rgba(250,250,250,.35);border-radius:100px;padding:9px 18px">sign in</a>
+      <a class="btn" style="background:var(--red);color:var(--white);padding:10px 20px;font-size:14px"
+         href="mailto:dolemitedo@gmail.com?subject=Revenue%20Autopilot%20-%20strategy%20call">book a call</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO: заливной hi-Red, гигантский астериск, плакатный заголовок -->
+<section style="background:var(--red);color:var(--white);padding:120px 0 130px">
+  <svg class="ast" viewBox="-60 -60 120 120" style="width:min(58vw,780px);right:-14%;top:-18%;opacity:.92"><use href="#ast" fill="var(--pink)"/></svg>
+  <svg class="ast" viewBox="-60 -60 120 120" style="width:200px;left:-60px;bottom:-70px;opacity:.35"><use href="#ast" fill="#1b1b1c"/></svg>
+  <div class="wrap" style="position:relative">
+    <h1 class="display rise rise-2" style="font-size:clamp(48px,7.4vw,96px);margin-top:26px;max-width:11ch">
+      Your revenue is leak&#8209;ing.
+    </h1>
+    <h1 class="display rise rise-2" style="font-size:clamp(48px,7.4vw,96px);color:var(--black)">
+      We put it back.
+    </h1>
+    <p class="rise rise-3" style="max-width:560px;font-size:19px;margin-top:30px;opacity:.94">
+      Retivo sees every user - device, behavior, billing, product usage - scores
+      churn and buy intent, and sends the right touch at the right moment, from
+      your brand, not ours. Every recovered dollar is proven against a control group.
+    </p>
+    <div class="rise rise-4" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:38px">
+      <a class="btn" style="background:var(--black);color:var(--white)"
+         href="mailto:dolemitedo@gmail.com?subject=Revenue%20Autopilot%20-%20strategy%20call&body=Hi%2C%20I%27d%20like%20a%2030-min%20call.%20Our%20product%3A%20">
+        book a 30&#8209;min strategy call
+      </a>
+      <a class="btn" style="background:transparent;color:var(--white);border:1.5px solid rgba(250,250,250,.55)" href="#how">
+        see how it works
+      </a>
+    </div>
+    <div class="rise rise-4" style="margin-top:26px;font-size:16.5px;font-weight:600">
+      First campaign live in 7 days - or your first month is free.
+    </div>
+    <div style="font-size:13.5px;margin-top:12px;opacity:.78">first tenant: +25% MRR in week three · $3.5k paid after our emails · 40+ behavioral signals per user</div>
+  </div>
+</section>
+
+<!-- LEAKS: hi-Black плакат -->
+<section id="leaks" style="background:var(--black);color:var(--white);padding:110px 0">
+  <svg class="ast" viewBox="-60 -60 120 120" style="width:460px;right:-140px;bottom:-160px;opacity:.14"><use href="#ast" fill="var(--red)"/></svg>
+  <div class="wrap" style="position:relative">
+    <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px;max-width:16ch">
+      Four quiet leaks in every subscription product
+    </h2>
+    <div class="grid g2" style="margin-top:52px;gap:0;border-top:1px solid rgba(250,250,250,.16)">
+      <div style="padding:30px 34px 30px 0;border-bottom:1px solid rgba(250,250,250,.16)">
+        <h3 style="font-size:21px;font-weight:600">Cards silently die<span style="color:var(--red)">.</span></h3>
+        <p style="opacity:.68;font-size:15px;margin-top:8px;max-width:44ch">Failed renewals are
+        20-40% of churn. Nobody even asked the user to update the card.</p>
+      </div>
+      <div style="padding:30px 0 30px 34px;border-bottom:1px solid rgba(250,250,250,.16)">
+        <h3 style="font-size:21px;font-weight:600">Trials expire unpaid<span style="color:var(--red)">.</span></h3>
+        <p style="opacity:.68;font-size:15px;margin-top:8px;max-width:44ch">Users sign up, run out
+        of time, and the trial quietly ends without a nudge.</p>
+      </div>
+      <div style="padding:30px 34px 30px 0;border-bottom:1px solid rgba(250,250,250,.16)">
+        <h3 style="font-size:21px;font-weight:600">Cancels nobody fights<span style="color:var(--red)">.</span></h3>
+        <p style="opacity:.68;font-size:15px;margin-top:8px;max-width:44ch">No pause offer, no
+        downgrade, no win-back. Most users leave without one save attempt.</p>
+      </div>
+      <div style="padding:30px 0 30px 34px;border-bottom:1px solid rgba(250,250,250,.16)">
+        <h3 style="font-size:21px;font-weight:600">Power users stay cheap<span style="color:var(--red)">.</span></h3>
+        <p style="opacity:.68;font-size:15px;margin-top:8px;max-width:44ch">Heavy users burn the
+        plan limit and never get asked to move up.</p>
+      </div>
+    </div>
+    <div style="margin-top:46px;border-top:1px solid rgba(250,250,250,.18);padding-top:34px;
+                display:flex;gap:34px;align-items:baseline;flex-wrap:wrap">
+      <div class="display" style="font-size:clamp(34px,4.4vw,58px)">you are leaking
+        <span style="color:var(--red)">~$772/mo</span></div>
+      <div class="mono" style="font-size:13px;opacity:.6">dunning $457 · silent cancels $291 · upgrades $25 · +$473 trial pipeline</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- PROOF: измерено, не обещано (off-white ledger) -->
+<section id="proof" style="padding:110px 0">
+  <div class="wrap">
+    <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px;max-width:15ch">
+      Three weeks live. Measured, not promised.
+    </h2>
+    <div style="margin-top:48px;border-top:1px solid var(--line)">
+      <div style="display:flex;gap:26px;align-items:baseline;flex-wrap:wrap;padding:26px 0;border-bottom:1px solid var(--line)">
+        <div class="display" style="font-size:clamp(34px,4.6vw,56px);color:var(--red);min-width:230px">+25% MRR</div>
+        <p style="max-width:52ch;color:var(--gray);font-size:15px">in a single week once the autopilot queue was fully open - the fastest week in the product's history.</p>
+      </div>
+      <div style="display:flex;gap:26px;align-items:baseline;flex-wrap:wrap;padding:26px 0;border-bottom:1px solid var(--line)">
+        <div class="display" style="font-size:clamp(34px,4.6vw,56px);min-width:230px">$3,515</div>
+        <p style="max-width:52ch;color:var(--gray);font-size:15px">paid by users after an autopilot email reached them - about 60 payments, attributed strictly after delivery, never after mere enrollment.</p>
+      </div>
+      <div style="display:flex;gap:26px;align-items:baseline;flex-wrap:wrap;padding:26px 0;border-bottom:1px solid var(--line)">
+        <div class="display" style="font-size:clamp(34px,4.6vw,56px);min-width:230px">+$421</div>
+        <p style="max-width:52ch;color:var(--gray);font-size:15px">incremental revenue proven against the built-in 10% holdout - the number nobody can argue with, because the control group got nothing.</p>
+      </div>
+      <div style="display:flex;gap:26px;align-items:baseline;flex-wrap:wrap;padding:26px 0;border-bottom:1px solid var(--line)">
+        <div class="display" style="font-size:clamp(34px,4.6vw,56px);min-width:230px">1,572</div>
+        <p style="max-width:52ch;color:var(--gray);font-size:15px">users reached across 5,000+ touches - with zero duplicate sends, quiet hours respected, and every unsubscribe honored forever.</p>
+      </div>
+    </div>
+    <div class="mono" style="font-size:12.5px;color:var(--gray);margin-top:18px">first tenant, an AI-video saas · september 2026 · "paid after" = payment following a delivered email · "proven" = lift vs the 10% control group</div>
+  </div>
+</section>
+
+
+<!-- PLAYS: сигнал -> ход -> деньги (pink) -->
+<section id="plays" style="background:var(--pink);padding:110px 0">
+  <svg class="ast" viewBox="-60 -60 120 120" style="width:420px;right:-150px;top:-150px;opacity:.45"><use href="#ast" fill="var(--red)"/></svg>
+  <div class="wrap" style="position:relative">
+    <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px">
+      One signal. One move.<br>Real money.
+    </h2>
+    <p style="max-width:56ch;margin-top:22px;font-size:16px">
+      No template catalog. A play is one repeatable move: a live signal fires,
+      the engine scores it, one human-sounding touch goes out - and a
+      deterministic validator reviews every text before it leaves.
+    </p>
+    <div class="grid" style="margin-top:44px;gap:14px">
+      <div class="card-w">
+        <h3 style="font-size:19px;font-weight:600">Looked at pricing, walked away<span style="color:var(--red)">.</span></h3>
+        <div class="chain">
+          <span class="chip"><b>SIGNAL</b> pricing viewed 40 min ago</span><span class="arr">&rarr;</span>
+          <span class="chip"><b>SCORE</b> buy intent 92</span><span class="arr">&rarr;</span>
+          <span class="chip"><b>TOUCH</b> a two-line email within the hour</span><span class="arr">&rarr;</span>
+          <span class="chip hot"><b>RESULT</b> first payment $65</span>
+        </div>
+        <p style="color:var(--gray);font-size:13.5px;margin-top:12px">A real play from the live tenant. The daily scanner finds this user tomorrow - the trigger catches the intent while it is warm.</p>
+      </div>
+      <div class="card-w">
+        <h3 style="font-size:19px;font-weight:600">Scheduled a cancellation<span style="color:var(--red)">.</span></h3>
+        <div class="chain">
+          <span class="chip"><b>SIGNAL</b> cancel scheduled</span><span class="arr">&rarr;</span>
+          <span class="chip"><b>TOUCH</b> one honest question, within the hour</span><span class="arr">&rarr;</span>
+          <span class="chip"><b>LEARN</b> reason lands in your CRM</span><span class="arr">&rarr;</span>
+          <span class="chip hot"><b>RESULT</b> save attempt before the period ends</span>
+        </div>
+        <p style="color:var(--gray);font-size:13.5px;margin-top:12px">No hard sell - "what made you decide: price, quality, a missing feature?" One word back beats any exit survey.</p>
+      </div>
+      <div class="card-w">
+        <h3 style="font-size:19px;font-weight:600">Card about to expire<span style="color:var(--red)">.</span></h3>
+        <div class="chain">
+          <span class="chip"><b>SIGNAL</b> card expires in 12 days</span><span class="arr">&rarr;</span>
+          <span class="chip"><b>SCORE</b> paying, active</span><span class="arr">&rarr;</span>
+          <span class="chip"><b>TOUCH</b> nudge before the charge fails</span><span class="arr">&rarr;</span>
+          <span class="chip hot"><b>RESULT</b> renewal kept, no dunning</span>
+        </div>
+        <p style="color:var(--gray);font-size:13.5px;margin-top:12px">Failed renewals are 20-40% of churn - the cheapest save is the one made before the failure.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW: off-white передышка -->
+<section id="how" style="padding:110px 0">
+  <div class="wrap">
+    <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px">
+      Connected in a day.<br>Working while you sleep.
+    </h2>
+    <div class="grid g4" style="margin-top:48px">
+      <div class="card-w">
+        <div class="display" style="font-size:44px;color:var(--red)">1</div>
+        <h3 style="font-size:17px;font-weight:600;margin-top:10px">Connect</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Stripe read-key + webhook,
+        a one-line snippet - or a read-only export of your product. We take data
+        where it already lives. No engineering sprint.</p>
+      </div>
+      <div class="card-w">
+        <div class="display" style="font-size:44px;color:var(--red)">2</div>
+        <h3 style="font-size:17px;font-weight:600;margin-top:10px">Score</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Churn, buy intent, LTV and
+        one of 7 lifecycle stages - per user, continuously. LTV is anchored in your
+        cohort's measured churn, not a formula guess.</p>
+      </div>
+      <div class="card-w">
+        <div class="display" style="font-size:44px;color:var(--red)">3</div>
+        <h3 style="font-size:17px;font-weight:600;margin-top:10px">Act</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Six always-on campaigns:
+        activation, trial, payment recovery, save, upgrade, win-back - across email,
+        in-app, Telegram, WhatsApp, SMS and Viber.</p>
+      </div>
+      <div class="card-w">
+        <div class="display" style="font-size:44px;color:var(--red)">4</div>
+        <h3 style="font-size:17px;font-weight:600;margin-top:10px">Prove</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Every campaign keeps a 10%
+        holdout. You see incremental dollars, not vanity clicks.</p>
+      </div>
+    </div>
+    <div style="margin-top:40px;border-top:1px solid var(--line);padding-top:28px;
+                display:flex;gap:30px;flex-wrap:wrap;align-items:baseline">
+      <div><span class="mono" style="font-size:12px;color:var(--gray)">DAY 1</span>
+        <div style="font-weight:600;margin-top:4px">Connected</div></div>
+      <div><span class="mono" style="font-size:12px;color:var(--gray)">DAY 7</span>
+        <div style="font-weight:600;margin-top:4px">First campaign live</div></div>
+      <div><span class="mono" style="font-size:12px;color:var(--gray)">DAY 30</span>
+        <div style="font-weight:600;margin-top:4px">First dollars proven vs control</div></div>
+      <div style="margin-left:auto;color:var(--red);font-weight:600;font-size:15px">
+        Late on day 7? Your first month is free.</div>
+    </div>
+  </div>
+</section>
+
+<!-- VS: одна честная таблица (black) -->
+<section id="vs" style="background:var(--black);color:var(--white);padding:110px 0">
+  <svg class="ast" viewBox="-60 -60 120 120" style="width:380px;left:-130px;bottom:-140px;opacity:.12"><use href="#ast" fill="var(--red)"/></svg>
+  <div class="wrap" style="position:relative">
+    <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px;max-width:15ch">
+      One more tool won't stop the leak.
+    </h2>
+    <p style="max-width:56ch;margin-top:22px;font-size:16px;opacity:.8">
+      Every option below can work - each column is honest. Only one fixes the
+      system underneath and proves the dollars.
+    </p>
+    <div style="overflow-x:auto;margin-top:40px;-webkit-overflow-scrolling:touch">
+      <table style="border-collapse:collapse;min-width:820px;width:100%;font-size:14.5px">
+        <thead><tr style="text-align:left">
+          <th style="padding:14px 18px 14px 0;border-bottom:1px solid rgba(250,250,250,.25);font-weight:500;opacity:.6"></th>
+          <th style="padding:14px 18px;border-bottom:2px solid var(--red);color:var(--white)">Retivo</th>
+          <th style="padding:14px 18px;border-bottom:1px solid rgba(250,250,250,.25);font-weight:500;opacity:.75">A retention hire</th>
+          <th style="padding:14px 18px;border-bottom:1px solid rgba(250,250,250,.25);font-weight:500;opacity:.75">An email tool</th>
+          <th style="padding:14px 18px;border-bottom:1px solid rgba(250,250,250,.25);font-weight:500;opacity:.75">Build in-house</th>
+        </tr></thead>
+        <tbody style="vertical-align:top">
+          <tr>
+            <td style="padding:16px 18px 16px 0;border-bottom:1px solid rgba(250,250,250,.14);opacity:.65">Proves $ against a control group</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);font-weight:600">built in, every campaign</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">rarely - needs the system first</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">opens and clicks, not dollars</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">if you build the math too</td>
+          </tr>
+          <tr>
+            <td style="padding:16px 18px 16px 0;border-bottom:1px solid rgba(250,250,250,.14);opacity:.65">Acts on live product signals</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);font-weight:600">within the hour, 40+ signals</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">whenever they check the dashboard</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">lists and blasts, not signals</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">yes - after the data pipeline</td>
+          </tr>
+          <tr>
+            <td style="padding:16px 18px 16px 0;border-bottom:1px solid rgba(250,250,250,.14);opacity:.65">Time to first campaign</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);font-weight:600">7 days, guaranteed</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">2-3 months of ramp</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">weeks of setup on your team</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">a quarter, optimistically</td>
+          </tr>
+          <tr>
+            <td style="padding:16px 18px 16px 0;border-bottom:1px solid rgba(250,250,250,.14);opacity:.65">What it costs</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);font-weight:600">$99-199 + % of proven uplift</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">$60k+/yr before results</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">subscription + your hours</td>
+            <td style="padding:16px 18px;border-bottom:1px solid rgba(250,250,250,.14);opacity:.75">engineering quarters</td>
+          </tr>
+          <tr>
+            <td style="padding:16px 18px 16px 0;opacity:.65">Learns from every send</td>
+            <td style="padding:16px 18px;font-weight:600">A/B on subjects, winners fixed weekly</td>
+            <td style="padding:16px 18px;opacity:.75">depends on the person</td>
+            <td style="padding:16px 18px;opacity:.75">you run the tests yourself</td>
+            <td style="padding:16px 18px;opacity:.75">you build the experiments too</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES: астериск как маркер -->
+<section id="features" style="background:var(--pink);padding:110px 0">
+  <svg class="ast" viewBox="-60 -60 120 120" style="width:520px;left:-180px;top:-180px;opacity:.5"><use href="#ast" fill="var(--red)"/></svg>
+  <div class="wrap" style="position:relative">
+    <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px">
+      A revenue team,<br>in software form
+    </h2>
+    <div class="grid g3" style="margin-top:48px">
+      <div class="card-w"><h3 style="font-weight:600">* Leak audit</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">One number: how much MRR is
+        leaking right now, and through which hole.</p></div>
+      <div class="card-w"><h3 style="font-weight:600">* A full card per user</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Behavior in plain language,
+        device, geo, plan, payment card expiry - and a live "online now" badge.
+        Message anyone by hand, right from the card.</p></div>
+      <div class="card-w"><h3 style="font-weight:600">* Stages and next best action</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">7 lifecycle stages per user.
+        Payment fails - the stage flips in seconds.</p></div>
+      <div class="card-w"><h3 style="font-weight:600">* Measured unit economics</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Real provider costs vs real
+        revenue - measured, not estimated. Every gift is priced against your actual
+        margin before a dollar is spent.</p></div>
+      <div class="card-w"><h3 style="font-weight:600">* Offers with guardrails</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Expected-value gate, gift
+        budget per user, escalation ladder - and never a discount for someone who
+        would pay anyway.</p></div>
+      <div class="card-w"><h3 style="font-weight:600">* Campaigns with a holdout</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Built-in 10% control group.
+        The weekly report says "+$X earned" - and you can check the math.</p></div>
+      <div class="card-w"><h3 style="font-weight:600">* Your brand on every channel</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Email from your domain,
+        SMS/Viber under your name, your Telegram bot, in-app banners that reach
+        users while they are online. We stay invisible.</p></div>
+      <div class="card-w"><h3 style="font-weight:600">* AI that answers to code</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Copy and insights are written
+        with your business context and validated by deterministic rules. No generic
+        prompts, no invented claims - you approve every change.</p></div>
+      <div class="card-w"><h3 style="font-weight:600">* Safe and transparent by default</h3>
+        <p style="color:var(--gray);font-size:14.5px;margin-top:8px">Dry-run until you flip the
+        switch, consent-first messaging - and a pipeline health screen that shows
+        every number is computed on fresh data.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING: black -->
+<section id="pricing" style="background:var(--black);color:var(--white);padding:110px 0">
+  <div class="wrap">
+    <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px">
+      We earn when<br>you recover revenue
+    </h2>
+    <div class="grid g2" style="margin-top:48px;max-width:920px">
+      <div class="card-b">
+        <div class="display" style="font-size:56px;margin-top:14px">$99-199<span style="font-size:18px;opacity:.6">/mo</span></div>
+        <p style="opacity:.7;font-size:14.5px;margin-top:10px">Platform, scoring, campaigns,
+        reports. Scales with your user base.</p>
+      </div>
+      <div class="card-b" style="border-color:var(--red)">
+        <div class="display" style="font-size:56px;margin-top:14px">10-20%<span style="font-size:18px;opacity:.6"> of uplift</span></div>
+        <p style="opacity:.7;font-size:14.5px;margin-top:10px">Only on incremental revenue confirmed
+        by the control group. No uplift - no percentage.</p>
+      </div>
+    </div>
+    <div style="margin-top:26px;font-size:14px;opacity:.7">no engineering sprint · cancel anytime · your data stays yours · dry-run until you approve</div>
+  </div>
+</section>
+
+
+<!-- FAQ: обезоруживающая честность (off-white) -->
+<section id="faq" style="padding:110px 0">
+  <div class="wrap">
+    <h2 class="display" style="font-size:clamp(38px,5.4vw,72px);margin-top:20px">
+      The questions people<br>actually ask
+    </h2>
+    <div class="faq" style="margin-top:44px;border-top:1px solid var(--line);max-width:880px">
+      <details>
+        <summary>Can you guarantee recovered revenue?</summary>
+        <p>No - and be careful with anyone who does: a revenue guarantee only pays
+        off by blasting more volume, the exact thing that burns your brand. What we
+        guarantee is delivery: your first campaign live within 7 days, or your
+        first month is free. From there, every dollar we claim is measured against
+        a control group you can inspect.</p>
+      </details>
+      <details>
+        <summary>We already got burned by an agency.</summary>
+        <p>The pattern that burns people is a lump sum for a black box and a report
+        full of opens. We work the opposite way: dry-run until you flip the switch,
+        every send logged, every claim checked against a holdout - and the leak
+        audit shows the math behind every number on your screen.</p>
+      </details>
+      <details>
+        <summary>Will you spam our users?</summary>
+        <p>Frequency caps per person per day and per week, quiet hours in the
+        user's own timezone, consent-first messaging, and a deterministic validator
+        that blocks hype words, invented numbers and pushy copy before anything
+        leaves. One unsubscribe is honored forever. We judge ourselves on replies
+        and payments, never on send volume.</p>
+      </details>
+      <details>
+        <summary>Whose name is on the emails?</summary>
+        <p>Yours. Email from your domain, your sender, your signature; SMS and
+        messengers under your brand; in-app banners inside your product. Users
+        never see Retivo - and replies land where you read them.</p>
+      </details>
+      <details>
+        <summary>What if our users speak different languages?</summary>
+        <p>Each user gets the letter in their language - the engine decides per
+        recipient from their locale, not per campaign. English and Russian today,
+        more on request.</p>
+      </details>
+      <details>
+        <summary>Who writes the copy?</summary>
+        <p>Drafts are generated with your real business facts, then a rule engine -
+        not a prompt - blocks cliches, unsourced numbers, shouting and repeated
+        follow-ups. Subjects run as A/B pairs and the winner is fixed weekly on
+        real clicks. You approve every text before it goes live.</p>
+      </details>
+      <details>
+        <summary>What do you need from us to start?</summary>
+        <p>A Stripe read-only key with a webhook and a one-line snippet on your
+        site - or a read-only export from your product. No SDK, no engineering
+        sprint, nothing to rip out later. Your data stays yours.</p>
+      </details>
+      <details>
+        <summary>How do we start?</summary>
+        <p>A free 30-minute teardown: bring your Stripe, we walk your funnel live
+        and size the leak in dollars. If the leak is too small to matter, we tell
+        you that too - and you keep the audit.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA: red плакат -->
+<section style="background:var(--red);color:var(--white);padding:120px 0">
+  <svg class="ast" viewBox="-60 -60 120 120" style="width:min(46vw,600px);right:-10%;bottom:-34%;opacity:.9"><use href="#ast" fill="var(--pink)"/></svg>
+  <div class="wrap" style="position:relative">
+    <h2 class="display" style="font-size:clamp(42px,6.4vw,88px);max-width:13ch">
+      Find out what you are leak&#8209;ing.
+    </h2>
+    <p style="font-size:19px;margin-top:24px;max-width:520px;opacity:.94">
+      Free 30-minute teardown: bring your Stripe, we walk your funnel live and
+      size the leak in dollars.
+    </p>
+    <div style="margin-top:34px">
+      <a class="btn" style="background:var(--black);color:var(--white)"
+         href="mailto:dolemitedo@gmail.com?subject=Revenue%20Autopilot%20-%20free%20teardown&body=Hi%2C%20book%20us%20for%20a%20teardown.%20Product%3A%20...%20MRR%20range%3A%20...">
+        book the teardown call
+      </a>
+    </div>
+    <div style="font-size:15px;margin-top:18px;font-weight:600">First campaign live in 7 days - or your first month is free.</div>
+    <div style="font-size:13.5px;margin-top:8px;opacity:.82">no deck, no pressure - just your numbers on screen</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="24" height="24" viewBox="-60 -60 120 120"><use href="#ast" fill="var(--red)"/></svg>
+      <b style="color:var(--white)">retivo</b> · revenue autopilot for saas
+    </div>
+    <div style="display:flex;gap:22px">
+      <a href="/login">sign in</a>
+      <a href="mailto:dolemitedo@gmail.com">contact</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
