@@ -80,6 +80,9 @@ services:
   # server-runtime (proxy/route handlers), и в браузере (через SSH-туннель) — в
   # bridge-сети контейнерный 127.0.0.1 указывал бы на сам контейнер.
   crm-spa:
+    # next-server как PID 1 не подбирает умерших детей healthcheck'ов -
+    # зомби копились тысячами и уложили хост (инцидент 2026-09-25).
+    init: true
     logging:
       driver: json-file
       options: {max-size: "50m", max-file: "3"}
