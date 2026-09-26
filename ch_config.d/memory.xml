@@ -1,0 +1,6 @@
+<!-- Потолок памяти CH на РАЗДЕЛЯЕМОМ хосте (15GB на всех: supabase, боты,
+     documenso). Дефолтные 90% RAM (14GiB) душили соседей и роняли сам CH
+     (код 241, затем смерть процесса - инциденты 2026-09-25/26). -->
+<clickhouse>
+    <max_server_memory_usage_to_ram_ratio>0.5</max_server_memory_usage_to_ram_ratio>
+</clickhouse>

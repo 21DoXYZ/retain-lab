@@ -4,6 +4,9 @@
 #   docker compose exec -T clickhouse clickhouse client --multiquery < player_features.sql
 services:
   clickhouse:
+    # init: смерть clickhouse-server без рипера оставляла зомби-PID, который
+    # docker не мог убить - контейнер клинило намертво (инцидент 2026-09-25/26).
+    init: true
     image: clickhouse/clickhouse-server:24-alpine
     volumes:
       - ch_data:/var/lib/clickhouse
