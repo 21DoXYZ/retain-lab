@@ -1,0 +1,21 @@
+<!-- Системные лог-таблицы CH съели 88GB при 80MB бизнес-данных (2026-09-28):
+     text_log 49G (Trace в таблицу), processors_profile_log 27G и т.д.
+     Тяжёлые - выключены, полезные - с TTL 7 дней. -->
+<clickhouse>
+    <text_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <trace_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <query_metric_log remove="1"/>
+    <query_views_log remove="1"/>
+    <query_log>
+        <ttl>event_date + INTERVAL 7 DAY</ttl>
+    </query_log>
+    <part_log>
+        <ttl>event_date + INTERVAL 7 DAY</ttl>
+    </part_log>
+    <logger>
+        <level>information</level>
+    </logger>
+</clickhouse>
